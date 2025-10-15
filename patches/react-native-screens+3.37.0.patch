@@ -1,0 +1,47 @@
+diff --git a/node_modules/react-native-screens/android/build.gradle b/node_modules/react-native-screens/android/build.gradle
+index bbca48a..35e9ea9 100644
+--- a/node_modules/react-native-screens/android/build.gradle
++++ b/node_modules/react-native-screens/android/build.gradle
+@@ -1,6 +1,3 @@
+-import com.android.Version
+-import groovy.json.JsonSlurper
+-
+ buildscript {
+     ext {
+         rnsDefaultTargetSdkVersion = 34
+@@ -79,22 +76,24 @@ android {
+         ndk {
+             abiFilters (*reactNativeArchitectures())
+         }
+-        externalNativeBuild {
+-            cmake {
+-                arguments "-DANDROID_STL=c++_shared",
+-                        "-DRNS_NEW_ARCH_ENABLED=${IS_NEW_ARCHITECTURE_ENABLED}"
+-            }
+-        }
++        // externalNativeBuild deshabilitado temporalmente para Windows
++        // externalNativeBuild {
++        //     cmake {
++        //         arguments "-DANDROID_STL=c++_shared",
++        //                 "-DRNS_NEW_ARCH_ENABLED=${IS_NEW_ARCHITECTURE_ENABLED}"
++        //     }
++        // }
+     }
+     buildFeatures {
+         prefab true
+         buildConfig true
+     }
+-    externalNativeBuild {
+-        cmake {
+-            path "CMakeLists.txt"
+-        }
+-    }
++    // externalNativeBuild deshabilitado temporalmente para Windows
++    // externalNativeBuild {
++    //     cmake {
++    //         path "CMakeLists.txt"
++    //     }
++    // }
+     lintOptions {
+         abortOnError false
+     }
