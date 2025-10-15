@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { View, Text, FlatList, Alert } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Container, Button, Card, Dropdown, Input } from '@/components/common';
+import { Container, Button, Card } from '@/components/common';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useGuideStore } from '@/laundry/store/guide.store';
 import { useTagStore } from '@/laundry/store/tag.store';
 import { rfidModule } from '@/lib/rfid/rfid.module';
-import { PROCESSES } from '@/constants';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
 
@@ -15,20 +14,21 @@ type ScanClothesPageProps = {
 };
 
 export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) => {
-  const { addGuideItem, guideItems } = useGuideStore();
+  const {} = useGuideStore();
   const { scannedTags, addScannedTag, clearScannedTags, isScanning, setIsScanning } = useTagStore();
 
-  const [selectedProcess, setSelectedProcess] = useState<string>('');
-  const [description, setDescription] = useState('');
+  // Ya no se requiere proceso ni descripción para este flujo
 
   const stopScanning = useCallback(async () => {
     try {
       setIsScanning(false);
-
-      if ((global as any).scanInterval) {
-        clearInterval((global as any).scanInterval);
-        (global as any).scanInterval = null;
+      if ((global as any).rfidSubscription) {
+        (global as any).rfidSubscription.remove();
+        (global as any).rfidSubscription = null;
       }
+      try {
+        await rfidModule.stopScan();
+      } catch {}
     } catch (error) {
       console.error('Error al detener escaneo:', error);
     }
@@ -37,12 +37,11 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
   const startScanning = useCallback(async () => {
     try {
       setIsScanning(true);
-
-      const interval = rfidModule.simulateScan((tag: ScannedTag) => {
+      const subscription = rfidModule.addTagListener((tag: ScannedTag) => {
         addScannedTag(tag);
       });
-
-      (global as any).scanInterval = interval;
+      (global as any).rfidSubscription = subscription;
+      await rfidModule.startScan();
     } catch (error) {
       Alert.alert('Error', 'No se pudo iniciar el escaneo RFID');
       setIsScanning(false);
@@ -58,44 +57,13 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleAddToGuide = () => {
-    if (!selectedProcess) {
-      Alert.alert('Error', 'Debes seleccionar un proceso');
-      return;
-    }
-
+  const handleContinueToGuides = () => {
+    stopScanning();
     if (scannedTags.length === 0) {
-      Alert.alert('Error', 'No hay prendas escaneadas');
+      Alert.alert('Sin lecturas', 'Escanea al menos una prenda para continuar.');
       return;
     }
-
-    scannedTags.forEach(tag => {
-      const exists = guideItems.some(item => item.tagEPC === tag.epc);
-      if (!exists) {
-        addGuideItem({
-          tagEPC: tag.epc,
-          proceso: selectedProcess,
-          descripcion: description || undefined,
-        });
-      }
-    });
-
-    Alert.alert('Éxito', `Se agregaron ${scannedTags.length} prenda(s) a la guía`, [
-      {
-        text: 'Continuar Escaneando',
-        onPress: () => {
-          clearScannedTags();
-          setDescription('');
-        },
-      },
-      {
-        text: 'Ir a la Guía',
-        onPress: () => {
-          clearScannedTags();
-          navigation.goBack();
-        },
-      },
-    ]);
+    navigation.navigate('CreateGuide');
   };
 
   const renderScannedTag = ({ item, index }: { item: ScannedTag; index: number }) => (
@@ -142,6 +110,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
             icon={<Icon name="play-outline" size={20} color="white" />}
             fullWidth
             size="lg"
+            style={{ backgroundColor: '#1f4eed' }}
           />
         ) : (
           <Button
@@ -164,26 +133,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
         )}
       </View>
 
-      <View className="mb-6">
-        <Dropdown
-          label="Proceso *"
-          placeholder="Selecciona un proceso"
-          options={PROCESSES}
-          value={selectedProcess}
-          onValueChange={setSelectedProcess}
-          icon="construct-outline"
-        />
-
-        <Input
-          label="Descripción (Opcional)"
-          placeholder="Detalles adicionales"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={3}
-          icon="document-text-outline"
-        />
-      </View>
+      {/* Sección de proceso/descrición eliminada para flujo simplificado */}
 
       <View className="flex-1 mb-6">
         <Text className="text-lg font-bold text-gray-900 mb-3">
@@ -208,12 +158,11 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
       {scannedTags.length > 0 && (
         <View className="space-y-3">
           <Button
-            title={`Agregar a la Guía (${scannedTags.length})`}
-            onPress={handleAddToGuide}
+            title={`Continuar (${scannedTags.length})`}
+            onPress={handleContinueToGuides}
             fullWidth
             size="lg"
-            icon={<Icon name="add-circle-outline" size={20} color="white" />}
-            disabled={!selectedProcess}
+            icon={<Icon name="arrow-forward-circle-outline" size={20} color="white" />}
           />
 
           <Button title="Limpiar Lista" onPress={clearScannedTags} variant="outline" fullWidth />
