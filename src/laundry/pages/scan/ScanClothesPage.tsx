@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback } from 'react';
-import { View, Text, FlatList, Alert } from 'react-native';
+import { View, Text, FlatList, Alert, NativeModules } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Container, Button, Card } from '@/components/common';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -26,6 +26,10 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
         (global as any).rfidSubscription.remove();
         (global as any).rfidSubscription = null;
       }
+      if ((global as any).rfidErrSubscription) {
+        (global as any).rfidErrSubscription.remove();
+        (global as any).rfidErrSubscription = null;
+      }
       try {
         await rfidModule.stopScan();
       } catch {}
@@ -37,11 +41,22 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
   const startScanning = useCallback(async () => {
     try {
       setIsScanning(true);
+      // eslint-disable-next-line no-console
+      console.log('Starting RFID scan...');
       const subscription = rfidModule.addTagListener((tag: ScannedTag) => {
+        // eslint-disable-next-line no-console
+        console.log('Tag received:', tag);
         addScannedTag(tag);
       });
       (global as any).rfidSubscription = subscription;
+      const errSub = rfidModule.addErrorListener((msg: string) => {
+        // eslint-disable-next-line no-console
+        console.warn('RFID error:', msg);
+      });
+      (global as any).rfidErrSubscription = errSub;
       await rfidModule.startScan();
+      // eslint-disable-next-line no-console
+      console.log('RFID scan started');
     } catch (error) {
       Alert.alert('Error', 'No se pudo iniciar el escaneo RFID');
       setIsScanning(false);
@@ -50,6 +65,9 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
 
   useEffect(() => {
     clearScannedTags();
+    // Debug: listar métodos expuestos por el módulo nativo
+    // eslint-disable-next-line no-console
+    console.log('RFIDModule methods:', Object.keys((NativeModules as any).RFIDModule || {}));
 
     return () => {
       stopScanning();

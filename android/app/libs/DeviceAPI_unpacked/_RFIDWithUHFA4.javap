@@ -1,0 +1,29 @@
+﻿Compiled from "RFIDWithUHFA4.java"
+public class com.rscja.deviceapi.RFIDWithUHFA4 extends com.rscja.team.qcom.deviceapi.B implements com.rscja.deviceapi.interfaces.IRFIDWithUHFA4,com.rscja.deviceapi.interfaces.IUHFOfAndroidUart {
+  public static synchronized com.rscja.deviceapi.RFIDWithUHFA4 getInstance() throws com.rscja.deviceapi.exception.ConfigurationException;
+  static {};
+  protected com.rscja.team.qcom.urax.IURA4Gpio getIUrt4Gpio();
+  public synchronized boolean init(android.content.Context);
+  public synchronized boolean free();
+  public synchronized boolean startInventoryTag();
+  public synchronized boolean stopInventory();
+  public void setInventoryCallback(com.rscja.deviceapi.interfaces.IUHFInventoryCallback);
+  public synchronized java.util.List<com.rscja.deviceapi.entity.AntennaState> getANT();
+  public synchronized boolean setANT(java.util.List<com.rscja.deviceapi.entity.AntennaState>);
+  public boolean output2Off();
+  public boolean output2On();
+  public boolean output1Off();
+  public boolean output1On();
+  public java.util.List<com.rscja.deviceapi.entity.GPIStateEntity> inputStatus();
+  public boolean output3On();
+  public boolean output3Off();
+  public boolean output4On();
+  public boolean output4Off();
+  public boolean outputWgData0On();
+  public boolean outputWgData0Off();
+  public boolean outputWgData1On();
+  public boolean outputWgData1Off();
+  public void successNotify();
+  public void led();
+  public void buzzer();
+}

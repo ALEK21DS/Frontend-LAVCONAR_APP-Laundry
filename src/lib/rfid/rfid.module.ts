@@ -5,7 +5,14 @@ import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
 
 const { RFIDModule } = NativeModules;
 
-const rfidEventEmitter = new NativeEventEmitter(RFIDModule);
+// Evita warnings cuando el módulo nativo no implementa addListener/removeListeners
+const rfidEventEmitter = new NativeEventEmitter(
+  RFIDModule &&
+  typeof (RFIDModule as any).addListener === 'function' &&
+  typeof (RFIDModule as any).removeListeners === 'function'
+    ? (RFIDModule as any)
+    : undefined
+);
 
 interface RFIDScanEvent {
   epc: string;

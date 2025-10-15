@@ -1,0 +1,44 @@
+﻿Compiled from "UHFTAGInfo.java"
+public class com.rscja.deviceapi.entity.UHFTAGInfo implements java.lang.Cloneable {
+  public static final java.lang.String EXTRADATA_INVALID_TAG;
+  public final java.lang.String EXTRADATA_EPCAREA;
+  public com.rscja.deviceapi.entity.UHFTAGInfo();
+  public float getFrequencyPoint();
+  public void setFrequencyPoint(float);
+  public void setEPC(java.lang.String);
+  public java.lang.String getEPC();
+  public java.lang.String getTid();
+  public void setTid(java.lang.String);
+  public java.lang.String getUser();
+  public void setUser(java.lang.String);
+  public java.lang.String getPc();
+  public void setPc(java.lang.String);
+  public java.lang.String getRssi();
+  public void setRssi(java.lang.String);
+  public java.lang.String getAnt();
+  public void setAnt(java.lang.String);
+  public int getRemain();
+  public void setRemain(int);
+  public int getIndex();
+  public void setIndex(int);
+  public byte[] getEpcBytes();
+  public void setEpcBytes(byte[]);
+  public java.lang.String getReserved();
+  public void setReserved(java.lang.String);
+  public java.lang.String getExtraData(java.lang.String);
+  public void setExtraData(java.lang.String, java.lang.String);
+  public int getCount();
+  public void setCount(int);
+  public com.rscja.deviceapi.entity.UHFTAGInfo$ChipInfo getChipInfo();
+  public void setChipInfo(com.rscja.deviceapi.entity.UHFTAGInfo$ChipInfo);
+  public long getTimestamp();
+  public void setTimestamp(long);
+  public byte[] getTidBytes();
+  public void setTidBytes(byte[]);
+  public byte[] getUserBytes();
+  public void setUserBytes(byte[]);
+  public int getPhase();
+  public void setPhase(int);
+  public com.rscja.deviceapi.entity.UHFTAGInfo clone();
+  public java.lang.Object clone() throws java.lang.CloneNotSupportedException;
+}
