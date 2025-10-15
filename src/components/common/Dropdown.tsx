@@ -1,12 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Modal,
-  FlatList,
-  TouchableWithoutFeedback,
-} from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { SelectOption } from '@/interfaces/pagination.response';
 
@@ -51,7 +44,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
   };
 
   return (
-    <View className="mb-4">
+    <View className="mb-4 relative">
       {label && (
         <Text
           className={`text-sm font-medium mb-2 ${
@@ -105,57 +98,57 @@ export const Dropdown: React.FC<DropdownProps> = ({
 
       {error && <Text className="text-sm text-danger-DEFAULT mt-1">{error}</Text>}
 
-      <Modal visible={isOpen} transparent animationType="fade">
-        <TouchableWithoutFeedback onPress={() => setIsOpen(false)}>
-          <View className="flex-1 justify-center items-center bg-black/50">
-            <TouchableWithoutFeedback>
-              <View className="bg-white rounded-xl w-11/12 max-h-96 overflow-hidden">
-                <View className="p-4 border-b border-gray-200">
-                  <Text className="text-lg font-semibold text-gray-900">
-                    {label || 'Seleccionar'}
-                  </Text>
-                </View>
-
-                <FlatList
-                  data={filteredOptions}
-                  keyExtractor={item => item.value}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      onPress={() => handleSelect(item)}
-                      className={`
-                        px-4 py-3 border-b border-gray-100
-                        ${item.value === value ? 'bg-primary-DEFAULT/10' : ''}
-                      `.trim()}>
-                      <Text
-                        className={`
-                          text-base
-                          ${
-                            item.value === value
-                              ? 'text-primary-DEFAULT font-semibold'
-                              : 'text-gray-700'
-                          }
-                        `.trim()}>
-                        {item.label}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  ListEmptyComponent={
-                    <View className="p-4">
-                      <Text className="text-gray-500 text-center">No hay opciones disponibles</Text>
-                    </View>
+      {isOpen && (
+        <View
+          className={`absolute left-0 right-0 mt-2 rounded-xl overflow-hidden ${
+            variant === 'dark'
+              ? 'bg-[#111216] border border-gray-700'
+              : 'bg-white border border-gray-200'
+          }`}
+          style={{ zIndex: 50, elevation: 20 }}>
+          {filteredOptions.length === 0 ? (
+            <View className="p-4">
+              <Text
+                className={`text-center ${variant === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                No hay opciones disponibles
+              </Text>
+            </View>
+          ) : (
+            filteredOptions.map(item => (
+              <TouchableOpacity
+                key={item.value}
+                onPress={() => handleSelect(item)}
+                className={`
+                  px-4 py-3 border-b
+                  ${variant === 'dark' ? 'border-gray-800' : 'border-gray-100'}
+                  ${
+                    item.value === value
+                      ? variant === 'dark'
+                        ? 'bg-white/5'
+                        : 'bg-primary-DEFAULT/10'
+                      : ''
                   }
-                />
-
-                <TouchableOpacity
-                  onPress={() => setIsOpen(false)}
-                  className="p-4 border-t border-gray-200">
-                  <Text className="text-center text-primary-DEFAULT font-semibold">Cerrar</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+                `.trim()}>
+                <Text
+                  className={`
+                    text-base
+                    ${
+                      item.value === value
+                        ? variant === 'dark'
+                          ? 'text-gray-100 font-semibold'
+                          : 'text-primary-DEFAULT font-semibold'
+                        : variant === 'dark'
+                        ? 'text-gray-300'
+                        : 'text-gray-700'
+                    }
+                  `.trim()}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+      )}
     </View>
   );
 };

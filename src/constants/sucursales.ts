@@ -1,9 +1,7 @@
 export const SUCURSALES = [
-  { label: 'Sucursal Centro', value: 'sucursal-centro-001' },
-  { label: 'Sucursal Norte', value: 'sucursal-norte-002' },
-  { label: 'Sucursal Sur', value: 'sucursal-sur-003' },
-  { label: 'Sucursal Este', value: 'sucursal-este-004' },
-  { label: 'Sucursal Oeste', value: 'sucursal-oeste-005' },
+  { label: 'Sucursal Cuenca', value: 'sucursal-cuenca' },
+  { label: 'Sucursal Guayaquil Centro', value: 'sucursal-guayaquil-centro' },
+  { label: 'Sucursal Principal - Quito Norte', value: 'sucursal-principal-quito-norte' },
 ];
 
 export const getSucursalLabel = (value: string): string => {

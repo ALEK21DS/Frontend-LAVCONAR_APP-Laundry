@@ -6,7 +6,7 @@ import { SUCURSALES } from '@/constants';
 import { validateLoginData } from '@/helpers/validators.helper';
 import { LoginCredentials } from '@/auth/interfaces/auth.response';
 import { AuthLayout } from '@/auth/layouts/AuthLayout';
-import Icon from 'react-native-vector-icons/Ionicons';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 export const LoginPage: React.FC = () => {
   const { loginDemo, isLoading, error, clearError } = useAuth();
@@ -51,7 +51,7 @@ export const LoginPage: React.FC = () => {
         <View className="items-center mb-8">
           {/* Icono de Olas */}
           <View className="bg-gray-800 w-16 h-16 rounded-2xl items-center justify-center mb-4">
-            <Icon name="water" size={32} color="#FFFFFF" />
+            <Icon name="waves" size={32} color="#FFFFFF" />
           </View>
           <Text className="text-3xl font-bold text-blue-600">LAVCONAR</Text>
           <Text className="text-sm text-gray-400 mt-1">Lavandería LAVCONAR</Text>
