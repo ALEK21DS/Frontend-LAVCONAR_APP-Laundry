@@ -14,7 +14,7 @@ export const MainNavigator: React.FC = () => {
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
-        animation: 'slide_from_right',
+        animation: 'none',
       }}>
       <Stack.Screen name="Dashboard" component={DashboardPage} />
       <Stack.Screen name="Clients" component={ClientsPage} />

@@ -89,11 +89,10 @@ export const ClientForm: React.FC<ClientFormProps> = ({
               autoCapitalize="characters"
             />
           </View>
-        </ScrollView>
 
-        <View className="border-top border-gray-200 pt-3 pb-2 bg-white">
+          <View className="h-3" />
           <Button title="Guardar" onPress={handleSubmit} isLoading={!!submitting} fullWidth size="md" />
-        </View>
+        </ScrollView>
       </View>
     </KeyboardAvoidingView>
   );

@@ -1,9 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
-import { Container, Button, Card } from '@/components/common';
-import { HeaderBar } from '@/components/layout/HeaderBar';
-import { SideMenu } from '@/components/layout/SideMenu';
+import { Card } from '@/components/common';
+import { MainLayout } from '@/components/layout/MainLayout';
 import { useClients } from '@/laundry/hooks/useClients';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ClientForm } from './ui/ClientForm';
@@ -16,12 +15,10 @@ type ClientsPageProps = {
 export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigation }) => {
   const { clients, isLoading, createClient, updateClient } = useClients();
   const [query, setQuery] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [initialValues, setInitialValues] = useState<any | undefined>(undefined);
 
-  // Lista demo si aún no hay datos (modo sin backend)
   const demoClients = [
     { id: 'demo-1', name: 'Juan Pérez', email: 'juan.perez@example.com', identification_number: '0102030405', acronym: 'JP' },
     { id: 'demo-2', name: 'María García', email: 'maria.garcia@example.com', identification_number: '0911223344', acronym: 'MG' },
@@ -36,17 +33,20 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
     return base.filter((c: any) => [c.name, c.email, c.identification_number, c.acronym].filter(Boolean).some(v => String(v).toLowerCase().includes(q)));
   }, [base, query]);
 
+  const openCreate = () => {
+    setEditingId(null);
+    setInitialValues(undefined);
+    setFormOpen(true);
+  };
+
   return (
-    <Container safe padding="none">
-      <SideMenu visible={menuOpen} onClose={() => setMenuOpen(false)} onNavigate={route => _navigation.navigate(route as never)} />
-
-      <TouchableOpacity activeOpacity={0.7} onPress={() => setMenuOpen(true)}>
-        <HeaderBar showThemeToggle={false} />
-      </TouchableOpacity>
-
+    <MainLayout activeTab="Clients" onNavigate={route => _navigation.navigate(route as never)}>
       <View className="px-4 pt-4 flex-1">
         <View className="flex-row items-center mb-4">
           <Text className="text-2xl font-bold text-gray-900 flex-1">Clientes</Text>
+          <TouchableOpacity onPress={openCreate} className="w-10 h-10 rounded-lg bg-blue-600 items-center justify-center active:bg-blue-700">
+            <IonIcon name="add" size={20} color="#ffffff" />
+          </TouchableOpacity>
         </View>
 
         <View className="mb-4 flex-row items-center bg-white border border-gray-200 rounded-lg px-3">
@@ -75,12 +75,12 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
                       <Text className="text-gray-900 font-semibold">{client.name}</Text>
                       <Text className="text-gray-500 text-xs">{client.identification_number}</Text>
                     </View>
-                    <TouchableOpacity className="px-3 py-2 rounded-lg bg-blue-600 active:bg-blue-700" onPress={() => {
+                    <TouchableOpacity className="w-9 h-9 rounded-lg bg-blue-600 active:bg-blue-700 items-center justify-center" onPress={() => {
                       setEditingId(client.id);
                       setInitialValues({ name: client.name, email: client.email, identification_number: client.identification_number, phone: client.phone, address: client.address, acronym: client.acronym, branch_office_id: client.branch_office_id });
                       setFormOpen(true);
                     }}>
-                      <Text className="text-white text-xs font-semibold">Editar</Text>
+                      <IonIcon name="pencil-outline" size={16} color="#ffffff" />
                     </TouchableOpacity>
                   </View>
                 </Card>
@@ -88,14 +88,8 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
             ))}
           </View>
         </ScrollView>
-
-        {/* FAB "Nuevo" */}
-        <TouchableOpacity className="absolute right-4 bottom-6 w-12 h-12 rounded-full items-center justify-center" style={{ backgroundColor: '#1f4eed', elevation: 6 }} onPress={() => { setEditingId(null); setInitialValues(undefined); setFormOpen(true); }} activeOpacity={0.85}>
-          <IonIcon name="add" size={22} color="#ffffff" />
-        </TouchableOpacity>
       </View>
 
-      {/* Modal */}
       <Modal visible={formOpen} transparent animationType="slide" onRequestClose={() => setFormOpen(false)}>
         <View className="flex-1 bg-black/40" />
         <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl p-4" style={{ elevation: 8 }}>
@@ -108,7 +102,7 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
           <ClientForm initialValues={initialValues} submitting={createClient.isPending || updateClient.isPending} onSubmit={async data => { if (editingId) { await updateClient.mutateAsync({ id: editingId, data }); } else { await createClient.mutateAsync(data); } setFormOpen(false); }} />
         </View>
       </Modal>
-    </Container>
+    </MainLayout>
   );
 };
 

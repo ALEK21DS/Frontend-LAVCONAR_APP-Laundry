@@ -8,6 +8,7 @@ type HeaderBarProps = {
   className?: string;
   bgColor?: string;
   showThemeToggle?: boolean;
+  onLogoutPress?: () => void;
 };
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -15,6 +16,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   className = '',
   bgColor = '#1f4eed',
   showThemeToggle = false,
+  onLogoutPress,
 }) => {
   return (
     <View
@@ -36,6 +38,13 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             onPress={onToggleTheme}
             className="w-9 h-9 rounded-lg bg-white/20 items-center justify-center mr-2">
             <IonIcon name="moon" size={18} color="#ffffff" />
+          </TouchableOpacity>
+        )}
+        {onLogoutPress && (
+          <TouchableOpacity
+            onPress={onLogoutPress}
+            className="w-9 h-9 rounded-lg bg-white/20 items-center justify-center">
+            <IonIcon name="log-out-outline" size={18} color="#ffffff" />
           </TouchableOpacity>
         )}
       </View>

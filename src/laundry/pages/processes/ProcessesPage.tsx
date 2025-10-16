@@ -1,9 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
-import { Container, Button, Card } from '@/components/common';
-import { HeaderBar } from '@/components/layout/HeaderBar';
-import { SideMenu } from '@/components/layout/SideMenu';
+import { Card } from '@/components/common';
+import { MainLayout } from '@/components/layout/MainLayout';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ProcessForm } from './ui/ProcessForm';
 
@@ -11,7 +10,6 @@ type ProcessesPageProps = { navigation: NativeStackNavigationProp<any> };
 
 export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
   const [query, setQuery] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -27,16 +25,16 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
     return demo.filter(p => [p.name, p.guide_number, p.status].some(v => v.toLowerCase().includes(q)));
   }, [query]);
 
-  return (
-    <Container safe padding="none">
-      <SideMenu visible={menuOpen} onClose={() => setMenuOpen(false)} onNavigate={r => navigation.navigate(r as never)} />
-      <TouchableOpacity activeOpacity={0.7} onPress={() => setMenuOpen(true)}>
-        <HeaderBar showThemeToggle={false} />
-      </TouchableOpacity>
+  const openCreate = () => { setEditingId(null); setFormOpen(true); };
 
+  return (
+    <MainLayout activeTab="Processes" onNavigate={route => navigation.navigate(route as never)}>
       <View className="px-4 pt-4 flex-1">
         <View className="flex-row items-center mb-4">
           <Text className="text-2xl font-bold text-gray-900 flex-1">Procesos</Text>
+          <TouchableOpacity onPress={openCreate} className="w-10 h-10 rounded-lg bg-blue-600 items-center justify-center active:bg-blue-700">
+            <IonIcon name="add" size={20} color="#ffffff" />
+          </TouchableOpacity>
         </View>
 
         <View className="mb-4 flex-row items-center bg-white border border-gray-200 rounded-lg px-3">
@@ -72,8 +70,8 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
                       <Text className="text-gray-500 text-xs">{p.guide_number}</Text>
                     </View>
                     <Text className="text-gray-600 text-xs mr-3">{p.status}</Text>
-                    <TouchableOpacity className="px-3 py-2 rounded-lg bg-blue-600 active:bg-blue-700" onPress={() => { setEditingId(p.id); setFormOpen(true); }}>
-                      <Text className="text-white text-xs font-semibold">Ver/Editar</Text>
+                    <TouchableOpacity className="w-9 h-9 rounded-lg bg-blue-600 active:bg-blue-700 items-center justify-center" onPress={() => { setEditingId(p.id); setFormOpen(true); }}>
+                      <IonIcon name="pencil-outline" size={16} color="#ffffff" />
                     </TouchableOpacity>
                   </View>
                 </Card>
@@ -81,16 +79,6 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
             ))}
           </View>
         </ScrollView>
-
-        {/* FAB */}
-        <TouchableOpacity
-          className="absolute right-4 bottom-6 w-12 h-12 rounded-full items-center justify-center"
-          style={{ backgroundColor: '#1f4eed', elevation: 6 }}
-          onPress={() => { setEditingId(null); setFormOpen(true); }}
-          activeOpacity={0.85}
-        >
-          <IonIcon name="add" size={22} color="#ffffff" />
-        </TouchableOpacity>
       </View>
 
       <Modal visible={formOpen} transparent animationType="slide" onRequestClose={() => setFormOpen(false)}>
@@ -111,7 +99,7 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
           />
         </View>
       </Modal>
-    </Container>
+    </MainLayout>
   );
 };
 

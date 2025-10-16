@@ -1,27 +1,35 @@
-import React, { useEffect, useCallback } from 'react';
-import { View, Text, FlatList, Alert, NativeModules } from 'react-native';
+import React, { useEffect, useCallback, useRef, useState } from 'react';
+import { View, Text, FlatList, Alert, NativeModules, NativeEventEmitter, Modal, TouchableOpacity } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Container, Button, Card } from '@/components/common';
 import { EmptyState } from '@/components/ui/empty-state';
-import { useGuideStore } from '@/laundry/store/guide.store';
 import { useTagStore } from '@/laundry/store/tag.store';
 import { rfidModule } from '@/lib/rfid/rfid.module';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
+import { GuideForm } from '@/laundry/pages/guides/ui/GuideForm';
+import { useClients } from '@/laundry/hooks/useClients';
 
 type ScanClothesPageProps = {
   navigation: NativeStackNavigationProp<any>;
 };
 
 export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) => {
-  const {} = useGuideStore();
   const { scannedTags, addScannedTag, clearScannedTags, isScanning, setIsScanning } = useTagStore();
+  const seenSetRef = useRef<Set<string>>(new Set());
+  const isScanningRef = useRef<boolean>(false);
+  const [isStopping, setIsStopping] = useState(false);
+  const [guideModalOpen, setGuideModalOpen] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string>('client-demo-1');
+  const MIN_RSSI = -65; // ignorar lecturas muy débiles
 
   // Ya no se requiere proceso ni descripción para este flujo
 
   const stopScanning = useCallback(async () => {
     try {
+      setIsStopping(true);
       setIsScanning(false);
+      isScanningRef.current = false;
       if ((global as any).rfidSubscription) {
         (global as any).rfidSubscription.remove();
         (global as any).rfidSubscription = null;
@@ -33,19 +41,31 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
       try {
         await rfidModule.stopScan();
       } catch {}
+      seenSetRef.current.clear();
     } catch (error) {
       console.error('Error al detener escaneo:', error);
+    } finally {
+      setIsStopping(false);
     }
   }, [setIsScanning]);
 
   const startScanning = useCallback(async () => {
     try {
       setIsScanning(true);
+      isScanningRef.current = true;
       // eslint-disable-next-line no-console
       console.log('Starting RFID scan...');
       const subscription = rfidModule.addTagListener((tag: ScannedTag) => {
+        if (!isScanningRef.current) return;
+        // Filtro de RSSI mínimo
+        if (typeof tag.rssi === 'number' && tag.rssi < MIN_RSSI) {
+          return;
+        }
+        // Deduplicación por EPC en memoria
+        if (seenSetRef.current.has(tag.epc)) return;
+        seenSetRef.current.add(tag.epc);
         // eslint-disable-next-line no-console
-        console.log('Tag received:', tag);
+        console.log('Tag accepted:', tag);
         addScannedTag(tag);
       });
       (global as any).rfidSubscription = subscription;
@@ -65,12 +85,38 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
 
   useEffect(() => {
     clearScannedTags();
+    seenSetRef.current.clear();
     // Debug: listar métodos expuestos por el módulo nativo
     // eslint-disable-next-line no-console
     console.log('RFIDModule methods:', Object.keys((NativeModules as any).RFIDModule || {}));
 
+    // Suscribir al gatillo hardware del C72
+    const emitter = new NativeEventEmitter();
+    const subDown = emitter.addListener('hwTriggerDown', () => {
+      if (!isScanningRef.current) {
+        startScanning();
+      }
+    });
+    const subUp = emitter.addListener('hwTriggerUp', () => {
+      if (isScanningRef.current) {
+        stopScanning();
+      }
+    });
+
+    // Log de depuración para identificar keyCode del gatillo
+    // Manejar botón físico keyCode=293 (C72) vía eventos genéricos si están disponibles
+    const subKey = emitter.addListener('hwKey', (payload: any) => {
+      if (payload?.keyCode === 293) {
+        if (payload.action === 0 && !isScanningRef.current) startScanning();
+        if (payload.action === 1 && isScanningRef.current) stopScanning();
+      }
+    });
+
     return () => {
       stopScanning();
+      subDown.remove();
+      subUp.remove();
+      subKey.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -81,7 +127,13 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
       Alert.alert('Sin lecturas', 'Escanea al menos una prenda para continuar.');
       return;
     }
-    navigation.navigate('Guides' as never);
+    setGuideModalOpen(true);
+  };
+
+  const handleCloseGuideModal = () => {
+    setGuideModalOpen(false);
+    clearScannedTags();
+    seenSetRef.current.clear();
   };
 
   const renderScannedTag = ({ item, index }: { item: ScannedTag; index: number }) => (
@@ -125,9 +177,9 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
           <Button
             title="Iniciar Escaneo"
             onPress={startScanning}
-            icon={<Icon name="play-outline" size={20} color="white" />}
+            icon={<Icon name="play-outline" size={18} color="white" />}
             fullWidth
-            size="lg"
+            size="sm"
             style={{ backgroundColor: '#1f4eed' }}
           />
         ) : (
@@ -135,17 +187,18 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
             title="Detener Escaneo"
             onPress={stopScanning}
             variant="danger"
-            icon={<Icon name="stop-outline" size={20} color="white" />}
+            icon={<Icon name="stop-outline" size={16} color="white" />}
             fullWidth
-            size="lg"
+            size="sm"
+            isLoading={isStopping}
           />
         )}
 
         {isScanning && (
-          <View className="mt-4 bg-primary-DEFAULT/10 border border-primary-DEFAULT/20 rounded-lg p-4">
+          <View className="mt-3 bg-primary-DEFAULT/10 border border-primary-DEFAULT/20 rounded-lg px-3 py-2">
             <View className="flex-row items-center justify-center">
-              <Icon name="radio-outline" size={20} color="#3B82F6" />
-              <Text className="text-primary-DEFAULT font-semibold ml-2">Escaneando...</Text>
+              <Icon name="radio-outline" size={16} color="#3B82F6" />
+              <Text className="text-primary-DEFAULT font-semibold ml-2 text-sm">Escaneando...</Text>
             </View>
           </View>
         )}
@@ -174,18 +227,40 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
       </View>
 
       {scannedTags.length > 0 && (
-        <View className="space-y-3">
+        <View className="space-y-2">
           <Button
             title={`Continuar (${scannedTags.length})`}
             onPress={handleContinueToGuides}
             fullWidth
-            size="lg"
-            icon={<Icon name="arrow-forward-circle-outline" size={20} color="white" />}
+            size="sm"
+            icon={<Icon name="arrow-forward-circle-outline" size={16} color="white" />}
           />
 
-          <Button title="Limpiar Lista" onPress={clearScannedTags} variant="outline" fullWidth />
+          <Button title="Limpiar Lista" onPress={clearScannedTags} variant="outline" fullWidth size="sm" />
         </View>
       )}
+
+      <Modal visible={guideModalOpen} transparent animationType="slide" onRequestClose={handleCloseGuideModal}>
+        <View className="flex-1 bg-black/40" />
+        <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl p-4" style={{ elevation: 8 }}>
+          <View className="flex-row items-center mb-4">
+            <Text className="text-xl font-bold text-gray-900 flex-1">Nueva Guía</Text>
+            <TouchableOpacity onPress={handleCloseGuideModal}>
+              <Icon name="close" size={22} color="#111827" />
+            </TouchableOpacity>
+          </View>
+          <GuideForm
+            clientOptions={[{ label: 'Cliente Demo', value: 'client-demo-1' }]}
+            selectedClientId={selectedClientId}
+            onChangeClient={setSelectedClientId}
+            guideItems={scannedTags.map(t => ({ tagEPC: t.epc, proceso: '' }))}
+            onRemoveItem={() => {}}
+            onScan={() => {}}
+            onSubmit={handleCloseGuideModal}
+            showScanButton={false}
+          />
+        </View>
+      </Modal>
     </Container>
   );
 };
