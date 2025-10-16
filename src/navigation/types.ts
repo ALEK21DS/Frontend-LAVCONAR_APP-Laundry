@@ -9,8 +9,9 @@ export type AuthStackParamList = {
 
 export type MainStackParamList = {
   Dashboard: undefined;
-  RegisterClient: undefined;
-  CreateGuide: undefined;
+  Clients: undefined;
+  Guides: undefined;
   ScanClothes: undefined;
   ScanProcesses: undefined;
+  Processes: undefined;
 };

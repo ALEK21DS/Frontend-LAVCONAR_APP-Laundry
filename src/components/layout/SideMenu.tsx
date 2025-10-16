@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, Dimensions, Pressable } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import WavesIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -18,9 +18,10 @@ type SideMenuProps = {
 
 const MENU_ITEMS: MenuItem[] = [
   { label: 'Dashboard', icon: 'home-outline', route: 'Dashboard' },
-  { label: 'Clientes', icon: 'people-outline', route: 'RegisterClient' },
-  { label: 'Guías', icon: 'document-text-outline', route: 'CreateGuide' },
-  { label: 'Procesos', icon: 'sync-outline', route: 'ScanProcesses' },
+  { label: 'Clientes', icon: 'people-outline', route: 'Clients' },
+  { label: 'Guías', icon: 'document-text-outline', route: 'Guides' },
+  { label: 'Procesos', icon: 'sync-outline', route: 'Processes' },
+  { label: 'Escanear', icon: 'scan-outline', route: 'ScanClothes' },
 ];
 
 export const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate, onLogout }) => {
@@ -41,11 +42,12 @@ export const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate
   return (
     <>
       {visible && (
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={onClose}
+        <View
           className="absolute inset-0 bg-black/40"
           style={{ zIndex: 48, elevation: 48 }}
+          pointerEvents="auto"
+          onStartShouldSetResponder={() => true}
+          onResponderRelease={onClose}
         />
       )}
       <Animated.View

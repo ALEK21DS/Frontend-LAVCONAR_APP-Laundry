@@ -2,6 +2,9 @@ import { apiClient } from '@/helpers/axios-instance.helper';
 import { LoginCredentials, LoginResponse } from '../interfaces/auth.response';
 import { ApiResponse } from '@/interfaces/base.response';
 
+// Modo demo: evita llamadas reales al backend para logout
+const USE_DEMO_AUTH = true;
+
 export const authApi = {
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
     const { data } = await apiClient.post<ApiResponse<LoginResponse>>(
@@ -12,6 +15,10 @@ export const authApi = {
   },
 
   logout: async (): Promise<void> => {
+    if (USE_DEMO_AUTH) {
+      await new Promise(resolve => setTimeout(resolve, 150));
+      return;
+    }
     await apiClient.post('/api/auth/logout');
   },
 

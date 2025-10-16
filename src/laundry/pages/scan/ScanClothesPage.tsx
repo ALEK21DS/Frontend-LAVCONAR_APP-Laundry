@@ -81,7 +81,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
       Alert.alert('Sin lecturas', 'Escanea al menos una prenda para continuar.');
       return;
     }
-    navigation.navigate('CreateGuide');
+    navigation.navigate('Guides' as never);
   };
 
   const renderScannedTag = ({ item, index }: { item: ScannedTag; index: number }) => (
