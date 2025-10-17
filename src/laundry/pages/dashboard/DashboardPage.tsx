@@ -9,7 +9,7 @@ import { useTodayGuides } from '@/laundry/hooks/useGuides';
 
  type DashboardPageProps = { navigation: NativeStackNavigationProp<any> };
 
- export const DashboardPage: React.FC<DashboardPageProps> = ({ navigation: _navigation }) => {
+ export const DashboardPage: React.FC<DashboardPageProps> = ({ navigation }) => {
   const { guides, isLoading, refetch } = useTodayGuides();
   const [refreshing, setRefreshing] = React.useState(false);
 
@@ -35,7 +35,13 @@ import { useTodayGuides } from '@/laundry/hooks/useGuides';
   ];
 
   return (
-    <MainLayout activeTab="Dashboard" onNavigate={route => _navigation.navigate(route as never)}>
+    <MainLayout 
+      activeTab="Dashboard" 
+      onNavigate={(route: string, params?: any) => {
+        // @ts-ignore
+        navigation.navigate(route, params);
+      }}
+    >
       <ScrollView className="flex-1" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}>
         <View className="px-4 pt-4">
           <View className="mb-6">
@@ -73,7 +79,7 @@ import { useTodayGuides } from '@/laundry/hooks/useGuides';
               <View className="w-1/2 px-2 mb-4">
                 <Card variant="elevated" padding="md">
                   <View className="items-center">
-                    <Icon name="sync-outline" size={32} color="#6366F1" />
+                    <Icon name="construct-outline" size={32} color="#6366F1" />
                     <Text className="text-2xl font-bold text-gray-900 mt-2">{stats.procesos}</Text>
                     <Text className="text-sm text-gray-500">Procesos</Text>
                   </View>

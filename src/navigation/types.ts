@@ -11,7 +11,8 @@ export type MainStackParamList = {
   Dashboard: undefined;
   Clients: undefined;
   Guides: undefined;
-  ScanClothes: undefined;
+  Garments: undefined;
+  ScanClothes: { mode?: 'garment' | 'guide' | 'process' } | undefined;
   ScanProcesses: undefined;
   Processes: undefined;
 };

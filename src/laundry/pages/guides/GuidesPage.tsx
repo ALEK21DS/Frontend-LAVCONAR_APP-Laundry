@@ -37,6 +37,17 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
 
   const openCreate = () => { setEditingId(null); setFormOpen(true); };
 
+  const closeModal = () => {
+    setFormOpen(false);
+    setScannedTags([]);
+    seenSetRef.current.clear();
+    stopScanning();
+    if (route?.params?.prefilledTags) {
+      // @ts-ignore
+      navigation.setParams({ prefilledTags: [] });
+    }
+  };
+
   const stopScanning = useCallback(async () => {
     try {
       setIsScanning(false);
@@ -52,7 +63,7 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
       try {
         await rfidModule.stopScan();
       } catch {}
-      seenSetRef.current.clear();
+      // NO limpiamos seenSetRef aquí para mantener el historial de tags escaneados
     } catch (error) {
       console.error('Error al detener escaneo:', error);
     }
@@ -75,7 +86,6 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
       });
       (global as any).rfidErrSubscription = errSub;
       await rfidModule.startScan();
-      Alert.alert('Escaneo iniciado', 'Acerca las prendas al lector');
     } catch (error) {
       Alert.alert('Error', 'No se pudo iniciar el escaneo RFID');
       setIsScanning(false);
@@ -89,7 +99,13 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   }, [stopScanning]);
 
   return (
-    <MainLayout activeTab="Guides" onNavigate={route => navigation.navigate(route as never)}>
+    <MainLayout 
+      activeTab="Guides" 
+      onNavigate={(route: string, params?: any) => {
+        // @ts-ignore
+        navigation.navigate(route, params);
+      }}
+    >
       <View className="px-4 pt-4 flex-1">
         <View className="flex-row items-center mb-4">
           <Text className="text-2xl font-bold text-gray-900 flex-1">Guías</Text>
@@ -136,12 +152,12 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
         </ScrollView>
       </View>
 
-      <Modal visible={formOpen || prefilledTags.length > 0} transparent animationType="slide" onRequestClose={() => setFormOpen(false)}>
+      <Modal visible={formOpen || prefilledTags.length > 0} transparent animationType="slide" onRequestClose={closeModal}>
         <View className="flex-1 bg-black/40" />
         <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl p-4" style={{ elevation: 8 }}>
           <View className="flex-row items-center mb-4">
             <Text className="text-xl font-bold text-gray-900 flex-1">{editingId ? 'Editar Guía' : 'Nueva Guía'}</Text>
-            <TouchableOpacity onPress={() => setFormOpen(false)}>
+            <TouchableOpacity onPress={closeModal}>
               <IonIcon name="close" size={22} color="#111827" />
             </TouchableOpacity>
           </View>
@@ -149,9 +165,21 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
             clientOptions={[{ label: 'Cliente Demo', value: 'client-demo-1' }]}
             selectedClientId={'client-demo-1'}
             onChangeClient={() => {}}
-            guideItems={[...prefilledTags.map((t: any) => ({ tagEPC: t.epc, proceso: '' })), ...scannedTags.map(t => ({ tagEPC: t.epc, proceso: '' }))]}
+            guideItems={(() => {
+              const allTags = [...prefilledTags, ...scannedTags];
+              const uniqueEPCs = new Set<string>();
+              return allTags
+                .filter((t: any) => {
+                  const epc = t.epc || t.tagEPC;
+                  if (uniqueEPCs.has(epc)) return false;
+                  uniqueEPCs.add(epc);
+                  return true;
+                })
+                .map((t: any) => ({ tagEPC: t.epc || t.tagEPC, proceso: '' }));
+            })()}
             onRemoveItem={(epc) => {
               setScannedTags(prev => prev.filter(t => t.epc !== epc));
+              seenSetRef.current.delete(epc);
             }}
             onScan={() => {
               if (isScanning) {
@@ -172,6 +200,7 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
               }
             }}
             showScanButton={prefilledTags.length === 0}
+            isScanning={isScanning}
           />
         </View>
       </Modal>

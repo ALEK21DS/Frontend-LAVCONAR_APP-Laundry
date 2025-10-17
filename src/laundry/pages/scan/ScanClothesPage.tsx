@@ -8,19 +8,26 @@ import { rfidModule } from '@/lib/rfid/rfid.module';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
 import { GuideForm } from '@/laundry/pages/guides/ui/GuideForm';
+import { ProcessForm } from '@/laundry/pages/processes/ui/ProcessForm';
+import { GarmentForm } from '@/laundry/pages/garments/ui/GarmentForm';
 import { useClients } from '@/laundry/hooks/useClients';
 
 type ScanClothesPageProps = {
   navigation: NativeStackNavigationProp<any>;
+  route?: any;
 };
 
-export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) => {
+export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, route }) => {
+  const mode = route?.params?.mode || 'guide'; // 'garment' o 'guide'
   const { scannedTags, addScannedTag, clearScannedTags, isScanning, setIsScanning } = useTagStore();
   const seenSetRef = useRef<Set<string>>(new Set());
   const isScanningRef = useRef<boolean>(false);
   const [isStopping, setIsStopping] = useState(false);
   const [guideModalOpen, setGuideModalOpen] = useState(false);
+  const [garmentModalOpen, setGarmentModalOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>('client-demo-1');
+  const [processModalOpen, setProcessModalOpen] = useState(false);
+  const [detectedGuideId, setDetectedGuideId] = useState<string | undefined>(undefined);
   const MIN_RSSI = -65; // ignorar lecturas muy débiles
 
   // Ya no se requiere proceso ni descripción para este flujo
@@ -67,6 +74,15 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
         // eslint-disable-next-line no-console
         console.log('Tag accepted:', tag);
         addScannedTag(tag);
+        
+        // En modo "garment", detener automáticamente después de escanear una prenda
+        if (mode === 'garment') {
+          stopScanning();
+        }
+        if (mode === 'process') {
+          // Para procesos también se detiene en la primera lectura
+          stopScanning();
+        }
       });
       (global as any).rfidSubscription = subscription;
       const errSub = rfidModule.addErrorListener((msg: string) => {
@@ -127,13 +143,32 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
       Alert.alert('Sin lecturas', 'Escanea al menos una prenda para continuar.');
       return;
     }
-    setGuideModalOpen(true);
+    
+    if (mode === 'garment') {
+      setGarmentModalOpen(true);
+    } else if (mode === 'guide') {
+      setGuideModalOpen(true);
+    } else if (mode === 'process') {
+      // TODO: Consultar guía por EPC (mock por ahora)
+      const first = scannedTags[0];
+      // Simulación: mapear EPC a una guía demo
+      const guideId = 'g-demo-001';
+      setDetectedGuideId(guideId);
+      setProcessModalOpen(true);
+    }
   };
 
   const handleCloseGuideModal = () => {
     setGuideModalOpen(false);
     clearScannedTags();
     seenSetRef.current.clear();
+  };
+
+  const handleCloseGarmentModal = () => {
+    setGarmentModalOpen(false);
+    clearScannedTags();
+    seenSetRef.current.clear();
+    // Permanecer en la página de escaneo para registrar otra prenda
   };
 
   const renderScannedTag = ({ item, index }: { item: ScannedTag; index: number }) => (
@@ -258,6 +293,41 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation }) 
             onScan={() => {}}
             onSubmit={handleCloseGuideModal}
             showScanButton={false}
+          />
+        </View>
+      </Modal>
+
+      <Modal visible={garmentModalOpen} transparent animationType="slide" onRequestClose={handleCloseGarmentModal}>
+        <View className="flex-1 bg-black/40" />
+        <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl p-4" style={{ elevation: 8 }}>
+          <View className="flex-row items-center mb-4">
+            <Text className="text-xl font-bold text-gray-900 flex-1">Registrar Prenda</Text>
+            <TouchableOpacity onPress={handleCloseGarmentModal}>
+              <Icon name="close" size={22} color="#111827" />
+            </TouchableOpacity>
+          </View>
+          <GarmentForm
+            rfidCode={scannedTags[0]?.epc || ''}
+            onSubmit={handleCloseGarmentModal}
+          />
+        </View>
+      </Modal>
+
+      {/* Modal para Procesos */}
+      <Modal visible={processModalOpen} transparent animationType="slide" onRequestClose={() => { setProcessModalOpen(false); clearScannedTags(); }}>
+        <View className="flex-1 bg-black/40" />
+        <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl p-4" style={{ elevation: 8 }}>
+          <View className="flex-row items-center mb-4">
+            <Text className="text-xl font-bold text-gray-900 flex-1">{detectedGuideId ? 'Editar Proceso' : 'Nuevo Proceso'}</Text>
+            <TouchableOpacity onPress={() => { setProcessModalOpen(false); clearScannedTags(); }}>
+              <Icon name="close" size={22} color="#111827" />
+            </TouchableOpacity>
+          </View>
+          <ProcessForm
+            guideOptions={[{ label: detectedGuideId ? `${detectedGuideId}` : 'Guía detectada', value: detectedGuideId || 'g-demo-001' }]}
+            selectedGuideId={detectedGuideId || 'g-demo-001'}
+            onChangeGuide={() => {}}
+            onSubmit={() => { setProcessModalOpen(false); clearScannedTags(); }}
           />
         </View>
       </Modal>

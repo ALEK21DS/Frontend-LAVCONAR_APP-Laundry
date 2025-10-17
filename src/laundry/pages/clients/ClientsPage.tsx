@@ -40,7 +40,13 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
   };
 
   return (
-    <MainLayout activeTab="Clients" onNavigate={route => _navigation.navigate(route as never)}>
+    <MainLayout 
+      activeTab="Clients" 
+      onNavigate={(route: string, params?: any) => {
+        // @ts-ignore
+        _navigation.navigate(route, params);
+      }}
+    >
       <View className="px-4 pt-4 flex-1">
         <View className="flex-row items-center mb-4">
           <Text className="text-2xl font-bold text-gray-900 flex-1">Clientes</Text>

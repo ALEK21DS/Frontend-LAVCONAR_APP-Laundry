@@ -21,6 +21,7 @@ interface GuideFormProps {
   onSubmit: () => void;
   submitting?: boolean;
   showScanButton?: boolean;
+  isScanning?: boolean;
 }
 
 export const GuideForm: React.FC<GuideFormProps> = ({
@@ -33,6 +34,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   onSubmit,
   submitting,
   showScanButton = true,
+  isScanning = false,
 }) => {
   const { user } = useAuthStore();
   const branchOfficeName = user?.branch_office_name || 'Sucursal';
@@ -195,13 +197,13 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       {showScanButton && (
         <View className="mb-6">
           <Button
-            title="Escanear Prendas"
+            title={isScanning ? 'Detener Escaneo' : 'Iniciar Escaneo'}
             onPress={onScan}
-            icon={<Icon name="scan-outline" size={18} color="white" />}
+            icon={<Icon name={isScanning ? 'stop-circle-outline' : 'scan-outline'} size={18} color="white" />}
             fullWidth
             size="sm"
             disabled={!selectedClientId}
-            style={{ backgroundColor: '#1f4eed' }}
+            style={isScanning ? { backgroundColor: '#dc2626' } : { backgroundColor: '#1f4eed' }}
           />
           {!selectedClientId && (
             <Text className="text-sm text-gray-500 mt-2 text-center">Selecciona un cliente para continuar</Text>
@@ -219,7 +221,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           <FlatList
             data={guideItems}
             renderItem={renderItem}
-            keyExtractor={item => item.tagEPC}
+            keyExtractor={(item, index) => `${item.tagEPC}-${index}`}
             scrollEnabled={false}
           />
         )}

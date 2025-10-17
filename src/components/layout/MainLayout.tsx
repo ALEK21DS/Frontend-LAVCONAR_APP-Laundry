@@ -7,17 +7,21 @@ import { useAuth } from '@/auth/hooks/useAuth';
 
 interface MainLayoutProps {
   activeTab: 'Dashboard' | 'Clients' | 'ScanClothes' | 'Guides' | 'Processes';
-  onNavigate: (route: MainLayoutProps['activeTab']) => void;
+  onNavigate: (route: MainLayoutProps['activeTab'], params?: any) => void;
   children: React.ReactNode;
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, children }) => {
   const { logout } = useAuth();
+  const handleNavigate = (route: MainLayoutProps['activeTab'], params?: any) => {
+    onNavigate(route, params);
+  };
+
   return (
     <Container safe padding="none">
       <HeaderBar showThemeToggle={false} onLogoutPress={logout} />
       <View className="flex-1">{children}</View>
-      <BottomNav active={activeTab} onNavigate={onNavigate} />
+      <BottomNav active={activeTab} onNavigate={handleNavigate} />
     </Container>
   );
 };

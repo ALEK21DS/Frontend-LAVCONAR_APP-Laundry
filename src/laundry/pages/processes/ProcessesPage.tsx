@@ -28,7 +28,13 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
   const openCreate = () => { setEditingId(null); setFormOpen(true); };
 
   return (
-    <MainLayout activeTab="Processes" onNavigate={route => navigation.navigate(route as never)}>
+    <MainLayout 
+      activeTab="Processes" 
+      onNavigate={(route: string, params?: any) => {
+        // @ts-ignore
+        navigation.navigate(route, params);
+      }}
+    >
       <View className="px-4 pt-4 flex-1">
         <View className="flex-row items-center mb-4">
           <Text className="text-2xl font-bold text-gray-900 flex-1">Procesos</Text>
