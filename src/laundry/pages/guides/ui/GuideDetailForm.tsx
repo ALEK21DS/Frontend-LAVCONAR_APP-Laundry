@@ -1,20 +1,25 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, TextInput, Modal } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Button, Input, Dropdown } from '@/components/common';
+import { ScanForm } from '@/laundry/pages/scan/ui/ScanForm';
 
 type GuideDetailFormProps = {
   onSubmit: (data: any) => void;
   onCancel: () => void;
   submitting?: boolean;
   initialValues?: any;
+  scannedTags?: string[];
+  onNavigate?: (route: string, params?: any) => void;
 };
 
 export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
   onSubmit,
   onCancel,
   submitting = false,
-  initialValues
+  initialValues,
+  scannedTags = [],
+  onNavigate
 }) => {
   const [formData, setFormData] = useState({
     guide_id: initialValues?.guide_id || '',
@@ -27,8 +32,7 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
   });
 
   const [showGuideDropdown, setShowGuideDropdown] = useState(false);
-  const [showGarmentTypeDropdown, setShowGarmentTypeDropdown] = useState(false);
-  const [showColorDropdown, setShowColorDropdown] = useState(false);
+  const [showScanForm, setShowScanForm] = useState(false);
 
   const garmentTypes = [
     { label: 'Camisa', value: 'camisa' },
@@ -69,13 +73,14 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
     setFormData(prev => ({
       ...prev,
       requested_services: prev.requested_services.includes(service)
-        ? prev.requested_services.filter(s => s !== service)
+        ? prev.requested_services.filter((s: string) => s !== service)
         : [...prev.requested_services, service]
     }));
   };
 
   const handleSubmit = () => {
     onSubmit(formData);
+    setShowScanForm(true);
   };
 
   return (
@@ -110,10 +115,8 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
             <Dropdown
               options={garmentTypes}
               value={formData.garment_type}
-              onSelect={(value) => setFormData(prev => ({ ...prev, garment_type: value }))}
+              onValueChange={(value: string) => setFormData(prev => ({ ...prev, garment_type: value }))}
               placeholder="Seleccionar tipo de prenda"
-              isOpen={showGarmentTypeDropdown}
-              onToggle={() => setShowGarmentTypeDropdown(!showGarmentTypeDropdown)}
             />
           </View>
 
@@ -123,10 +126,8 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
             <Dropdown
               options={colors}
               value={formData.predominant_color}
-              onSelect={(value) => setFormData(prev => ({ ...prev, predominant_color: value }))}
+              onValueChange={(value: string) => setFormData(prev => ({ ...prev, predominant_color: value }))}
               placeholder="Seleccionar color"
-              isOpen={showColorDropdown}
-              onToggle={() => setShowColorDropdown(!showColorDropdown)}
             />
           </View>
 
@@ -202,24 +203,50 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
             </View>
           </View>
 
-          {/* Botones */}
-          <View className="flex-row space-x-3">
-            <Button
-              title="Cancelar"
-              variant="outline"
-              onPress={onCancel}
-              className="flex-1"
-            />
+          {/* Botón */}
+          <View className="flex-row">
             <Button
               title="Guardar"
               variant="primary"
               onPress={handleSubmit}
               isLoading={submitting}
-              className="flex-1"
+              fullWidth
             />
           </View>
         </View>
       </ScrollView>
+
+      <Modal transparent visible={showScanForm} animationType="slide" onRequestClose={() => setShowScanForm(false)}>
+        <View className="flex-1 bg-black/40" />
+        <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl" style={{ elevation: 8 }}>
+          <View className="flex-row items-center p-4 border-b border-gray-200">
+            <View className="flex-row items-center">
+              <IonIcon name="scan-outline" size={20} color="#1f4eed" />
+              <Text className="text-xl font-bold text-gray-900 ml-2">Nuevo Escaneo RFID</Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowScanForm(false)} className="ml-auto">
+              <IonIcon name="close" size={22} color="#111827" />
+            </TouchableOpacity>
+          </View>
+          <View className="px-4 py-2">
+            <Text className="text-sm text-gray-600 mb-4">
+              Completa los datos para crear un nuevo escaneo RFID
+            </Text>
+          </View>
+          <ScanForm
+            onSubmit={(data) => {
+              console.log('Escaneo RFID creado:', data);
+              setShowScanForm(false);
+              onCancel(); // Cerrar el modal principal
+            }}
+            onCancel={() => setShowScanForm(false)}
+            submitting={false}
+            initialValues={{ guide_id: formData.guide_id }}
+            scannedTags={scannedTags}
+            onNavigate={onNavigate}
+          />
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };

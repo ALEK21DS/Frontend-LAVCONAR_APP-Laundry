@@ -28,7 +28,24 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const [selectedClientId, setSelectedClientId] = useState<string>('client-demo-1');
   const [processModalOpen, setProcessModalOpen] = useState(false);
   const [detectedGuideId, setDetectedGuideId] = useState<string | undefined>(undefined);
-  const MIN_RSSI = -65; // ignorar lecturas muy débiles
+  const [scanRange, setScanRange] = useState<number>(-65); // Rango del escáner (RSSI)
+  const MIN_RSSI = scanRange; // Usar el rango configurado por el usuario
+
+  const applyReaderPower = useCallback(async (rangeDbm: number) => {
+    // Mapear sensibilidad a potencia real del lector (0-30 aprox. segun SDK)
+    // Muy Baja(-90) -> 30, Baja(-75)->26, Media(-65)->22, Alta(-55)->18
+    const power = rangeDbm <= -85 ? 30 : rangeDbm <= -70 ? 26 : rangeDbm <= -60 ? 22 : 18;
+    try {
+      await rfidModule.setPower(power);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('No se pudo aplicar potencia al lector:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    applyReaderPower(scanRange);
+  }, [scanRange, applyReaderPower]);
 
   // Ya no se requiere proceso ni descripción para este flujo
 
@@ -239,6 +256,56 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         )}
       </View>
 
+      {/* Control de Rango del Escáner */}
+      <View className="mb-6">
+        <Text className="text-lg font-semibold text-gray-900 mb-3">Rango del Escáner</Text>
+        <Card variant="outlined" padding="md">
+          <View className="flex-row items-center justify-between mb-3">
+            <View className="flex-row items-center">
+              <Icon name="radio-outline" size={20} color="#6B7280" />
+              <Text className="text-gray-700 ml-2">Sensibilidad</Text>
+            </View>
+            <Text className="text-sm font-medium text-gray-900">{scanRange} dBm</Text>
+          </View>
+          
+          <View className="flex-row items-center space-x-3">
+            <Button
+              title="Muy Baja"
+              variant={scanRange === -90 ? "primary" : "outline"}
+              size="sm"
+              onPress={() => setScanRange(-90)}
+            />
+            <Button
+              title="Baja"
+              variant={scanRange === -75 ? "primary" : "outline"}
+              size="sm"
+              onPress={() => setScanRange(-75)}
+            />
+            <Button
+              title="Media"
+              variant={scanRange === -65 ? "primary" : "outline"}
+              size="sm"
+              onPress={() => setScanRange(-65)}
+            />
+            <Button
+              title="Alta"
+              variant={scanRange === -55 ? "primary" : "outline"}
+              size="sm"
+              onPress={() => setScanRange(-55)}
+            />
+          </View>
+          
+          <View className="mt-3">
+            <Text className="text-xs text-gray-500">
+              {scanRange === -90 && "Muy Baja: Detecta tags muy lejanos (puede incluir interferencias)"}
+              {scanRange === -75 && "Baja: Detecta tags a distancia media"}
+              {scanRange === -65 && "Media: Rango equilibrado (recomendado)"}
+              {scanRange === -55 && "Alta: Solo tags muy cercanos (mayor precisión)"}
+            </Text>
+          </View>
+        </Card>
+      </View>
+
       {/* Sección de proceso/descrición eliminada para flujo simplificado */}
 
       <View className="flex-1 mb-6">
@@ -293,6 +360,10 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             onScan={() => {}}
             onSubmit={handleCloseGuideModal}
             showScanButton={false}
+            onNavigate={(route: string, params?: any) => {
+              // @ts-ignore
+              navigation.navigate(route, params);
+            }}
           />
         </View>
       </Modal>

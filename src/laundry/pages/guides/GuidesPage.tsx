@@ -201,6 +201,10 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
             }}
             showScanButton={prefilledTags.length === 0}
             isScanning={isScanning}
+            onNavigate={(route: string, params?: any) => {
+              // @ts-ignore
+              navigation.navigate(route, params);
+            }}
           />
         </View>
       </Modal>

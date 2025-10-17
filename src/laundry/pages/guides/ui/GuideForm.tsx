@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Modal, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Modal, Alert } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Button, Card, Dropdown, Input } from '@/components/common';
 import { GuideItem } from '@/laundry/interfaces/guides/guides.interface';
@@ -23,6 +23,7 @@ interface GuideFormProps {
   submitting?: boolean;
   showScanButton?: boolean;
   isScanning?: boolean;
+  onNavigate?: (route: string, params?: any) => void;
 }
 
 export const GuideForm: React.FC<GuideFormProps> = ({
@@ -36,15 +37,16 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   submitting,
   showScanButton = true,
   isScanning = false,
+  onNavigate,
 }) => {
   const { user } = useAuthStore();
-  const branchOfficeName = user?.branch_office_name || 'Sucursal';
+  const branchOfficeName = user?.sucursalId || 'Sucursal';
 
   // Estado local para campos del servicio y fechas
   const [serviceType, setServiceType] = useState<string>('');
   const [chargeType, setChargeType] = useState<string>('');
   const [condition, setCondition] = useState<string>('');
-  const [branchOfficeId] = useState<string>(user?.branch_office_id || '');
+  const [branchOfficeId] = useState<string>(user?.sucursalId || '');
   const [sealNumber, setSealNumber] = useState<string>('');
   const [collectionDate, setCollectionDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [deliveryDate, setDeliveryDate] = useState<string>('');
@@ -55,24 +57,6 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   const [clientModalOpen, setClientModalOpen] = useState(false);
   const [showDetailForm, setShowDetailForm] = useState(false);
   const { createClient } = useClients();
-  const renderItem = ({ item }: { item: GuideItem }) => (
-    <Card variant="outlined" className="mb-3">
-      <View className="flex-row justify-between items-center">
-        <View>
-          <Text className="text-sm font-mono text-gray-700">{item.tagEPC}</Text>
-          {item.proceso && (
-            <Text className="text-xs text-gray-500 mt-1">Proceso: {item.proceso}</Text>
-          )}
-          {item.descripcion && (
-            <Text className="text-xs text-gray-500 mt-1">{item.descripcion}</Text>
-          )}
-        </View>
-        <TouchableOpacity onPress={() => onRemoveItem(item.tagEPC)} className="p-2">
-          <Icon name="close-circle-outline" size={22} color="#EF4444" />
-        </TouchableOpacity>
-      </View>
-    </Card>
-  );
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
@@ -213,21 +197,6 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         </View>
       )}
 
-      <View className="mb-6">
-        <Text className="text-lg font-bold text-gray-900 mb-3">Prendas ({guideItems.length})</Text>
-        {guideItems.length === 0 ? (
-          <Card padding="md" className="items-center">
-            <Text className="text-gray-500">No hay prendas agregadas</Text>
-          </Card>
-        ) : (
-          <FlatList
-            data={guideItems}
-            renderItem={renderItem}
-            keyExtractor={(item, index) => `${item.tagEPC}-${index}`}
-            scrollEnabled={false}
-          />
-        )}
-      </View>
 
       <Input
         label="Notas"
@@ -249,15 +218,8 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           const guideId = `GUIDE-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
           // eslint-disable-next-line no-console
           console.log('Guía creada con ID:', guideId);
-          // Simular creación exitosa
-          Alert.alert('Éxito', 'Guía creada correctamente', [
-            {
-              text: 'OK',
-              onPress: () => {
-                setShowDetailForm(true);
-              }
-            }
-          ]);
+          // Pasar directamente al formulario de detalles
+          setShowDetailForm(true);
         }}
         isLoading={!!submitting}
         fullWidth
@@ -295,7 +257,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           <View className="flex-row items-center p-4 border-b border-gray-200">
             <View className="flex-row items-center">
               <Icon name="document-text-outline" size={20} color="#1f4eed" />
-              <Text className="text-xl font-bold text-gray-900 ml-2">Nuevo Detalle de Guía</Text>
+              <Text className="text-xl font-bold text-gray-900 ml-2">Detalle de Guía</Text>
             </View>
             <TouchableOpacity onPress={() => setShowDetailForm(false)} className="ml-auto">
               <Icon name="close" size={22} color="#111827" />
@@ -309,12 +271,13 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           <GuideDetailForm
             onSubmit={(data) => {
               console.log('Detalle de guía creado:', data);
-              setShowDetailForm(false);
-              onSubmit(); // Cerrar el formulario principal
+              // No cerrar el modal aquí, el ScanForm se abrirá desde GuideDetailForm
             }}
             onCancel={() => setShowDetailForm(false)}
             submitting={false}
             initialValues={{ guide_id: `GUIDE-${Date.now()}` }}
+            scannedTags={guideItems.map(item => item.tagEPC)}
+            onNavigate={onNavigate}
           />
         </View>
       </Modal>
