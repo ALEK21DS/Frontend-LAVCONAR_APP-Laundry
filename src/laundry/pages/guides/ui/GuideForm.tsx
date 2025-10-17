@@ -8,6 +8,7 @@ import { SUCURSALES } from '@/constants';
 import { GUIDE_STATUS, GUIDE_STATUS_LABELS } from '@/constants/processes';
 import { ClientForm } from '@/laundry/pages/clients/ui/ClientForm';
 import { useClients } from '@/laundry/hooks/useClients';
+import { GuideDetailForm } from './GuideDetailForm';
 
 type Option = { label: string; value: string };
 
@@ -52,6 +53,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   const [status, setStatus] = useState<string>(GUIDE_STATUS.COLLECTED);
   const [notes, setNotes] = useState<string>('');
   const [clientModalOpen, setClientModalOpen] = useState(false);
+  const [showDetailForm, setShowDetailForm] = useState(false);
   const { createClient } = useClients();
   const renderItem = ({ item }: { item: GuideItem }) => (
     <Card variant="outlined" className="mb-3">
@@ -252,7 +254,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             {
               text: 'OK',
               onPress: () => {
-                onSubmit();
+                setShowDetailForm(true);
               }
             }
           ]);
@@ -283,6 +285,36 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               setClientModalOpen(false);
             }}
             onCancel={() => setClientModalOpen(false)}
+          />
+        </View>
+      </Modal>
+
+      <Modal transparent visible={showDetailForm} animationType="slide" onRequestClose={() => setShowDetailForm(false)}>
+        <View className="flex-1 bg-black/40" />
+        <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl" style={{ elevation: 8 }}>
+          <View className="flex-row items-center p-4 border-b border-gray-200">
+            <View className="flex-row items-center">
+              <Icon name="document-text-outline" size={20} color="#1f4eed" />
+              <Text className="text-xl font-bold text-gray-900 ml-2">Nuevo Detalle de Guía</Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowDetailForm(false)} className="ml-auto">
+              <Icon name="close" size={22} color="#111827" />
+            </TouchableOpacity>
+          </View>
+          <View className="px-4 py-2">
+            <Text className="text-sm text-gray-600 mb-4">
+              Completa los datos para crear un nuevo detalle de guía
+            </Text>
+          </View>
+          <GuideDetailForm
+            onSubmit={(data) => {
+              console.log('Detalle de guía creado:', data);
+              setShowDetailForm(false);
+              onSubmit(); // Cerrar el formulario principal
+            }}
+            onCancel={() => setShowDetailForm(false)}
+            submitting={false}
+            initialValues={{ guide_id: `GUIDE-${Date.now()}` }}
           />
         </View>
       </Modal>

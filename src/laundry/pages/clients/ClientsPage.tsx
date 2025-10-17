@@ -20,9 +20,9 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
   const [initialValues, setInitialValues] = useState<any | undefined>(undefined);
 
   const demoClients = [
-    { id: 'demo-1', name: 'Juan Pérez', email: 'juan.perez@example.com', identification_number: '0102030405', acronym: 'JP' },
-    { id: 'demo-2', name: 'María García', email: 'maria.garcia@example.com', identification_number: '0911223344', acronym: 'MG' },
-    { id: 'demo-3', name: 'Comercial Andes S.A.', email: 'contacto@andes.com', identification_number: '1790012345001', acronym: 'ANDES' },
+    { id: 'demo-1', name: 'Juan Pérez', email: 'juan.perez@example.com', identification_number: '0102030405', acronym: 'JP', is_active: true },
+    { id: 'demo-2', name: 'María García', email: 'maria.garcia@example.com', identification_number: '0911223344', acronym: 'MG', is_active: true },
+    { id: 'demo-3', name: 'Comercial Andes S.A.', email: 'contacto@andes.com', identification_number: '1790012345001', acronym: 'ANDES', is_active: false },
   ];
 
   const base = clients && clients.length > 0 ? clients : demoClients;
@@ -78,12 +78,19 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
                       <IonIcon name="person-outline" size={20} color="#2563EB" />
                     </View>
                     <View className="flex-1">
-                      <Text className="text-gray-900 font-semibold">{client.name}</Text>
+                      <View className="flex-row items-center mb-1">
+                        <Text className="text-gray-900 font-semibold mr-2">{client.name}</Text>
+                        <View className={`px-2 py-0.5 rounded-full ${client.is_active ? 'bg-green-100' : 'bg-gray-100'}`}>
+                          <Text className={`text-xs font-medium ${client.is_active ? 'text-green-700' : 'text-gray-600'}`}>
+                            {client.is_active ? 'Activo' : 'Inactivo'}
+                          </Text>
+                        </View>
+                      </View>
                       <Text className="text-gray-500 text-xs">{client.identification_number}</Text>
                     </View>
                     <TouchableOpacity className="w-9 h-9 rounded-lg bg-blue-600 active:bg-blue-700 items-center justify-center" onPress={() => {
                       setEditingId(client.id);
-                      setInitialValues({ name: client.name, email: client.email, identification_number: client.identification_number, phone: client.phone, address: client.address, acronym: client.acronym, branch_office_id: client.branch_office_id });
+                      setInitialValues({ name: client.name, email: client.email, identification_number: client.identification_number, phone: client.phone, address: client.address, acronym: client.acronym, branch_office_id: client.branch_office_id, is_active: client.is_active });
                       setFormOpen(true);
                     }}>
                       <IonIcon name="pencil-outline" size={16} color="#ffffff" />
