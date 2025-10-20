@@ -10,6 +10,7 @@ interface AuthStore {
   user: User | null;
   isAuthenticated: boolean;
   token: string | null;
+  refreshToken: string | null;
   isLoading: boolean;
   error: string | null;
 
@@ -28,6 +29,7 @@ export const useAuthStore = create<AuthStore>()(
       user: null,
       isAuthenticated: false,
       token: null,
+      refreshToken: null,
       isLoading: false,
       error: null,
 
@@ -36,11 +38,14 @@ export const useAuthStore = create<AuthStore>()(
         try {
           const response = await loginAction(credentials);
 
-          await AsyncStorage.setItem('auth-token', response.token);
+          // Guardar tokens en AsyncStorage
+          await AsyncStorage.setItem('auth-token', response.accessToken);
+          await AsyncStorage.setItem('auth-refresh-token', response.refreshToken);
 
           set({
             user: response.user,
-            token: response.token,
+            token: response.accessToken,
+            refreshToken: response.refreshToken,
             isAuthenticated: true,
             isLoading: false,
           });
@@ -60,11 +65,14 @@ export const useAuthStore = create<AuthStore>()(
         try {
           const response = await loginDemoAction(credentials);
 
-          await AsyncStorage.setItem('auth-token', response.token);
+          // Guardar tokens en AsyncStorage
+          await AsyncStorage.setItem('auth-token', response.accessToken);
+          await AsyncStorage.setItem('auth-refresh-token', response.refreshToken);
 
           set({
             user: response.user,
-            token: response.token,
+            token: response.accessToken,
+            refreshToken: response.refreshToken,
             isAuthenticated: true,
             isLoading: false,
           });
@@ -80,16 +88,20 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       logout: async () => {
+        const { refreshToken } = _get();
         try {
-          await logoutAction();
+          if (refreshToken) {
+            await logoutAction(refreshToken);
+          }
         } catch (error) {
           console.error('Error al cerrar sesión:', error);
         } finally {
-          await AsyncStorage.multiRemove(['auth-token', 'auth-storage']);
+          await AsyncStorage.multiRemove(['auth-token', 'auth-refresh-token', 'auth-storage']);
 
           set({
             user: null,
             token: null,
+            refreshToken: null,
             isAuthenticated: false,
             error: null,
           });
@@ -119,6 +131,7 @@ export const useAuthStore = create<AuthStore>()(
       partialize: state => ({
         user: state.user,
         token: state.token,
+        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
     }

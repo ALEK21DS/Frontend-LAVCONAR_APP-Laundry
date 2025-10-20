@@ -1,5 +1,5 @@
 import { authApi } from '../api/auth.api';
 
-export const logoutAction = async (): Promise<void> => {
-  await authApi.logout();
+export const logoutAction = async (refreshToken: string): Promise<void> => {
+  await authApi.logout(refreshToken);
 };

@@ -1,14 +1,24 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '@/constants';
+import { useConfigStore } from '@/config/store/config.store';
 
-export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+// Función para crear cliente dinámico
+export const createApiClient = () => {
+  const { apiBaseUrl } = useConfigStore.getState();
+  
+  console.log('🌐 API Base URL:', apiBaseUrl); // Debug: ver qué URL está usando
+  
+  return axios.create({
+    baseURL: apiBaseUrl,
+    timeout: 10000,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+};
+
+// Cliente por defecto (se actualiza dinámicamente)
+export const apiClient = createApiClient();
 
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {

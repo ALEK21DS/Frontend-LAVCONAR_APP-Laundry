@@ -68,15 +68,15 @@ export const validateLoginData = (data: {
   sucursalId: string;
 }): ValidationResult => {
   if (!validateRequired(data.username)) {
-    return { isValid: false, error: 'El usuario es requerido' };
+    return { isValid: false, error: 'Usuario requerido' };
   }
 
   if (!validateRequired(data.password)) {
-    return { isValid: false, error: 'La contraseña es requerida' };
+    return { isValid: false, error: 'Contraseña requerida' };
   }
 
   if (!validateRequired(data.sucursalId)) {
-    return { isValid: false, error: 'La sucursal es requerida' };
+    return { isValid: false, error: 'Selecciona una sucursal' };
   }
 
   return { isValid: true };
