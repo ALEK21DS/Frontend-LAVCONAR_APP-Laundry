@@ -7,6 +7,8 @@ import { useGuides } from '@/laundry/hooks/useGuides';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GuideForm } from './ui/GuideForm';
 import { GuideDetailsModal } from './ui/GuideDetailsModal';
+import { ServiceTypeModal } from '@/laundry/components/ServiceTypeModal';
+import { GarmentForm } from '@/laundry/pages/garments/ui/GarmentForm';
 import { rfidModule } from '@/lib/rfid/rfid.module';
 import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
 
@@ -25,6 +27,13 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const seenSetRef = useRef<Set<string>>(new Set());
   const isScanningRef = useRef<boolean>(false);
   const MIN_RSSI = -65;
+  
+  // Estados para el flujo de servicio personal
+  const [showServiceTypeModal, setShowServiceTypeModal] = useState(false);
+  const [selectedServiceType, setSelectedServiceType] = useState<'industrial' | 'personal'>('industrial');
+  const [garmentModalOpen, setGarmentModalOpen] = useState(false);
+  const [currentScannedTag, setCurrentScannedTag] = useState<ScannedTag | null>(null);
+  const [registeredGarments, setRegisteredGarments] = useState<any[]>([]);
 
   const demoGuides = [
     { 
@@ -60,7 +69,10 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
     return base.filter((g: any) => [g.guide_number, g.client_name, g.status].filter(Boolean).some(v => String(v).toLowerCase().includes(q)));
   }, [base, query]);
 
-  const openCreate = () => { setEditingId(null); setFormOpen(true); };
+  const openCreate = () => { 
+    setEditingId(null); 
+    setShowServiceTypeModal(true); 
+  };
 
   const openDetails = (guide: any) => {
     setSelectedGuide(guide);
@@ -71,6 +83,19 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
     if (selectedGuide) {
       setEditingId(selectedGuide.id);
       setFormOpen(true);
+    }
+  };
+
+  const handleServiceTypeSelect = (serviceType: 'industrial' | 'personal') => {
+    setSelectedServiceType(serviceType);
+    setShowServiceTypeModal(false);
+    
+    if (serviceType === 'industrial') {
+      // Flujo industrial: abrir formulario directamente
+      setFormOpen(true);
+    } else {
+      // Flujo personal: iniciar escaneo prenda por prenda
+      startScanning();
     }
   };
 
@@ -115,7 +140,16 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
         if (typeof tag.rssi === 'number' && tag.rssi < MIN_RSSI) return;
         if (seenSetRef.current.has(tag.epc)) return;
         seenSetRef.current.add(tag.epc);
-        setScannedTags(prev => [...prev, tag]);
+        
+        if (selectedServiceType === 'personal') {
+          // Flujo personal: detener escaneo y abrir formulario de prenda
+          stopScanning();
+          setCurrentScannedTag(tag);
+          setGarmentModalOpen(true);
+        } else {
+          // Flujo industrial: continuar escaneando
+          setScannedTags(prev => [...prev, tag]);
+        }
       });
       (global as any).rfidSubscription = subscription;
       const errSub = rfidModule.addErrorListener((msg: string) => {
@@ -128,6 +162,54 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
       setIsScanning(false);
     }
   }, []);
+
+  // Funciones para el flujo de servicio personal
+  const handleGarmentSubmit = (garmentData: any) => {
+    if (currentScannedTag) {
+      const newGarment = {
+        ...garmentData,
+        rfidCode: currentScannedTag.epc,
+        id: `garment-${Date.now()}`,
+      };
+      
+      setRegisteredGarments(prev => [...prev, newGarment]);
+      setCurrentScannedTag(null);
+      setGarmentModalOpen(false);
+      
+      // Continuar escaneando
+      startScanning();
+    }
+  };
+
+  const handleGarmentCancel = () => {
+    setCurrentScannedTag(null);
+    setGarmentModalOpen(false);
+    // Continuar escaneando
+    startScanning();
+  };
+
+  const removeRegisteredGarment = (garmentId: string) => {
+    setRegisteredGarments(prev => prev.filter(g => g.id !== garmentId));
+    // Remover del seenSet para permitir re-escaneo
+    const garment = registeredGarments.find(g => g.id === garmentId);
+    if (garment) {
+      seenSetRef.current.delete(garment.rfidCode);
+    }
+  };
+
+  const finishPersonalGuide = () => {
+    if (registeredGarments.length === 0) {
+      Alert.alert('Error', 'Debe registrar al menos una prenda');
+      return;
+    }
+    
+    // Convertir prendas registradas a formato de tags para el formulario
+    const garmentTags = registeredGarments.map(g => ({ tagEPC: g.rfidCode, proceso: '' }));
+    setScannedTags(garmentTags);
+    setFormOpen(true);
+    setRegisteredGarments([]);
+    stopScanning();
+  };
 
   useEffect(() => {
     return () => {
@@ -190,6 +272,47 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
           </View>
         </ScrollView>
       </View>
+
+      {/* Interfaz para prendas registradas (Servicio Personal) */}
+      {selectedServiceType === 'personal' && registeredGarments.length > 0 && (
+        <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
+          <View className="flex-row items-center justify-between mb-3">
+            <Text className="text-lg font-semibold text-gray-900">
+              Prendas Registradas ({registeredGarments.length})
+            </Text>
+            <TouchableOpacity
+              onPress={finishPersonalGuide}
+              className="bg-blue-600 px-4 py-2 rounded-lg"
+            >
+              <Text className="text-white font-medium">Finalizar Guía</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View className="flex-row space-x-2">
+              {registeredGarments.map((garment) => (
+                <View key={garment.id} className="bg-gray-50 rounded-lg p-3 min-w-[200px]">
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-1">
+                      <Text className="text-sm font-medium text-gray-900" numberOfLines={1}>
+                        {garment.description || 'Sin descripción'}
+                      </Text>
+                      <Text className="text-xs text-gray-500 mt-1">
+                        RFID: {garment.rfidCode.substring(0, 12)}...
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => removeRegisteredGarment(garment.id)}
+                      className="ml-2"
+                    >
+                      <IonIcon name="close-circle" size={20} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      )}
 
       {/* Modal de Detalles */}
       <GuideDetailsModal
@@ -256,9 +379,44 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
           />
         </View>
       </Modal>
+
+      {/* Modal de Selección de Tipo de Servicio */}
+      <ServiceTypeModal
+        visible={showServiceTypeModal}
+        onClose={() => setShowServiceTypeModal(false)}
+        onSelectService={handleServiceTypeSelect}
+        title="Seleccionar Tipo de Servicio"
+      />
+
+      {/* Modal de Formulario de Prenda (Servicio Personal) */}
+      <Modal visible={garmentModalOpen} transparent animationType="slide" onRequestClose={handleGarmentCancel}>
+        <View className="flex-1 bg-black/40" />
+        <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl" style={{ elevation: 8 }}>
+          <View className="flex-row items-center p-4 border-b border-gray-200">
+            <View className="flex-row items-center flex-1">
+              <IonIcon name="shirt-outline" size={24} color="#3B82F6" />
+              <Text className="text-xl font-bold text-gray-900 ml-2">Registrar Prenda</Text>
+            </View>
+            <TouchableOpacity onPress={handleGarmentCancel}>
+              <IonIcon name="close" size={24} color="#111827" />
+            </TouchableOpacity>
+          </View>
+          <View className="px-4 py-2">
+            <Text className="text-sm text-gray-600 mb-4">
+              RFID detectado: {currentScannedTag?.epc}
+            </Text>
+          </View>
+          <GarmentForm
+            onSubmit={handleGarmentSubmit}
+            onCancel={handleGarmentCancel}
+            submitting={false}
+            rfidCode={currentScannedTag?.epc || ''}
+          />
+        </View>
+      </Modal>
     </MainLayout>
   );
- } 
+}
 
  export default GuidesPage;
 

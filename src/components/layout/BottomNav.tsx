@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, TouchableOpacity, Text, Animated, Pressable } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
+import { ServiceTypeModal } from '@/laundry/components/ServiceTypeModal';
 
 type TabItem = {
   key: 'Dashboard' | 'Clients' | 'ScanClothes' | 'Guides' | 'Processes';
@@ -25,6 +26,7 @@ const TABS: TabItem[] = [
 export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpenProcessTypeModal }) => {
   const [showGuidesMenu, setShowGuidesMenu] = useState(false);
   const [radialOpen, setRadialOpen] = useState(false);
+  const [showServiceTypeModal, setShowServiceTypeModal] = useState(false);
   const animLeft = useRef(new Animated.Value(0)).current;
   const animTop = useRef(new Animated.Value(0)).current;
   const animRight = useRef(new Animated.Value(0)).current;
@@ -58,9 +60,22 @@ export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpen
     }
   }, [guidesRadialOpen, guidesAnimUp, guidesAnimDiag]);
 
+  const handleServiceTypeSelect = (serviceType: 'industrial' | 'personal') => {
+    setShowServiceTypeModal(false);
+    setRadialOpen(false);
+    
+    if (serviceType === 'industrial') {
+      // Flujo industrial: navegar directamente al escáner
+      onNavigate('ScanClothes', { mode: 'guide' });
+    } else {
+      // Flujo personal: navegar al escáner con modo personal
+      onNavigate('ScanClothes', { mode: 'guide', serviceType: 'personal' });
+    }
+  };
+
   const radialItems = useMemo(() => ([
     { key: 'garment', icon: 'shirt-outline', label: 'Prenda', onPress: () => onNavigate('ScanClothes' as any) },
-    { key: 'guide', icon: 'document-text-outline', label: 'Guía', onPress: () => onNavigate('ScanClothes' as any) },
+    { key: 'guide', icon: 'document-text-outline', label: 'Guía', onPress: () => setShowServiceTypeModal(true) },
     { key: 'process', icon: 'construct-outline', label: 'Proceso', onPress: () => onNavigate('ScanClothes' as any) },
   ]), [onNavigate]);
 
@@ -94,7 +109,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpen
 
                 {/* Izquierda (Guía)  */}
                 <Animated.View style={{ position: 'absolute', top: -70, left: -75, transform: [{ scale: animLeft }], opacity: animLeft, zIndex: 50 }} pointerEvents={radialOpen ? 'auto' : 'none'}>
-                  <TouchableOpacity activeOpacity={0.85} onPress={() => { setRadialOpen(false); /* @ts-ignore */ onNavigate('ScanClothes' as any, { mode: 'guide' }); }}>
+                  <TouchableOpacity activeOpacity={0.85} onPress={() => { setRadialOpen(false); setShowServiceTypeModal(true); }}>
                     <View style={{ width: 78, height: 78, borderRadius: 39, backgroundColor: '#F59E0B', elevation: 10 }} className="items-center justify-center">
                       <IonIcon name="document-text-outline" size={20} color="#ffffff" />
                     </View>
@@ -189,6 +204,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpen
         );
       })}
 
+      {/* Modal de Selección de Tipo de Servicio */}
+      <ServiceTypeModal
+        visible={showServiceTypeModal}
+        onClose={() => setShowServiceTypeModal(false)}
+        onSelectService={handleServiceTypeSelect}
+        title="Seleccionar Tipo de Servicio"
+      />
     </View>
   );
 };

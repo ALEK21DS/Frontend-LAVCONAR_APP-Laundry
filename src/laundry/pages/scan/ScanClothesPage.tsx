@@ -38,13 +38,20 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const [selectedClientId, setSelectedClientId] = useState<string>('client-demo-1');
   const [processModalOpen, setProcessModalOpen] = useState(false);
   const [selectedGuideId, setSelectedGuideId] = useState<string>('');
-  const [scanRange, setScanRange] = useState<number>(-65); // Rango del escáner (RSSI)
+  // Para servicio personal, usar sensibilidad media (-65) para detección confiable a corta distancia
+  const [scanRange, setScanRange] = useState<number>(
+    mode === 'guide' && serviceType === 'personal' ? -65 : -65 
+  );
   const MIN_RSSI = scanRange; // Usar el rango configurado por el usuario
   
   // Estados para los nuevos modales
   const [processTypeModalOpen, setProcessTypeModalOpen] = useState(false);
   const [guideSelectionModalOpen, setGuideSelectionModalOpen] = useState(false);
   const [selectedProcessType, setSelectedProcessType] = useState<string>('');
+  
+  // Estados para el flujo de servicio personal (registro prenda por prenda)
+  const [registeredGarments, setRegisteredGarments] = useState<Array<{id: string, description: string, rfidCode: string, category?: string, color?: string}>>([]);
+  const [showActionButtons, setShowActionButtons] = useState(false);
 
   const applyReaderPower = useCallback(async (rangeDbm: number) => {
     // Mapear sensibilidad a potencia real del lector (0-30 aprox. segun SDK)
@@ -107,7 +114,13 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         if (mode === 'garment') {
           stopScanning();
         }
-        // En modo "guide" y "process", permitir escaneo continuo de múltiples prendas
+        
+        // En modo "guide" con servicio personal, detener y mostrar botones de acción
+        if (mode === 'guide' && serviceType === 'personal') {
+          stopScanning();
+          setShowActionButtons(true);
+        }
+        // En modo "guide" industrial y "process", permitir escaneo continuo de múltiples prendas
       });
       (global as any).rfidSubscription = subscription;
       const errSub = rfidModule.addErrorListener((msg: string) => {
@@ -166,7 +179,13 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     if (mode === 'garment') {
       setGarmentModalOpen(true);
     } else if (mode === 'guide') {
-      setGuideModalOpen(true);
+      if (serviceType === 'personal') {
+        // Flujo personal: abrir formulario de prenda directamente
+        setGarmentModalOpen(true);
+      } else {
+        // Flujo industrial: abrir formulario de guía
+        setGuideModalOpen(true);
+      }
     } else if (mode === 'process') {
       const processType = route?.params?.processType;
       const guideId = route?.params?.guideId;
@@ -197,6 +216,96 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     clearScannedTags();
     seenSetRef.current.clear();
     // Permanecer en la página de escaneo para registrar otra prenda
+  };
+
+  // Funciones para el flujo de servicio personal
+  const handleRegisterGarment = () => {
+    setShowActionButtons(false);
+    setGarmentModalOpen(true);
+  };
+
+  const handleGarmentSubmit = (garmentData: any) => {
+    if (scannedTags.length > 0) {
+      const currentTag = scannedTags[scannedTags.length - 1];
+      const newGarment = {
+        id: `garment-${Date.now()}`,
+        description: garmentData.description || 'Sin descripción',
+        rfidCode: currentTag.epc,
+        category: garmentData.category,
+        color: garmentData.color,
+      };
+      
+      setRegisteredGarments(prev => [...prev, newGarment]);
+      setGarmentModalOpen(false);
+      clearScannedTags();
+      // Continuar en la página de escaneo, listo para escanear otra prenda
+    }
+  };
+
+  const handleContinueToGuideForm = () => {
+    setShowActionButtons(false);
+    // Convertir prendas registradas a tags y abrir formulario de guía
+    const garmentTags = registeredGarments.map(g => ({ epc: g.rfidCode, rssi: -50, timestamp: Date.now() }));
+    // Agregar los tags al store
+    clearScannedTags();
+    garmentTags.forEach(tag => addScannedTag(tag));
+    setGuideModalOpen(true);
+  };
+
+  const removeRegisteredGarment = (garmentId: string) => {
+    const garment = registeredGarments.find(g => g.id === garmentId);
+    if (garment) {
+      // Remover del seenSet para permitir re-escaneo
+      seenSetRef.current.delete(garment.rfidCode);
+    }
+    setRegisteredGarments(prev => prev.filter(g => g.id !== garmentId));
+  };
+
+  // Función para verificar si un código RFID ya está registrado
+  const isRfidCodeAlreadyRegistered = (rfidCode: string) => {
+    return registeredGarments.some(garment => garment.rfidCode === rfidCode);
+  };
+
+  // Función para obtener la prenda existente por código RFID
+  const getExistingGarmentByRfid = (rfidCode: string) => {
+    return registeredGarments.find(garment => garment.rfidCode === rfidCode);
+  };
+
+  // Función para manejar la edición de prenda existente
+  const handleEditExistingGarment = () => {
+    if (scannedTags.length > 0) {
+      const currentTag = scannedTags[scannedTags.length - 1];
+      const existingGarment = getExistingGarmentByRfid(currentTag.epc);
+      
+      if (existingGarment) {
+        // Pre-llenar el formulario con los datos existentes
+        setGarmentModalOpen(true);
+        // Aquí podrías pasar los datos existentes al formulario
+      }
+    }
+  };
+
+  // Función para actualizar una prenda existente
+  const handleUpdateExistingGarment = (updatedGarmentData: any) => {
+    if (scannedTags.length > 0) {
+      const currentTag = scannedTags[scannedTags.length - 1];
+      const existingGarment = getExistingGarmentByRfid(currentTag.epc);
+      
+      if (existingGarment) {
+        const updatedGarment = {
+          ...existingGarment,
+          description: updatedGarmentData.description || existingGarment.description,
+          category: updatedGarmentData.category || existingGarment.category,
+          color: updatedGarmentData.color || existingGarment.color,
+        };
+        
+        setRegisteredGarments(prev => 
+          prev.map(g => g.id === existingGarment.id ? updatedGarment : g)
+        );
+        setGarmentModalOpen(false);
+        clearScannedTags();
+      }
+    }
   };
 
   // Funciones para manejar la selección de procesos
@@ -278,7 +387,9 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             navigation.goBack();
           }}
         />
-        <Text className="text-2xl font-bold text-gray-900 ml-2">Escanear Prendas</Text>
+        <Text className="text-2xl font-bold text-gray-900 ml-2">
+          {mode === 'guide' && serviceType === 'personal' ? 'Registrar Prenda' : 'Escanear Prendas'}
+        </Text>
       </View>
 
       <View className="mb-6">
@@ -313,69 +424,193 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         )}
       </View>
 
-      {/* Control de Rango del Escáner */}
-      <View className="mb-6">
-        <Card variant="outlined" padding="md">
-          <View className="flex-row items-center justify-between mb-3">
-            <View className="flex-row items-center">
-              <Icon name="radio-outline" size={20} color="#6B7280" />
-              <Text className="text-gray-700 ml-2">Sensibilidad</Text>
+      {/* Control de Rango del Escáner - Oculto en servicio personal */}
+      {!(mode === 'guide' && serviceType === 'personal') && (
+        <View className="mb-6">
+          <Card variant="outlined" padding="md">
+            <View className="flex-row items-center justify-between mb-3">
+              <View className="flex-row items-center">
+                <Icon name="radio-outline" size={20} color="#6B7280" />
+                <Text className="text-gray-700 ml-2">Sensibilidad</Text>
+              </View>
+              <Text className="text-sm font-medium text-gray-900">{scanRange} dBm</Text>
             </View>
-            <Text className="text-sm font-medium text-gray-900">{scanRange} dBm</Text>
-          </View>
-          
-          <View className="flex-row items-center space-x-3">
-            <Button
-              title="Muy Baja"
-              variant={scanRange === -90 ? "primary" : "outline"}
-              size="sm"
-              onPress={() => setScanRange(-90)}
-            />
-            <Button
-              title="Baja"
-              variant={scanRange === -75 ? "primary" : "outline"}
-              size="sm"
-              onPress={() => setScanRange(-75)}
-            />
-            <Button
-              title="Media"
-              variant={scanRange === -65 ? "primary" : "outline"}
-              size="sm"
-              onPress={() => setScanRange(-65)}
-            />
-            <Button
-              title="Alta"
-              variant={scanRange === -55 ? "primary" : "outline"}
-              size="sm"
-              onPress={() => setScanRange(-55)}
-            />
-          </View>
-        </Card>
-      </View>
+            
+            <View className="flex-row items-center space-x-3">
+              <Button
+                title="Muy Baja"
+                variant={scanRange === -90 ? "primary" : "outline"}
+                size="sm"
+                onPress={() => setScanRange(-90)}
+              />
+              <Button
+                title="Baja"
+                variant={scanRange === -75 ? "primary" : "outline"}
+                size="sm"
+                onPress={() => setScanRange(-75)}
+              />
+              <Button
+                title="Media"
+                variant={scanRange === -65 ? "primary" : "outline"}
+                size="sm"
+                onPress={() => setScanRange(-65)}
+              />
+              <Button
+                title="Alta"
+                variant={scanRange === -55 ? "primary" : "outline"}
+                size="sm"
+                onPress={() => setScanRange(-55)}
+              />
+            </View>
+          </Card>
+        </View>
+      )}
 
       {/* Sección de proceso/descrición eliminada para flujo simplificado */}
 
       <View className="flex-1 mb-6">
-        <Text className="text-lg font-bold text-gray-900 mb-3">
-          Prendas Escaneadas ({scannedTags.length})
-        </Text>
+        {mode === 'guide' && serviceType === 'personal' ? (
+          <>
+            {/* Sección de Código Escaneado (temporal) */}
+            {scannedTags.length > 0 && (
+              <View className="mb-4">
+                <View className="flex-row items-center justify-between mb-3">
+                  <Text className="text-lg font-bold text-gray-900">
+                    Código Escaneado
+                  </Text>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      clearScannedTags();
+                      setShowActionButtons(false);
+                    }}
+                    className="flex-row items-center bg-red-50 px-3 py-1 rounded-lg"
+                  >
+                    <Icon name="close-circle-outline" size={16} color="#EF4444" />
+                    <Text className="text-red-600 text-sm font-medium ml-1">Quitar</Text>
+                  </TouchableOpacity>
+                </View>
+                <Card variant="outlined" className="bg-yellow-50">
+                  <View className="flex-row items-center">
+                    <View className="bg-yellow-500 w-10 h-10 rounded-full items-center justify-center mr-3">
+                      <Icon name="scan-outline" size={20} color="#ffffff" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-base font-semibold text-gray-900">Tag detectado</Text>
+                      <Text className="text-sm text-gray-600 mt-1 font-mono">{scannedTags[scannedTags.length - 1]?.epc}</Text>
+                      {scannedTags[scannedTags.length - 1]?.rssi && (
+                        <Text className="text-xs text-gray-500 mt-1">
+                          Señal: {scannedTags[scannedTags.length - 1].rssi} dBm
+                        </Text>
+                      )}
+                    </View>
+                    <Icon name="alert-circle-outline" size={24} color="#F59E0B" />
+                  </View>
+                </Card>
+              </View>
+            )}
 
-        {scannedTags.length === 0 ? (
-          <EmptyState
-            icon="scan-outline"
-            title="No hay prendas escaneadas"
-            message="Inicia el escaneo para detectar tags RFID"
-          />
+            {/* Sección de Prendas Registradas */}
+            <View className="flex-1">
+              <Text className="text-lg font-bold text-gray-900 mb-3">
+                Prendas Registradas ({registeredGarments.length})
+              </Text>
+
+              {registeredGarments.length === 0 && scannedTags.length === 0 ? (
+                <EmptyState
+                  icon="scan-outline"
+                  title="No hay prendas registradas"
+                  message="Escanea y registra prendas para crear la guía"
+                />
+              ) : registeredGarments.length === 0 ? (
+                <EmptyState
+                  icon="shirt-outline"
+                  title="Sin prendas registradas aún"
+                  message="Presiona 'Registrar Prenda' para agregar el tag detectado"
+                />
+              ) : (
+                <FlatList
+                  data={registeredGarments}
+                  renderItem={({ item, index }) => (
+                    <Card variant="outlined" className="mb-2">
+                      <View className="flex-row justify-between items-center">
+                        <View className="flex-1">
+                          <View className="flex-row items-center">
+                            <View className="bg-green-500 w-8 h-8 rounded-full items-center justify-center mr-3">
+                              <Text className="text-white font-bold">{index + 1}</Text>
+                            </View>
+                            <View className="flex-1">
+                              <Text className="text-base font-semibold text-gray-900">{item.description}</Text>
+                              <Text className="text-xs text-gray-500 mt-1 font-mono">RFID: {item.rfidCode}</Text>
+                            </View>
+                          </View>
+                        </View>
+                        <TouchableOpacity onPress={() => removeRegisteredGarment(item.id)} className="ml-2">
+                          <Icon name="close-circle" size={24} color="#EF4444" />
+                        </TouchableOpacity>
+                      </View>
+                    </Card>
+                  )}
+                  keyExtractor={item => item.id}
+                />
+              )}
+            </View>
+          </>
         ) : (
-          <FlatList
-            data={scannedTags}
-            renderItem={renderScannedTag}
-            keyExtractor={item => item.epc}
-          />
+          <>
+            <Text className="text-lg font-bold text-gray-900 mb-3">
+              Prendas Escaneadas ({scannedTags.length})
+            </Text>
+
+            {scannedTags.length === 0 ? (
+              <EmptyState
+                icon="scan-outline"
+                title="No hay prendas escaneadas"
+                message="Inicia el escaneo para detectar tags RFID"
+              />
+            ) : (
+              <FlatList
+                data={scannedTags}
+                renderItem={renderScannedTag}
+                keyExtractor={item => item.epc}
+              />
+            )}
+          </>
         )}
       </View>
 
-      {scannedTags.length > 0 && (
+      {/* Botones de acción para servicio personal */}
+      {mode === 'guide' && serviceType === 'personal' && showActionButtons && scannedTags.length > 0 && (
+        <View className="space-y-2">
+          {(() => {
+            const currentTag = scannedTags[scannedTags.length - 1];
+            const isAlreadyRegistered = isRfidCodeAlreadyRegistered(currentTag?.epc);
+            
+            return (
+              <Button
+                title={isAlreadyRegistered ? "Editar Prenda" : "Registrar Prenda"}
+                onPress={isAlreadyRegistered ? handleEditExistingGarment : handleRegisterGarment}
+                fullWidth
+                size="sm"
+                icon={<Icon name={isAlreadyRegistered ? "create-outline" : "add-circle-outline"} size={16} color="white" />}
+                style={{ backgroundColor: isAlreadyRegistered ? "#F59E0B" : "#3B82F6" }}
+              />
+            );
+          })()}
+          {registeredGarments.length > 0 && (
+            <Button
+              title={`Continuar a Guía (${registeredGarments.length} prendas)`}
+              onPress={handleContinueToGuideForm}
+              variant="outline"
+              fullWidth
+              size="sm"
+              icon={<Icon name="arrow-forward-circle-outline" size={16} color="#3B82F6" />}
+            />
+          )}
+        </View>
+      )}
+
+      {/* Botones para otros modos */}
+      {!(mode === 'guide' && serviceType === 'personal') && scannedTags.length > 0 && (
         <View className="space-y-2">
           <Button
             title={`Continuar (${scannedTags.length})`}
@@ -386,6 +621,19 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           />
 
           <Button title="Limpiar Lista" onPress={clearScannedTags} variant="outline" fullWidth size="sm" />
+        </View>
+      )}
+
+      {/* Botón para continuar a guía (solo servicio personal con prendas registradas) */}
+      {mode === 'guide' && serviceType === 'personal' && !showActionButtons && registeredGarments.length > 0 && scannedTags.length === 0 && (
+        <View className="space-y-2">
+          <Button
+            title={`Continuar a Guía (${registeredGarments.length} prendas)`}
+            onPress={handleContinueToGuideForm}
+            fullWidth
+            size="sm"
+            icon={<Icon name="arrow-forward-circle-outline" size={16} color="white" />}
+          />
         </View>
       )}
 
@@ -419,14 +667,30 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         <View className="flex-1 bg-black/40" />
         <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl p-4" style={{ elevation: 8 }}>
           <View className="flex-row items-center mb-4">
-            <Text className="text-xl font-bold text-gray-900 flex-1">Registrar Prenda</Text>
+            <Text className="text-xl font-bold text-gray-900 flex-1">
+              {(() => {
+                if (mode === 'guide' && serviceType === 'personal' && scannedTags.length > 0) {
+                  const currentTag = scannedTags[scannedTags.length - 1];
+                  const isAlreadyRegistered = isRfidCodeAlreadyRegistered(currentTag?.epc);
+                  return isAlreadyRegistered ? "Editar Prenda" : "Registrar Prenda";
+                }
+                return "Registrar Prenda";
+              })()}
+            </Text>
             <TouchableOpacity onPress={handleCloseGarmentModal}>
               <Icon name="close" size={22} color="#111827" />
             </TouchableOpacity>
           </View>
           <GarmentForm
             rfidCode={scannedTags[0]?.epc || ''}
-            onSubmit={handleCloseGarmentModal}
+            onSubmit={(() => {
+              if (mode === 'guide' && serviceType === 'personal' && scannedTags.length > 0) {
+                const currentTag = scannedTags[scannedTags.length - 1];
+                const isAlreadyRegistered = isRfidCodeAlreadyRegistered(currentTag?.epc);
+                return isAlreadyRegistered ? handleUpdateExistingGarment : handleGarmentSubmit;
+              }
+              return handleCloseGarmentModal;
+            })()}
           />
         </View>
       </Modal>
