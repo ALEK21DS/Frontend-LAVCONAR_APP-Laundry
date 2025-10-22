@@ -6,6 +6,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { useGuides } from '@/laundry/hooks/useGuides';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GuideForm } from './ui/GuideForm';
+import { GuideDetailsModal } from './ui/GuideDetailsModal';
 import { rfidModule } from '@/lib/rfid/rfid.module';
 import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
 
@@ -15,7 +16,9 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const { guides, isLoading, createGuide } = useGuides();
   const [query, setQuery] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedGuide, setSelectedGuide] = useState<any | null>(null);
   const prefilledTags = route?.params?.prefilledTags || [];
   const [scannedTags, setScannedTags] = useState<ScannedTag[]>([]);
   const [isScanning, setIsScanning] = useState(false);
@@ -24,8 +27,30 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const MIN_RSSI = -65;
 
   const demoGuides = [
-    { id: 'g-001', guide_number: 'G-0001', client_name: 'Juan Pérez', status: 'IN_PROCESS' },
-    { id: 'g-002', guide_number: 'G-0002', client_name: 'María García', status: 'COMPLETED' },
+    { 
+      id: 'g-001', 
+      guide_number: 'G-0001', 
+      client_name: 'Juan Pérez', 
+      status: 'IN_PROCESS',
+      created_at: '21 de octubre de 2025, 10:30',
+      total_garments: 15
+    },
+    { 
+      id: 'g-002', 
+      guide_number: 'G-0002', 
+      client_name: 'María García', 
+      status: 'COMPLETED',
+      created_at: '20 de octubre de 2025, 14:15',
+      total_garments: 8
+    },
+    { 
+      id: 'g-003', 
+      guide_number: 'G-0003', 
+      client_name: 'Comercial Andes S.A.', 
+      status: 'WASHING',
+      created_at: '19 de octubre de 2025, 09:45',
+      total_garments: 25
+    },
   ];
   const base = guides && guides.length > 0 ? guides : (demoGuides as any[]);
 
@@ -36,6 +61,18 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   }, [base, query]);
 
   const openCreate = () => { setEditingId(null); setFormOpen(true); };
+
+  const openDetails = (guide: any) => {
+    setSelectedGuide(guide);
+    setDetailsOpen(true);
+  };
+
+  const openEdit = () => {
+    if (selectedGuide) {
+      setEditingId(selectedGuide.id);
+      setFormOpen(true);
+    }
+  };
 
   const closeModal = () => {
     setFormOpen(false);
@@ -131,27 +168,38 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
           <View className="-mx-1 flex-row flex-wrap">
             {filtered.map((g: any) => (
               <View key={g.id} className="w-full px-1 mb-2">
-                <Card padding="md" variant="default">
-                  <View className="flex-row items-center">
-                    <View className="bg-yellow-50 rounded-lg p-2 mr-3">
-                      <IonIcon name="document-text-outline" size={20} color="#F59E0B" />
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => openDetails(g)}
+                >
+                  <Card padding="md" variant="default">
+                    <View className="flex-row items-center">
+                      <View className="bg-yellow-50 rounded-lg p-2 mr-3">
+                        <IonIcon name="document-text-outline" size={20} color="#F59E0B" />
+                      </View>
+                      <View className="flex-1">
+                        <Text className="text-gray-900 font-semibold">{g.guide_number}</Text>
+                        <Text className="text-gray-500 text-xs">{g.client_name}</Text>
+                      </View>
+                      <Text className="text-gray-600 text-xs">{g.status}</Text>
                     </View>
-                    <View className="flex-1">
-                      <Text className="text-gray-900 font-semibold">{g.guide_number}</Text>
-                      <Text className="text-gray-500 text-xs">{g.client_name}</Text>
-                    </View>
-                    <Text className="text-gray-600 text-xs mr-3">{g.status}</Text>
-                    <TouchableOpacity className="w-9 h-9 rounded-lg bg-blue-600 active:bg-blue-700 items-center justify-center" onPress={() => { setEditingId(g.id); setFormOpen(true); }}>
-                      <IonIcon name="pencil-outline" size={16} color="#ffffff" />
-                    </TouchableOpacity>
-                  </View>
-                </Card>
+                  </Card>
+                </TouchableOpacity>
               </View>
             ))}
           </View>
         </ScrollView>
       </View>
 
+      {/* Modal de Detalles */}
+      <GuideDetailsModal
+        visible={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+        guide={selectedGuide}
+        onEdit={openEdit}
+      />
+
+      {/* Modal de Formulario */}
       <Modal visible={formOpen || prefilledTags.length > 0} transparent animationType="slide" onRequestClose={closeModal}>
         <View className="flex-1 bg-black/40" />
         <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl p-4" style={{ elevation: 8 }}>

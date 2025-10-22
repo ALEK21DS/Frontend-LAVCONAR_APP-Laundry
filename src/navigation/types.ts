@@ -13,7 +13,8 @@ export type MainStackParamList = {
   Clients: undefined;
   Guides: undefined;
   Garments: undefined;
-  ScanClothes: { mode?: 'garment' | 'guide' | 'process' } | undefined;
+  ScanClothes: { mode?: 'garment' | 'guide' | 'process'; guideId?: string; processType?: string } | undefined;
   ScanProcesses: undefined;
   Processes: undefined;
+  GarmentValidation: { guideId: string; processType: string; scannedTags: string[] };
 };

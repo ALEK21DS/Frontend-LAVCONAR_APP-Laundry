@@ -59,6 +59,89 @@ export const CHARGE_TYPES = [
   { label: 'Mixto', value: 'MIXED' },
 ];
 
+// Prioridades de servicio
+export const SERVICE_PRIORITIES = [
+  { label: 'Normal', value: 'NORMAL' },
+  { label: 'Alta', value: 'HIGH' },
+  { label: 'Urgente', value: 'URGENT' },
+];
+
+// Tipos de lavado
+export const WASHING_TYPES = [
+  { label: 'Lavado Normal', value: 'NORMAL' },
+  { label: 'Lavado Delicado', value: 'DELICATE' },
+  { label: 'Lavado Industrial', value: 'INDUSTRIAL' },
+  { label: 'Lavado en Seco', value: 'DRY_CLEAN' },
+  { label: 'Lavado Especial', value: 'SPECIAL' },
+];
+
+// Tipos de proceso para el flujo de trabajo
+export const PROCESS_TYPES = [
+  { 
+    label: 'EN PROCESO', 
+    value: 'IN_PROCESS',
+    description: 'Guías recibidas para procesar',
+    icon: 'construct-outline',
+    color: '#3B82F6'
+  },
+  { 
+    label: 'LAVADO', 
+    value: 'WASHING',
+    description: 'Guías en proceso para lavar',
+    icon: 'water-outline',
+    color: '#06B6D4'
+  },
+  { 
+    label: 'SECADO', 
+    value: 'DRYING',
+    description: 'Guías lavadas para secar',
+    icon: 'sunny-outline',
+    color: '#F59E0B'
+  },
+  { 
+    label: 'PLANCHADO', 
+    value: 'IRONING',
+    description: 'Guías secas para planchar',
+    icon: 'flame-outline',
+    color: '#DC2626'
+  },
+  { 
+    label: 'DOBLADO', 
+    value: 'FOLDING',
+    description: 'Guías planchadas para doblar',
+    icon: 'layers-outline',
+    color: '#7C3AED'
+  },
+  { 
+    label: 'EMPAQUE', 
+    value: 'PACKAGING',
+    description: 'Guías secas para empacar',
+    icon: 'cube-outline',
+    color: '#8B5CF6'
+  },
+  { 
+    label: 'EMBARQUE', 
+    value: 'SHIPPING',
+    description: 'Guías empacadas para embarcar',
+    icon: 'boat-outline',
+    color: '#EF4444'
+  },
+  { 
+    label: 'CARGA', 
+    value: 'LOADING',
+    description: 'Guías embarcadas para cargar',
+    icon: 'car-outline',
+    color: '#84CC16'
+  },
+  { 
+    label: 'ENTREGA', 
+    value: 'DELIVERY',
+    description: 'Guías cargadas para entregar',
+    icon: 'checkmark-circle-outline',
+    color: '#22C55E'
+  },
+];
+
 // Mantener compatibilidad con código antiguo
 export const PROCESS_STATUS = GUIDE_STATUS;
 export const PROCESS_STATUS_LABELS = GUIDE_STATUS_LABELS;

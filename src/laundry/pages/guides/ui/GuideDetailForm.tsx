@@ -29,37 +29,31 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
     initial_state_description: initialValues?.initial_state_description || '',
     additional_cost: initialValues?.additional_cost || '0',
     observations: initialValues?.observations || '',
+    // Nuevos campos basados en la imagen - vienen de la guía principal
+    garment_weight: initialValues?.total_weight || '0.00',
+    quantity: initialValues?.total_garments?.toString() || '1',
+    label_printed: initialValues?.label_printed || false,
+    incidents: initialValues?.incidents || '',
   });
 
   const [showGuideDropdown, setShowGuideDropdown] = useState(false);
   const [showScanForm, setShowScanForm] = useState(false);
 
   const garmentTypes = [
-    { label: 'Camisa', value: 'camisa' },
-    { label: 'Pantalón', value: 'pantalon' },
-    { label: 'Vestido', value: 'vestido' },
-    { label: 'Blusa', value: 'blusa' },
-    { label: 'Chaqueta', value: 'chaqueta' },
-    { label: 'Abrigo', value: 'abrigo' },
-    { label: 'Falda', value: 'falda' },
-    { label: 'Short', value: 'short' },
-    { label: 'Jeans', value: 'jeans' },
-    { label: 'Sudadera', value: 'sudadera' },
+    { label: 'Uniforme', value: 'UNIFORMS' },
+    { label: 'Sabanas', value: 'SHEETS' },
+    { label: 'Toallas', value: 'TOWELS' },
+    { label: 'Manteles', value: 'TABLECLOTHS' },
+    { label: 'Cortinas', value: 'CURTAINS' },
+    { label: 'Tapetes', value: 'MATS' },
+    { label: 'Otros', value: 'OTHER' }
   ];
 
   const colors = [
     { label: 'Blanco', value: 'blanco' },
-    { label: 'Negro', value: 'negro' },
-    { label: 'Azul', value: 'azul' },
-    { label: 'Rojo', value: 'rojo' },
-    { label: 'Verde', value: 'verde' },
-    { label: 'Amarillo', value: 'amarillo' },
-    { label: 'Rosa', value: 'rosa' },
-    { label: 'Morado', value: 'morado' },
-    { label: 'Naranja', value: 'naranja' },
-    { label: 'Gris', value: 'gris' },
-    { label: 'Marrón', value: 'marron' },
-    { label: 'Beige', value: 'beige' },
+    { label: 'Colores Claros', value: 'LIGHT_COLORS' },
+    { label: 'Colores Oscuros', value: 'DARK_COLORS' },
+    { label: 'Mixto', value: 'MIXED' },
   ];
 
   const serviceOptions = [
@@ -187,6 +181,76 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
             />
           </View>
 
+          {/* Peso y Cantidad */}
+          <View className="mb-6 bg-yellow-50 p-4 rounded-lg">
+            <Text className="text-base text-yellow-800 font-semibold mb-3">Peso y Cantidad</Text>
+            <View className="flex-row -mx-1">
+              <View className="flex-1 px-1">
+                <Input
+                  label="Peso de la Prenda (kg)"
+                  placeholder="0.00"
+                  value={formData.garment_weight}
+                  editable={false}
+                  className="bg-gray-50"
+                />
+              </View>
+              <View className="flex-1 px-1">
+                <Input
+                  label="Cantidad"
+                  placeholder="1"
+                  value={formData.quantity}
+                  editable={false}
+                  className="bg-gray-50"
+                />
+              </View>
+            </View>
+            <Text className="text-xs text-gray-500 mt-2">
+              Estos valores provienen de la guía principal
+            </Text>
+          </View>
+
+          {/* Etiqueta e Incidencias */}
+          <View className="mb-6 bg-blue-50 p-4 rounded-lg">
+            <Text className="text-base text-blue-800 font-semibold mb-3">Etiqueta e Incidencias</Text>
+            
+            {/* Etiqueta Impresa */}
+            <View className="mb-4">
+              <Text className="text-sm font-medium text-gray-700 mb-2">Etiqueta Impresa</Text>
+              <View className="flex-row items-center">
+                <Text className="text-sm text-gray-600 flex-1">
+                  ¿Se ha impreso la etiqueta de seguimiento?
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setFormData(prev => ({ ...prev, label_printed: !prev.label_printed }))}
+                  className="flex-row items-center"
+                >
+                  <View className={`w-5 h-5 border-2 rounded mr-2 ${formData.label_printed ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`}>
+                    {formData.label_printed && <IonIcon name="checkmark" size={12} color="white" />}
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Incidencias/Novedades */}
+            <View className="mb-4">
+              <Text className="text-sm font-medium text-gray-700 mb-2">Incidencias/Novedades</Text>
+              <View className="bg-white border border-gray-300 rounded-lg p-3">
+                <TextInput
+                  className="text-gray-900 min-h-[80px] text-left"
+                  placeholder="Ej: Falta un botón, cremallera rota, mancha permanente, etc."
+                  placeholderTextColor="#9CA3AF"
+                  value={formData.incidents}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, incidents: text }))}
+                  multiline
+                  textAlignVertical="top"
+                />
+              </View>
+              <Text className="text-xs text-gray-500 mt-1">
+                Separa las incidencias con comas
+              </Text>
+            </View>
+          </View>
+
           {/* Observaciones */}
           <View className="mb-6">
             <Text className="text-sm font-medium text-gray-700 mb-2">Observaciones</Text>
@@ -238,6 +302,10 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
               console.log('Escaneo RFID creado:', data);
               setShowScanForm(false);
               onCancel(); // Cerrar el modal principal
+              // Navegar al Dashboard después de completar todo el proceso
+              if (onNavigate) {
+                onNavigate('Dashboard');
+              }
             }}
             onCancel={() => setShowScanForm(false)}
             submitting={false}

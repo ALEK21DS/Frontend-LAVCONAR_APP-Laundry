@@ -62,10 +62,10 @@ class RFIDModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMo
                             if (epc != null) {
                                 val rssi = try {
                                     when {
-                                        tag.rssi is String -> (tag.rssi as String).toIntOrNull() ?: -50
-                                        else -> tag.getRssi()?.toIntOrNull() ?: -50
+                                        tag.rssi is String -> (tag.rssi as String).toIntOrNull() ?: -65
+                                        else -> tag.getRssi()?.toIntOrNull() ?: -65
                                     }
-                                } catch (_: Exception) { -50 }
+                                } catch (_: Exception) { -65 }
                                 sendTagScannedEvent(epc, rssi)
                             }
                         } else {

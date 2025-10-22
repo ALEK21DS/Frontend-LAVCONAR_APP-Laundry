@@ -6,6 +6,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { useClients } from '@/laundry/hooks/useClients';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ClientForm } from './ui/ClientForm';
+import { ClientDetailsModal } from './ui/ClientDetailsModal';
 
 
 type ClientsPageProps = {
@@ -16,13 +17,54 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
   const { clients, isLoading, createClient, updateClient } = useClients();
   const [query, setQuery] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [initialValues, setInitialValues] = useState<any | undefined>(undefined);
 
   const demoClients = [
-    { id: 'demo-1', name: 'Juan Pérez', email: 'juan.perez@example.com', identification_number: '0102030405', acronym: 'JP', is_active: true },
-    { id: 'demo-2', name: 'María García', email: 'maria.garcia@example.com', identification_number: '0911223344', acronym: 'MG', is_active: true },
-    { id: 'demo-3', name: 'Comercial Andes S.A.', email: 'contacto@andes.com', identification_number: '1790012345001', acronym: 'ANDES', is_active: false },
+    { 
+      id: 'demo-1', 
+      name: 'Juan Pérez', 
+      email: 'juan.perez@example.com', 
+      identification_number: '0102030405', 
+      acronym: 'JP', 
+      phone: '+593 99 123 4567',
+      address: 'Av. Amazonas N24-03, Quito',
+      branch_office_id: 'Sucursal Centro',
+      branch_id: '99e24613-45dc-4e84-ac5b-7b898275c989',
+      is_active: true,
+      created_at: '21 de octubre de 2025, 07:34',
+      updated_at: '21 de octubre de 2025, 07:34'
+    },
+    { 
+      id: 'demo-2', 
+      name: 'María García', 
+      email: 'maria.garcia@example.com', 
+      identification_number: '0911223344', 
+      acronym: 'MG', 
+      phone: '+593 98 765 4321',
+      address: 'Calle Loja 456, Guayaquil',
+      branch_office_id: 'Sucursal Norte',
+      branch_id: '88d13524-36cb-3d73-bc4a-6a787164b878',
+      is_active: true,
+      created_at: '20 de octubre de 2025, 15:22',
+      updated_at: '21 de octubre de 2025, 09:15'
+    },
+    { 
+      id: 'demo-3', 
+      name: 'Comercial Andes S.A.', 
+      email: 'contacto@andes.com', 
+      identification_number: '1790012345001', 
+      acronym: 'ANDES', 
+      phone: '+593 2 234 5678',
+      address: 'Av. Naciones Unidas E4-29, Quito',
+      branch_office_id: 'Sucursal Sur',
+      branch_id: '77c02413-27ba-2c62-ab3a-5a676053a767',
+      is_active: false,
+      created_at: '19 de octubre de 2025, 11:45',
+      updated_at: '20 de octubre de 2025, 14:30'
+    },
   ];
 
   const base = clients && clients.length > 0 ? clients : demoClients;
@@ -37,6 +79,33 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
     setEditingId(null);
     setInitialValues(undefined);
     setFormOpen(true);
+  };
+
+  const openDetails = (client: any) => {
+    setSelectedClient(client);
+    setDetailsOpen(true);
+  };
+
+  const openEdit = () => {
+    if (selectedClient) {
+      setEditingId(selectedClient.id);
+      setInitialValues({
+        name: selectedClient.name,
+        email: selectedClient.email,
+        identification_number: selectedClient.identification_number,
+        phone: selectedClient.phone,
+        address: selectedClient.address,
+        acronym: selectedClient.acronym,
+        branch_office_id: selectedClient.branch_office_id,
+        is_active: selectedClient.is_active,
+      });
+      setFormOpen(true);
+    }
+  };
+
+  const handleDelete = () => {
+    // TODO: Implementar eliminación con el backend
+    console.log('Eliminar cliente:', selectedClient?.id);
   };
 
   return (
@@ -72,37 +141,43 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
           <View className="-mx-1 flex-row flex-wrap">
             {filtered.map((client: any) => (
               <View key={client.id} className="w-full px-1 mb-2">
-                <Card padding="md" variant="default">
-                  <View className="flex-row items-center">
-                    <View className="bg-blue-50 rounded-lg p-2 mr-3">
-                      <IonIcon name="person-outline" size={20} color="#2563EB" />
-                    </View>
-                    <View className="flex-1">
-                      <View className="flex-row items-center mb-1">
-                        <Text className="text-gray-900 font-semibold mr-2">{client.name}</Text>
-                        <View className={`px-2 py-0.5 rounded-full ${client.is_active ? 'bg-green-100' : 'bg-gray-100'}`}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => openDetails(client)}
+                >
+                  <Card padding="md" variant="default">
+                    <View className="flex-row items-center">
+                      <View className="bg-blue-50 rounded-lg p-2 mr-3">
+                        <IonIcon name="person-outline" size={20} color="#2563EB" />
+                      </View>
+                      <View className="flex-1">
+                        <Text className="text-gray-900 font-semibold mb-1">{client.name}</Text>
+                        <Text className="text-gray-500 text-xs mb-1">{client.identification_number}</Text>
+                        <View className={`px-2 py-0.5 rounded-full self-start ${client.is_active ? 'bg-green-100' : 'bg-gray-100'}`}>
                           <Text className={`text-xs font-medium ${client.is_active ? 'text-green-700' : 'text-gray-600'}`}>
                             {client.is_active ? 'Activo' : 'Inactivo'}
                           </Text>
                         </View>
                       </View>
-                      <Text className="text-gray-500 text-xs">{client.identification_number}</Text>
                     </View>
-                    <TouchableOpacity className="w-9 h-9 rounded-lg bg-blue-600 active:bg-blue-700 items-center justify-center" onPress={() => {
-                      setEditingId(client.id);
-                      setInitialValues({ name: client.name, email: client.email, identification_number: client.identification_number, phone: client.phone, address: client.address, acronym: client.acronym, branch_office_id: client.branch_office_id, is_active: client.is_active });
-                      setFormOpen(true);
-                    }}>
-                      <IonIcon name="pencil-outline" size={16} color="#ffffff" />
-                    </TouchableOpacity>
-                  </View>
-                </Card>
+                  </Card>
+                </TouchableOpacity>
               </View>
             ))}
           </View>
         </ScrollView>
       </View>
 
+      {/* Modal de Detalles */}
+      <ClientDetailsModal
+        visible={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+        client={selectedClient}
+        onEdit={openEdit}
+        onDelete={handleDelete}
+      />
+
+      {/* Modal de Formulario */}
       <Modal visible={formOpen} transparent animationType="slide" onRequestClose={() => setFormOpen(false)}>
         <View className="flex-1 bg-black/40" />
         <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl p-4" style={{ elevation: 8 }}>

@@ -11,6 +11,7 @@ type TabItem = {
 interface BottomNavProps {
   active: TabItem['key'];
   onNavigate: (route: TabItem['key'], params?: any) => void;
+  onOpenProcessTypeModal?: () => void;
 }
 
 const TABS: TabItem[] = [
@@ -21,7 +22,7 @@ const TABS: TabItem[] = [
   { key: 'Processes', label: 'Procesos', icon: 'sync-outline' },
 ];
 
-export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate }) => {
+export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpenProcessTypeModal }) => {
   const [showGuidesMenu, setShowGuidesMenu] = useState(false);
   const [radialOpen, setRadialOpen] = useState(false);
   const animLeft = useRef(new Animated.Value(0)).current;
@@ -102,7 +103,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate }) => {
 
                 {/* Derecha (Proceso - morado) */}
                 <Animated.View style={{ position: 'absolute', top: -70, right: -75, transform: [{ scale: animRight }], opacity: animRight, zIndex: 50 }} pointerEvents={radialOpen ? 'auto' : 'none'}>
-                  <TouchableOpacity activeOpacity={0.85} onPress={() => { setRadialOpen(false); /* @ts-ignore */ onNavigate('ScanClothes' as any, { mode: 'process' }); }}>
+                  <TouchableOpacity activeOpacity={0.85} onPress={() => { setRadialOpen(false); onOpenProcessTypeModal?.(); }}>
                     <View style={{ width: 78, height: 78, borderRadius: 39, backgroundColor: '#7c3aed', elevation: 10 }} className="items-center justify-center">
                       <IonIcon name="construct-outline" size={20} color="#ffffff" />
                     </View>

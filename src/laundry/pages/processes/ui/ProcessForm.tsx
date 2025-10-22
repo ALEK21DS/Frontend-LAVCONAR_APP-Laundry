@@ -13,6 +13,8 @@ interface ProcessFormProps {
   onScanRFID?: () => void;
   onSubmit: () => void;
   submitting?: boolean;
+  scannedTags?: string[]; // Tags RFID escaneados
+  processType?: string; // Tipo de proceso (IN_PROCESS, WASHING, etc.)
 }
 
 export const ProcessForm: React.FC<ProcessFormProps> = ({
@@ -22,13 +24,15 @@ export const ProcessForm: React.FC<ProcessFormProps> = ({
   onScanRFID,
   onSubmit,
   submitting,
+  scannedTags = [],
+  processType = 'IN_PROCESS',
 }) => {
   const { user } = useAuthStore();
   const branchOfficeId = user?.sucursalId;
 
   // Estado del formulario
   const [machineCode, setMachineCode] = useState<string>('M-001');
-  const [processType, setProcessType] = useState<string>('WASH');
+  const [selectedProcessType, setSelectedProcessType] = useState<string>('WASH');
   const [loadWeight, setLoadWeight] = useState<string>('0');
   const [garmentQty, setGarmentQty] = useState<string>('0');
   const [specialTreatment, setSpecialTreatment] = useState<string>('NORMAL');
@@ -47,28 +51,30 @@ export const ProcessForm: React.FC<ProcessFormProps> = ({
   // Opciones
   const PROCESS_TYPES: Option[] = [
     { label: 'Lavado', value: 'WASH' },
-    { label: 'Enjuague', value: 'RINSE' },
     { label: 'Secado', value: 'DRY' },
+    { label: 'Planchado', value: 'IRON' },
+    { label: 'Lavado en Seco', value: 'DRY_CLEAN' },
   ];
 
   const SPECIAL_TREATMENTS: Option[] = [
+    { label: 'Ninguno', value: 'NONE' },
     { label: 'Remoción de manchas', value: 'STAIN_REMOVAL' },
+    { label: 'Desinfección', value: 'DISINFECTION' },
     { label: 'Delicado', value: 'DELICATE' },
-    { label: 'Uso pesado', value: 'HEAVY_DUTY' },
-    { label: 'Normal', value: 'NORMAL' },
+    { label: 'Uso pesado', value: 'HEAVY_DUTY' }
   ];
 
   const WASH_TEMPERATURES: Option[] = [
-    { label: 'Frío', value: 'COLD' },
-    { label: 'Tibio', value: 'WARM' },
-    { label: 'Caliente', value: 'HOT' },
+    { label: 'Fría (20°C)', value: 'COLD' },
+    { label: 'Tibia (40°C)', value: 'WARM' },
+    { label: 'Caliente (60°C)', value: 'HOT' },
+    { label: 'Muy caliente (90°C)', value: 'VERY_HOT' },
   ];
 
   const STATUS_OPTIONS: Option[] = [
-    { label: 'Pendiente', value: 'PENDING' },
     { label: 'En progreso', value: 'IN_PROGRESS' },
     { label: 'Completado', value: 'COMPLETED' },
-    { label: 'Cancelado', value: 'CANCELLED' },
+    { label: 'Fallido', value: 'FAILED' },
   ];
 
   return (
@@ -76,19 +82,67 @@ export const ProcessForm: React.FC<ProcessFormProps> = ({
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 16 }}>
       {/* Guía y escaneo */}
       <View className="mb-6">
-        <Dropdown
-          label="Guía *"
-          placeholder="Selecciona una guía"
-          options={guideOptions}
-          value={selectedGuideId || ''}
-          onValueChange={onChangeGuide}
-          icon="document-text-outline"
-          searchable
-        />
+        {/* Guía seleccionada (solo lectura) */}
+        <View className="mb-4">
+          <Text className="text-base font-semibold text-gray-700 mb-2">Guía</Text>
+          <Card padding="md" variant="outlined">
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center flex-1">
+                <IonIcon name="document-text-outline" size={20} color="#3B82F6" />
+                <View className="ml-3">
+                  <Text className="text-base font-semibold text-gray-900">
+                    {guideOptions.find(g => g.value === selectedGuideId)?.label || 'Guía seleccionada'}
+                  </Text>
+                  <Text className="text-sm text-gray-600">
+                    ID: {selectedGuideId || 'No seleccionada'}
+                  </Text>
+                </View>
+              </View>
+              <View className="bg-green-100 px-2 py-1 rounded">
+                <Text className="text-xs font-medium text-green-800">Confirmada</Text>
+              </View>
+            </View>
+          </Card>
+        </View>
+        
+        {/* Información de prendas escaneadas */}
+        {scannedTags.length > 0 && (
+          <View className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+            <View className="flex-row items-center mb-2">
+              <IonIcon name="checkmark-circle" size={20} color="#10B981" />
+              <Text className="text-sm font-medium text-green-800 ml-2">
+                Prendas Escaneadas ({scannedTags.length})
+              </Text>
+            </View>
+            <Text className="text-xs text-green-700 mb-2">
+              {processType === 'IN_PROCESS' 
+                ? 'Validando prendas contra la guía...' 
+                : 'Prendas listas para procesar'
+              }
+            </Text>
+            <View className="flex-row flex-wrap">
+              {scannedTags.slice(0, 5).map((tag, index) => (
+                <View key={index} className="bg-green-100 px-2 py-1 rounded mr-2 mb-1">
+                  <Text className="text-xs text-green-800 font-mono">
+                    {tag.substring(0, 8)}...
+                  </Text>
+                </View>
+              ))}
+              {scannedTags.length > 5 && (
+                <View className="bg-green-100 px-2 py-1 rounded">
+                  <Text className="text-xs text-green-800">
+                    +{scannedTags.length - 5} más
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+        
         {onScanRFID && (
           <View className="mt-3">
             <Button
-              title="Escanear Prenda"
+              title={scannedTags.length > 0 ? "Escanear Más Prendas" : "Escanear Prendas"}
               onPress={onScanRFID}
               size="sm"
               icon={<IonIcon name="scan-outline" size={18} color="white" />}
@@ -113,8 +167,8 @@ export const ProcessForm: React.FC<ProcessFormProps> = ({
           label="Tipo de Proceso *"
           placeholder="Selecciona el tipo"
           options={PROCESS_TYPES}
-          value={processType}
-          onValueChange={setProcessType}
+          value={selectedProcessType}
+          onValueChange={setSelectedProcessType}
           icon="construct-outline"
         />
 

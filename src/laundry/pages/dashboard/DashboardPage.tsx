@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, ScrollView, RefreshControl } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Card } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -18,6 +18,8 @@ import { useTodayGuides } from '@/laundry/hooks/useGuides';
     await refetch();
     setRefreshing(false);
   };
+
+
 
   const stats = {
     clientes: Array.from(new Set(guides.map(g => (g.client_id ? String(g.client_id) : g.client_name || '')))).filter(Boolean).length,
@@ -88,6 +90,7 @@ import { useTodayGuides } from '@/laundry/hooks/useGuides';
             </View>
           </View>
 
+
           <View className="mb-8">
             <Text className="text-xl font-bold text-gray-900 mb-3">Actividad Reciente</Text>
             <View className="-mx-2 flex-row flex-wrap">
@@ -110,6 +113,7 @@ import { useTodayGuides } from '@/laundry/hooks/useGuides';
           </View>
         </View>
       </ScrollView>
+
     </MainLayout>
   );
  }

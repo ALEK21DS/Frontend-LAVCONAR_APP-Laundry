@@ -29,8 +29,16 @@ export const LoginPage: React.FC = () => {
 
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = async () => {
+    // Prevenir múltiples llamadas
+    if (isSubmitting || isLoading) {
+      console.log('🚫 Login ya en progreso, ignorando llamada duplicada');
+      return;
+    }
+
+    setIsSubmitting(true);
     clearError();
     setErrors({});
 
@@ -38,6 +46,7 @@ export const LoginPage: React.FC = () => {
     if (!validation.isValid) {
       setToastMsg(validation.error || 'Datos incompletos.');
       setShowErrorToast(true);
+      setIsSubmitting(false);
       return;
     }
 
@@ -46,6 +55,8 @@ export const LoginPage: React.FC = () => {
     } catch (err: any) {
       setToastMsg(err?.message || 'No se pudo iniciar sesión. Verifica tus credenciales.');
       setShowErrorToast(true);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -121,7 +132,7 @@ export const LoginPage: React.FC = () => {
           <Button
             title="Iniciar Sesión"
             onPress={handleLogin}
-            isLoading={isLoading}
+            isLoading={isLoading || isSubmitting}
             fullWidth
             size="lg"
             variant="white"

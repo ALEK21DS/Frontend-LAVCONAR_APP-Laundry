@@ -5,12 +5,14 @@ import { Card } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ProcessForm } from './ui/ProcessForm';
+import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
 
 type ProcessesPageProps = { navigation: NativeStackNavigationProp<any> };
 
 export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
   const [query, setQuery] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+  const [processTypeModalOpen, setProcessTypeModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Datos demo de procesos
@@ -25,7 +27,20 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
     return demo.filter(p => [p.name, p.guide_number, p.status].some(v => v.toLowerCase().includes(q)));
   }, [query]);
 
-  const openCreate = () => { setEditingId(null); setFormOpen(true); };
+  const openCreate = () => { setProcessTypeModalOpen(true); };
+
+  const openProcessTypeModal = () => {
+    setProcessTypeModalOpen(true);
+  };
+
+  const handleProcessTypeSelect = (processType: string) => {
+    setProcessTypeModalOpen(false);
+    // Navegar al escáner con el tipo de proceso seleccionado
+    navigation.navigate('ScanClothes', {
+      mode: 'process',
+      processType: processType
+    });
+  };
 
   return (
     <MainLayout 
@@ -66,27 +81,37 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
           <View className="-mx-1 flex-row flex-wrap">
             {filtered.map(p => (
               <View key={p.id} className="w-full px-1 mb-2">
-                <Card padding="md" variant="default">
-                  <View className="flex-row items-center">
-                    <View className="bg-green-50 rounded-lg p-2 mr-3">
-                      <IonIcon name="construct-outline" size={20} color="#10B981" />
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={openProcessTypeModal}
+                >
+                  <Card padding="md" variant="default">
+                    <View className="flex-row items-center">
+                      <View className="bg-green-50 rounded-lg p-2 mr-3">
+                        <IonIcon name="construct-outline" size={20} color="#10B981" />
+                      </View>
+                      <View className="flex-1">
+                        <Text className="text-gray-900 font-semibold">{p.name}</Text>
+                        <Text className="text-gray-500 text-xs">{p.guide_number}</Text>
+                      </View>
+                      <Text className="text-gray-600 text-xs">{p.status}</Text>
                     </View>
-                    <View className="flex-1">
-                      <Text className="text-gray-900 font-semibold">{p.name}</Text>
-                      <Text className="text-gray-500 text-xs">{p.guide_number}</Text>
-                    </View>
-                    <Text className="text-gray-600 text-xs mr-3">{p.status}</Text>
-                    <TouchableOpacity className="w-9 h-9 rounded-lg bg-blue-600 active:bg-blue-700 items-center justify-center" onPress={() => { setEditingId(p.id); setFormOpen(true); }}>
-                      <IonIcon name="pencil-outline" size={16} color="#ffffff" />
-                    </TouchableOpacity>
-                  </View>
-                </Card>
+                  </Card>
+                </TouchableOpacity>
               </View>
             ))}
           </View>
         </ScrollView>
       </View>
 
+      {/* Modal de Selección de Tipo de Proceso */}
+      <ProcessTypeModal
+        visible={processTypeModalOpen}
+        onClose={() => setProcessTypeModalOpen(false)}
+        onSelectProcess={handleProcessTypeSelect}
+      />
+
+      {/* Modal de Formulario (mantenido para compatibilidad) */}
       <Modal visible={formOpen} transparent animationType="slide" onRequestClose={() => setFormOpen(false)}>
         <View className="flex-1 bg-black/40" />
         <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl p-4" style={{ elevation: 8 }}>

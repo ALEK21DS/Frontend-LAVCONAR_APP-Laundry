@@ -5,7 +5,7 @@ import { Button, Card, Dropdown, Input } from '@/components/common';
 import { GuideItem } from '@/laundry/interfaces/guides/guides.interface';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { SUCURSALES } from '@/constants';
-import { GUIDE_STATUS, GUIDE_STATUS_LABELS } from '@/constants/processes';
+import { GUIDE_STATUS, GUIDE_STATUS_LABELS, SERVICE_PRIORITIES, WASHING_TYPES } from '@/constants/processes';
 import { ClientForm } from '@/laundry/pages/clients/ui/ClientForm';
 import { useClients } from '@/laundry/hooks/useClients';
 import { GuideDetailForm } from './GuideDetailForm';
@@ -46,21 +46,43 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   const [serviceType, setServiceType] = useState<string>('');
   const [chargeType, setChargeType] = useState<string>('');
   const [condition, setCondition] = useState<string>('');
+  const [personalEmployee, setPersonalEmployee] = useState<string>('');
+  const [transportEmployee, setTransportEmployee] = useState<string>('');
+  const [packageManager, setPackageManager] = useState<string>('');
+  const [departureTime, setDepartureTime] = useState<string>('');
+  const [arrivalTime, setArrivalTime] = useState<string>('');
   const [branchOfficeId] = useState<string>(user?.sucursalId || '');
   const [sealNumber, setSealNumber] = useState<string>('');
   const [collectionDate, setCollectionDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [deliveryDate, setDeliveryDate] = useState<string>('');
   const [totalWeight, setTotalWeight] = useState<string>('');
   const totalGarments = guideItems.length;
-  const [status, setStatus] = useState<string>(GUIDE_STATUS.COLLECTED);
+  const [status, setStatus] = useState<string>(GUIDE_STATUS.RECEIVED);
   const [notes, setNotes] = useState<string>('');
   const [clientModalOpen, setClientModalOpen] = useState(false);
   const [showDetailForm, setShowDetailForm] = useState(false);
+
+  // Nuevos campos basados en las imágenes y schema
+  const [servicePriority, setServicePriority] = useState<string>('NORMAL');
+  const [washingType, setWashingType] = useState<string>('');
+  
+  // Personal involucrado
+  const [deliveredBy, setDeliveredBy] = useState<string>('');
+  const [receivedBy, setReceivedBy] = useState<string>('');
+  const [driverName, setDriverName] = useState<string>('');
+  const [driverId, setDriverId] = useState<string>('');
+  
+  // Gestión de paquetes
+  const [totalBundlesExpected, setTotalBundlesExpected] = useState<string>('0');
+  const [totalBundlesReceived, setTotalBundlesReceived] = useState<string>('0');
+  const [bundlesDiscrepancy, setBundlesDiscrepancy] = useState<string>('0');
+  const [vehiclePlate, setVehiclePlate] = useState<string>('');
   const { createClient } = useClients();
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
       <ScrollView className="flex-1" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 16 }}>
+      {/* Información Básica */}
       <View className="mb-6">
         <Text className="text-base text-gray-700 font-semibold mb-2">Información Básica</Text>
         <Input 
@@ -113,20 +135,22 @@ export const GuideForm: React.FC<GuideFormProps> = ({
 
       <View className="mb-6">
         <Text className="text-base text-gray-700 font-semibold mb-2">Información del Servicio</Text>
-        <View className="flex-row -mx-1">
-          <View className="flex-1 px-1">
-            <Dropdown
-              label="Tipo de Servicio"
-              placeholder="Selecciona un tipo"
-              options={[
-                { label: 'Industrial', value: 'INDUSTRIAL' },
-                { label: 'Personal', value: 'PERSONAL' },
-              ]}
-              value={serviceType}
-              onValueChange={setServiceType}
-              icon="cog-outline"
-            />
-          </View>
+        
+        {/* Dropdown para seleccionar tipo de servicio */}
+        <Dropdown
+          label="Tipo de Servicio"
+          placeholder="Selecciona un tipo"
+          options={[
+            { label: 'Industrial', value: 'INDUSTRIAL' },
+            { label: 'Personal', value: 'PERSONAL' },
+          ]}
+          value={serviceType}
+          onValueChange={setServiceType}
+          icon="cog-outline"
+        />
+
+        {/* Campos base que siempre aparecen */}
+        <View className="flex-row -mx-1 mt-4">
           <View className="flex-1 px-1">
             <Dropdown
               label="Tipo de Carga"
@@ -141,6 +165,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             />
           </View>
         </View>
+        
         <Dropdown
           label="Condición General"
           placeholder="Selecciona la condición"
@@ -170,13 +195,11 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             />
           </View>
         </View>
-        <Dropdown
+        <Input
           label="Estado"
-          placeholder="Selecciona un estado"
-          options={Object.keys(GUIDE_STATUS_LABELS).map(k => ({ label: GUIDE_STATUS_LABELS[k as keyof typeof GUIDE_STATUS_LABELS], value: k }))}
-          value={status}
-          onValueChange={setStatus}
-          icon="radio-button-on-outline"
+          value={GUIDE_STATUS_LABELS[status as keyof typeof GUIDE_STATUS_LABELS] || 'Recibida'}
+          editable={false}
+          className="bg-gray-50"
         />
       </View>
 
@@ -197,10 +220,184 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         </View>
       )}
 
+      {/* Detalles de Servicio */}
+      <View className="mb-6 bg-blue-50 p-4 rounded-lg">
+        <Text className="text-base text-blue-800 font-semibold mb-3">Detalles de Servicio</Text>
+        <View className="flex-row -mx-1">
+          <View className="flex-1 px-1">
+            <Dropdown
+              label="Prioridad"
+              placeholder="Seleccionar prioridad"
+              options={SERVICE_PRIORITIES}
+              value={servicePriority}
+              onValueChange={setServicePriority}
+              icon="flag-outline"
+            />
+          </View>
+          <View className="flex-1 px-1">
+            <Dropdown
+              label="Tipo de Lavado"
+              placeholder="Seleccionar tipo de lavado"
+              options={WASHING_TYPES}
+              value={washingType}
+              onValueChange={setWashingType}
+              icon="water-outline"
+            />
+          </View>
+        </View>
+      </View>
+
+      {/* Campos para Servicio Industrial - Personal de Transporte */}
+      {serviceType === 'INDUSTRIAL' && (
+        <View className="mb-6 bg-green-50 p-4 rounded-lg">
+          <Text className="text-base text-green-800 font-semibold mb-3">Personal de Transporte (Servicio Industrial)</Text>
+          <View className="flex-row -mx-1 mb-3">
+            <View className="flex-1 px-1">
+              <Input
+                label="Entregado por"
+                placeholder="Nombre del transportista"
+                value={deliveredBy}
+                onChangeText={setDeliveredBy}
+              />
+            </View>
+            <View className="flex-1 px-1">
+              <Input
+                label="Recibido por"
+                placeholder="Nombre de quien recibe"
+                value={receivedBy}
+                onChangeText={setReceivedBy}
+              />
+            </View>
+          </View>
+          <View className="flex-row -mx-1">
+            <View className="flex-1 px-1">
+              <Input
+                label="Nombre del Conductor"
+                placeholder="Nombre del conductor"
+                value={driverName}
+                onChangeText={setDriverName}
+              />
+            </View>
+            <View className="flex-1 px-1">
+              <Input
+                label="ID del Conductor"
+                placeholder="Cédula o ID del conductor"
+                value={driverId}
+                onChangeText={setDriverId}
+              />
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Campos para Servicio Industrial - Gestión de Paquetes */}
+      {serviceType === 'INDUSTRIAL' && (
+        <View className="mb-6 bg-purple-50 p-4 rounded-lg">
+          <Text className="text-base text-purple-800 font-semibold mb-3">Gestión de Paquetes (Servicio Industrial)</Text>
+          <View className="flex-row -mx-1 mb-3">
+            <View className="flex-1 px-1">
+              <Input
+                label="Paquetes Esperados"
+                placeholder="0"
+                value={totalBundlesExpected}
+                onChangeText={setTotalBundlesExpected}
+                keyboardType="numeric"
+              />
+            </View>
+            <View className="flex-1 px-1">
+              <Input
+                label="Paquetes Recibidos"
+                placeholder="0"
+                value={totalBundlesReceived}
+                onChangeText={setTotalBundlesReceived}
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+          <View className="flex-row -mx-1 mb-3">
+            <View className="flex-1 px-1">
+              <Input
+                label="Discrepancia"
+                placeholder="0"
+                value={bundlesDiscrepancy}
+                onChangeText={setBundlesDiscrepancy}
+                keyboardType="numeric"
+              />
+            </View>
+            <View className="flex-1 px-1">
+              <Input
+                label="Placa del Vehículo"
+                placeholder="ej: ABC-123"
+                value={vehiclePlate}
+                onChangeText={setVehiclePlate}
+              />
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Campos para Servicio Industrial - Horarios */}
+      {serviceType === 'INDUSTRIAL' && (
+        <View className="mb-6 bg-yellow-50 p-4 rounded-lg">
+          <Text className="text-base text-yellow-800 font-semibold mb-3">Tiempos de Transporte</Text>
+          <View className="flex-row -mx-1">
+            <View className="flex-1 px-1">
+              <Input
+                label="Hora de Salida"
+                placeholder="dd/mm/aaaa --:--"
+                value={departureTime}
+                onChangeText={setDepartureTime}
+                icon="calendar-outline"
+              />
+            </View>
+            <View className="flex-1 px-1">
+              <Input
+                label="Hora de Llegada"
+                placeholder="dd/mm/aaaa --:--"
+                value={arrivalTime}
+                onChangeText={setArrivalTime}
+                icon="calendar-outline"
+              />
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Campos para Servicio Personal - FUERA del contenedor de Detalles de Servicio */}
+      {serviceType === 'PERSONAL' && (
+        <View className="mb-6">
+          <Card padding="md" className="bg-green-50 border-green-200">
+            <Text className="text-base text-green-800 font-semibold mb-3">Personal de Atención (Servicio Personal)</Text>
+            <Input
+              label="Entregado por"
+              placeholder="Empleado que entrega al cliente"
+              value={personalEmployee}
+              onChangeText={setPersonalEmployee}
+              icon="person-outline"
+            />
+          </Card>
+          
+          <Card padding="md" className="bg-yellow-50 border-yellow-200 mt-4">
+            <Text className="text-base text-yellow-800 font-semibold mb-3">Entrega en Local (Servicio Personal)</Text>
+            <Input
+              label="Entregado al Cliente en"
+              placeholder="dd/mm/aaaa --:--"
+              value={deliveryDate}
+              onChangeText={setDeliveryDate}
+              icon="calendar-outline"
+            />
+          </Card>
+        </View>
+      )}
+
+      
+
+      {/* Secciones de servicio antiguo removidas para que los nuevos campos 
+          dependientes del dropdown se muestren debajo de Detalles de Servicio */}
 
       <Input
         label="Notas"
-        placeholder="Información adicional sobre la guía..."
+        placeholder="Notas adicionales sobre la guía..."
         value={notes}
         onChangeText={setNotes}
         multiline
@@ -275,12 +472,18 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             }}
             onCancel={() => setShowDetailForm(false)}
             submitting={false}
-            initialValues={{ guide_id: `GUIDE-${Date.now()}` }}
+            initialValues={{ 
+              guide_id: `GUIDE-${Date.now()}`,
+              // Pasar datos de la guía principal
+              total_weight: totalWeight,
+              total_garments: totalGarments,
+            }}
             scannedTags={guideItems.map(item => item.tagEPC)}
             onNavigate={onNavigate}
           />
         </View>
       </Modal>
+
       </ScrollView>
     </KeyboardAvoidingView>
   );

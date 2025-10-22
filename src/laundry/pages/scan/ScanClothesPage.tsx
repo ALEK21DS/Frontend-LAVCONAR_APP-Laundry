@@ -11,14 +11,24 @@ import { GuideForm } from '@/laundry/pages/guides/ui/GuideForm';
 import { ProcessForm } from '@/laundry/pages/processes/ui/ProcessForm';
 import { GarmentForm } from '@/laundry/pages/garments/ui/GarmentForm';
 import { useClients } from '@/laundry/hooks/useClients';
+import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
+import { GuideSelectionModal } from '@/laundry/components/GuideSelectionModal';
 
 type ScanClothesPageProps = {
   navigation: NativeStackNavigationProp<any>;
-  route?: any;
+  route?: {
+    params?: {
+      mode?: string;
+      guideId?: string;
+      processType?: string;
+      serviceType?: 'industrial' | 'personal';
+    };
+  };
 };
 
 export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, route }) => {
   const mode = route?.params?.mode || 'guide'; // 'garment' o 'guide'
+  const serviceType = route?.params?.serviceType || 'industrial';
   const { scannedTags, addScannedTag, clearScannedTags, isScanning, setIsScanning } = useTagStore();
   const seenSetRef = useRef<Set<string>>(new Set());
   const isScanningRef = useRef<boolean>(false);
@@ -27,9 +37,14 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const [garmentModalOpen, setGarmentModalOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>('client-demo-1');
   const [processModalOpen, setProcessModalOpen] = useState(false);
-  const [detectedGuideId, setDetectedGuideId] = useState<string | undefined>(undefined);
+  const [selectedGuideId, setSelectedGuideId] = useState<string>('');
   const [scanRange, setScanRange] = useState<number>(-65); // Rango del escáner (RSSI)
   const MIN_RSSI = scanRange; // Usar el rango configurado por el usuario
+  
+  // Estados para los nuevos modales
+  const [processTypeModalOpen, setProcessTypeModalOpen] = useState(false);
+  const [guideSelectionModalOpen, setGuideSelectionModalOpen] = useState(false);
+  const [selectedProcessType, setSelectedProcessType] = useState<string>('');
 
   const applyReaderPower = useCallback(async (rangeDbm: number) => {
     // Mapear sensibilidad a potencia real del lector (0-30 aprox. segun SDK)
@@ -77,8 +92,6 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     try {
       setIsScanning(true);
       isScanningRef.current = true;
-      // eslint-disable-next-line no-console
-      console.log('Starting RFID scan...');
       const subscription = rfidModule.addTagListener((tag: ScannedTag) => {
         if (!isScanningRef.current) return;
         // Filtro de RSSI mínimo
@@ -88,28 +101,20 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         // Deduplicación por EPC en memoria
         if (seenSetRef.current.has(tag.epc)) return;
         seenSetRef.current.add(tag.epc);
-        // eslint-disable-next-line no-console
-        console.log('Tag accepted:', tag);
         addScannedTag(tag);
         
         // En modo "garment", detener automáticamente después de escanear una prenda
         if (mode === 'garment') {
           stopScanning();
         }
-        if (mode === 'process') {
-          // Para procesos también se detiene en la primera lectura
-          stopScanning();
-        }
+        // En modo "guide" y "process", permitir escaneo continuo de múltiples prendas
       });
       (global as any).rfidSubscription = subscription;
       const errSub = rfidModule.addErrorListener((msg: string) => {
-        // eslint-disable-next-line no-console
         console.warn('RFID error:', msg);
       });
       (global as any).rfidErrSubscription = errSub;
       await rfidModule.startScan();
-      // eslint-disable-next-line no-console
-      console.log('RFID scan started');
     } catch (error) {
       Alert.alert('Error', 'No se pudo iniciar el escaneo RFID');
       setIsScanning(false);
@@ -119,9 +124,6 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   useEffect(() => {
     clearScannedTags();
     seenSetRef.current.clear();
-    // Debug: listar métodos expuestos por el módulo nativo
-    // eslint-disable-next-line no-console
-    console.log('RFIDModule methods:', Object.keys((NativeModules as any).RFIDModule || {}));
 
     // Suscribir al gatillo hardware del C72
     const emitter = new NativeEventEmitter();
@@ -166,12 +168,21 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     } else if (mode === 'guide') {
       setGuideModalOpen(true);
     } else if (mode === 'process') {
-      // TODO: Consultar guía por EPC (mock por ahora)
-      const first = scannedTags[0];
-      // Simulación: mapear EPC a una guía demo
-      const guideId = 'g-demo-001';
-      setDetectedGuideId(guideId);
-      setProcessModalOpen(true);
+      const processType = route?.params?.processType;
+      const guideId = route?.params?.guideId;
+      
+      // Para EMPAQUE, CARGA y ENTREGA, ir a la página de validación
+      if (processType === 'PACKAGING' || processType === 'LOADING' || processType === 'DELIVERY') {
+        navigation.navigate('GarmentValidation', {
+          guideId: guideId || selectedGuideId,
+          processType: processType,
+          scannedTags: scannedTags.map(tag => tag.epc),
+          serviceType: serviceType,
+        });
+      } else {
+        // Para otros procesos, abrir el ProcessForm
+        setProcessModalOpen(true);
+      }
     }
   };
 
@@ -186,6 +197,52 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     clearScannedTags();
     seenSetRef.current.clear();
     // Permanecer en la página de escaneo para registrar otra prenda
+  };
+
+  // Funciones para manejar la selección de procesos
+  const handleProcessTypeSelect = (processType: string) => {
+    setSelectedProcessType(processType);
+    setProcessTypeModalOpen(false);
+    
+    // Para todos los procesos, mostrar modal de selección de guías
+    setGuideSelectionModalOpen(true);
+  };
+
+  const handleGuideSelect = (guideId: string) => {
+    setSelectedGuideId(guideId);
+    setGuideSelectionModalOpen(false);
+    
+    // Navegar al escáner con la guía seleccionada
+    navigation.navigate('ScanClothes', { 
+      mode: 'process', 
+      guideId: guideId,
+      processType: selectedProcessType 
+    });
+  };
+
+  // Datos demo de guías (esto vendría del backend)
+  const getGuidesByProcessType = (processType: string) => {
+    const demoGuides = [
+      { id: 'g-001', guide_number: 'G-0001', client_name: 'Cliente A', status: 'RECEIVED', created_at: '2024-01-15', total_garments: 15 },
+      { id: 'g-002', guide_number: 'G-0002', client_name: 'Cliente B', status: 'IN_PROCESS', created_at: '2024-01-14', total_garments: 8 },
+      { id: 'g-003', guide_number: 'G-0003', client_name: 'Cliente C', status: 'WASHING', created_at: '2024-01-13', total_garments: 12 },
+      { id: 'g-004', guide_number: 'G-0004', client_name: 'Cliente D', status: 'DRYING', created_at: '2024-01-12', total_garments: 20 },
+      { id: 'g-005', guide_number: 'G-0005', client_name: 'Cliente E', status: 'PACKAGING', created_at: '2024-01-11', total_garments: 6 },
+    ];
+
+    // Mapear el tipo de proceso al estado de guía que debe mostrar
+    const statusMapping: Record<string, string> = {
+      'IN_PROCESS': 'RECEIVED',
+      'WASHING': 'IN_PROCESS',
+      'DRYING': 'WASHING',
+      'PACKAGING': 'DRYING',
+      'SHIPPING': 'PACKAGING',
+      'LOADING': 'SHIPPING',
+      'DELIVERY': 'LOADING',
+    };
+
+    const targetStatus = statusMapping[processType] || processType;
+    return demoGuides.filter(guide => guide.status === targetStatus);
   };
 
   const renderScannedTag = ({ item, index }: { item: ScannedTag; index: number }) => (
@@ -258,7 +315,6 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
 
       {/* Control de Rango del Escáner */}
       <View className="mb-6">
-        <Text className="text-lg font-semibold text-gray-900 mb-3">Rango del Escáner</Text>
         <Card variant="outlined" padding="md">
           <View className="flex-row items-center justify-between mb-3">
             <View className="flex-row items-center">
@@ -293,15 +349,6 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
               size="sm"
               onPress={() => setScanRange(-55)}
             />
-          </View>
-          
-          <View className="mt-3">
-            <Text className="text-xs text-gray-500">
-              {scanRange === -90 && "Muy Baja: Detecta tags muy lejanos (puede incluir interferencias)"}
-              {scanRange === -75 && "Baja: Detecta tags a distancia media"}
-              {scanRange === -65 && "Media: Rango equilibrado (recomendado)"}
-              {scanRange === -55 && "Alta: Solo tags muy cercanos (mayor precisión)"}
-            </Text>
           </View>
         </Card>
       </View>
@@ -389,19 +436,44 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         <View className="flex-1 bg-black/40" />
         <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl p-4" style={{ elevation: 8 }}>
           <View className="flex-row items-center mb-4">
-            <Text className="text-xl font-bold text-gray-900 flex-1">{detectedGuideId ? 'Editar Proceso' : 'Nuevo Proceso'}</Text>
+            <Text className="text-xl font-bold text-gray-900 flex-1">Nuevo Proceso</Text>
             <TouchableOpacity onPress={() => { setProcessModalOpen(false); clearScannedTags(); }}>
               <Icon name="close" size={22} color="#111827" />
             </TouchableOpacity>
           </View>
+
           <ProcessForm
-            guideOptions={[{ label: detectedGuideId ? `${detectedGuideId}` : 'Guía detectada', value: detectedGuideId || 'g-demo-001' }]}
-            selectedGuideId={detectedGuideId || 'g-demo-001'}
-            onChangeGuide={() => {}}
+            guideOptions={[
+              { label: 'G-0001 - Lavado Industrial', value: 'g-001' },
+              { label: 'G-0002 - Lavado Doméstico', value: 'g-002' },
+              { label: 'G-0003 - Lavado Hospital', value: 'g-003' },
+              { label: 'G-0004 - Lavado Hotel', value: 'g-004' },
+            ]}
+            selectedGuideId={selectedGuideId}
+            onChangeGuide={setSelectedGuideId}
             onSubmit={() => { setProcessModalOpen(false); clearScannedTags(); }}
+            onScanRFID={() => { setProcessModalOpen(false); }}
+            scannedTags={scannedTags.map(tag => tag.epc)}
+            processType={route?.params?.processType || 'IN_PROCESS'}
           />
         </View>
       </Modal>
+
+      {/* Modal de Selección de Tipo de Proceso */}
+      <ProcessTypeModal
+        visible={processTypeModalOpen}
+        onClose={() => setProcessTypeModalOpen(false)}
+        onSelectProcess={handleProcessTypeSelect}
+      />
+
+      {/* Modal de Selección de Guías */}
+      <GuideSelectionModal
+        visible={guideSelectionModalOpen}
+        onClose={() => setGuideSelectionModalOpen(false)}
+        onSelectGuide={handleGuideSelect}
+        processType={selectedProcessType}
+        guides={getGuidesByProcessType(selectedProcessType)}
+      />
     </Container>
   );
 };
