@@ -1,10 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
-import { branchOfficesApi, BranchOffice } from '../api/branch-offices/branch-offices.api';
+import { branchOfficesApi } from '../api/branch-offices/branch-offices.api';
+import { BranchOffice } from '../interfaces/branch-offices/branch-offices.interface';
+import { ApiResponse } from '@/interfaces/base.response';
 
 export const useBranchOffices = () => {
   const { data, isLoading, error } = useQuery({
     queryKey: ['branch-offices'],
-    queryFn: branchOfficesApi.getAll,
+    queryFn: async (): Promise<BranchOffice[]> => {
+      const response = await branchOfficesApi.get<ApiResponse<BranchOffice[]>>('/');
+      return response.data.data || [];
+    },
     staleTime: 1000 * 60 * 5, // 5 minutos
   });
 

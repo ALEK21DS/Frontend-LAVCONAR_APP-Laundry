@@ -1,48 +1,50 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { type AxiosInstance } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useConfigStore } from '@/config/store/config.store';
 
-// Función para crear cliente dinámico
-export const createApiClient = () => {
+/**
+ * Crea una instancia de Axios con interceptor de autenticación configurado
+ * @param endpoint - Endpoint específico para la instancia (opcional)
+ * @returns Instancia de Axios configurada con token automático
+ */
+export const createAuthenticatedAxiosInstance = (
+  endpoint?: string
+): AxiosInstance => {
   const { apiBaseUrl } = useConfigStore.getState();
   
-  console.log('🌐 API Base URL:', apiBaseUrl); // Debug: ver qué URL está usando
-  
-  return axios.create({
-    baseURL: apiBaseUrl,
+  const instance = axios.create({
+    baseURL: endpoint ? `${apiBaseUrl}${endpoint}` : apiBaseUrl,
     timeout: 10000,
-    headers: {
-      'Content-Type': 'application/json',
-    },
   });
-};
 
-// Cliente por defecto (se actualiza dinámicamente)
-export const apiClient = createApiClient();
-
-apiClient.interceptors.request.use(
-  async (config: InternalAxiosRequestConfig) => {
-    try {
+  // Interceptor para agregar el token automáticamente
+  instance.interceptors.request.use(
+    async (config) => {
       const token = await AsyncStorage.getItem('auth-token');
       if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
       }
-    } catch (error) {
-      console.error('Error getting token:', error);
+      return config;
+    },
+    (error) => {
+      return Promise.reject(
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
-    return config;
-  },
-  (error: AxiosError) => {
-    return Promise.reject(error);
-  }
-);
+  );
 
-apiClient.interceptors.response.use(
-  response => response,
-  async (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      await AsyncStorage.multiRemove(['auth-token', 'auth-user']);
+  // Interceptor de respuesta (para manejar errores 401)
+  instance.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      if (error.response?.status === 401) {
+        await AsyncStorage.multiRemove(['auth-token', 'auth-user']);
+      }
+      return Promise.reject(
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
-    return Promise.reject(error);
-  }
-);
+  );
+
+  return instance;
+};

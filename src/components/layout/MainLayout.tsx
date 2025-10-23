@@ -146,7 +146,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
     // Mapear el tipo de proceso al estado de guía que debe mostrar
     // Diferente mapeo según el tipo de servicio
     const getStatusMapping = () => {
-      console.log('🔍 Debug - selectedServiceType:', selectedServiceType, 'processType:', processType);
       if (selectedServiceType === 'personal') {
         // Para servicio personal: incluye PLANCHADO y DOBLADO
         return {
@@ -176,7 +175,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
 
     const statusMapping = getStatusMapping();
     const targetStatus = statusMapping[processType] || processType;
-    console.log('🎯 Debug - targetStatus:', targetStatus, 'filtered guides:', demoGuides.filter(guide => guide.status === targetStatus).length);
     return demoGuides.filter(guide => guide.status === targetStatus);
   };
 

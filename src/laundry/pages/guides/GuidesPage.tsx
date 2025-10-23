@@ -1,10 +1,11 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Alert, ActivityIndicator } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Card } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useGuides } from '@/laundry/hooks/useGuides';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { GuideForm } from './ui/GuideForm';
 import { GuideDetailsModal } from './ui/GuideDetailsModal';
 import { ServiceTypeModal } from '@/laundry/components/ServiceTypeModal';
@@ -15,7 +16,9 @@ import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
  type GuidesPageProps = { navigation: NativeStackNavigationProp<any> };
 
 export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any) => {
-  const { guides, isLoading, createGuide } = useGuides();
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const { guides, isLoading, createGuide, refetch, total, totalPages, currentPage } = useGuides(page, limit);
   const [query, setQuery] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -27,6 +30,13 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const seenSetRef = useRef<Set<string>>(new Set());
   const isScanningRef = useRef<boolean>(false);
   const MIN_RSSI = -65;
+
+  // Recargar la lista de guías cada vez que la pantalla recibe foco
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
   
   // Estados para el flujo de servicio personal
   const [showServiceTypeModal, setShowServiceTypeModal] = useState(false);
@@ -244,10 +254,14 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
         </View>
 
         <ScrollView className="flex-1">
-          {isLoading && guides.length === 0 && <Text className="text-gray-500">Cargando guías...</Text>}
-          {!isLoading && filtered.length === 0 && <Text className="text-gray-500">No se encontraron guías.</Text>}
-
-          <View className="-mx-1 flex-row flex-wrap">
+          {isLoading && guides.length === 0 ? (
+            <View className="flex-1 items-center justify-center py-20">
+              <ActivityIndicator size="large" color="#F59E0B" />
+            </View>
+          ) : !isLoading && filtered.length === 0 ? (
+            <Text className="text-gray-500">No se encontraron guías.</Text>
+          ) : (
+            <View className="-mx-1 flex-row flex-wrap">
             {filtered.map((g: any) => (
               <View key={g.id} className="w-full px-1 mb-2">
                 <TouchableOpacity
@@ -269,8 +283,53 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
                 </TouchableOpacity>
               </View>
             ))}
-          </View>
+            </View>
+          )}
         </ScrollView>
+
+        {/* Controles de paginación */}
+        {totalPages > 1 && (
+          <View className="border-t border-gray-200 bg-white p-4">
+            <View className="flex-row items-center justify-between">
+              <TouchableOpacity
+                onPress={() => setPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className={`flex-row items-center px-4 py-2 rounded-lg ${
+                  currentPage === 1 ? 'bg-gray-100' : 'bg-blue-600'
+                }`}
+              >
+                <IonIcon 
+                  name="chevron-back" 
+                  size={18} 
+                  color={currentPage === 1 ? '#9CA3AF' : '#FFFFFF'} 
+                />
+              </TouchableOpacity>
+
+              <View className="flex-row items-center">
+                <Text className="text-gray-600 font-medium">
+                  Página {currentPage} de {totalPages}
+                </Text>
+                <Text className="text-gray-400 text-sm ml-2">
+                  ({total} total)
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className={`flex-row items-center px-4 py-2 rounded-lg ${
+                  currentPage === totalPages ? 'bg-gray-100' : 'bg-blue-600'
+                }`}
+              >
+                <IonIcon 
+                  name="chevron-forward" 
+                  size={18} 
+                  color={currentPage === totalPages ? '#9CA3AF' : '#FFFFFF'} 
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Interfaz para prendas registradas (Servicio Personal) */}
@@ -407,10 +466,9 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
             </Text>
           </View>
           <GarmentForm
-            onSubmit={handleGarmentSubmit}
-            onCancel={handleGarmentCancel}
-            submitting={false}
             rfidCode={currentScannedTag?.epc || ''}
+            onSubmit={handleGarmentSubmit}
+            submitting={false}
           />
         </View>
       </Modal>

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, Alert } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Button, Card } from '@/components/common';
+import { formatDateTime } from '@/helpers';
 
 interface ClientDetailsModalProps {
   visible: boolean;
@@ -139,8 +140,8 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
               <Text className="text-lg font-semibold text-gray-900 ml-2">Sucursal Asignada</Text>
             </View>
             <Card padding="md" className="bg-blue-50 border-blue-200">
-              <Text className="text-base font-semibold text-blue-900">{client.branch_office_id || 'N/A'}</Text>
-              <Text className="text-sm text-blue-700">ID: {client.branch_id || client.id || 'N/A'}</Text>
+              <Text className="text-base font-semibold text-blue-900">{client.branch_office_name || 'N/A'}</Text>
+              <Text className="text-sm text-blue-700">ID: {client.branch_office_id || 'N/A'}</Text>
             </Card>
           </Card>
 
@@ -155,14 +156,14 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
                 <Text className="text-xs text-gray-500 mb-1">Fecha de Creación</Text>
                 <View className="flex-row items-center">
                   <IonIcon name="time-outline" size={16} color="#4B5563" />
-                  <Text className="text-sm text-gray-800 ml-2">{client.created_at || 'N/A'}</Text>
+                  <Text className="text-sm text-gray-800 ml-2">{formatDateTime(client.created_at)}</Text>
                 </View>
               </View>
               <View className="w-1/2 px-2 mb-4">
                 <Text className="text-xs text-gray-500 mb-1">Última Actualización</Text>
                 <View className="flex-row items-center">
                   <IonIcon name="reload-outline" size={16} color="#4B5563" />
-                  <Text className="text-sm text-gray-800 ml-2">{client.updated_at || 'N/A'}</Text>
+                  <Text className="text-sm text-gray-800 ml-2">{formatDateTime(client.updated_at)}</Text>
                 </View>
               </View>
             </View>

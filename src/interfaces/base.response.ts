@@ -1,6 +1,15 @@
 export interface ApiResponse<T = any> {
-  success: boolean;
+  status: number;
+  message: string;
   data?: T;
-  message?: string;
+  totalData?: number;
+  pagination?: {
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  timestamp?: string;
+  // Campos legacy (para compatibilidad)
+  success?: boolean;
   error?: string;
 }

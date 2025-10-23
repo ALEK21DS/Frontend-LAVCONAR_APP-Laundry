@@ -18,10 +18,11 @@ export interface CreateClientDto {
   name: string;
   email: string;
   identification_number: string;
-  phone?: string;
-  address?: string;
-  acronym?: string;
-  branch_office_id?: string;
+  phone: string;
+  address: string;
+  acronym: string;
+  branch_office_id?: string; // Se asigna automáticamente desde el usuario autenticado
+  // is_active se maneja por defecto en el backend
 }
 
 export interface UpdateClientDto {

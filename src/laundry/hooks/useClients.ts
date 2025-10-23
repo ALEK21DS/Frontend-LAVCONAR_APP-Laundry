@@ -1,24 +1,51 @@
+import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientsApi } from '../api/clients/clients.api';
-import { CreateClientDto, UpdateClientDto } from '../interfaces/clients/clients.interface';
+import { Client, CreateClientDto, UpdateClientDto } from '../interfaces/clients/clients.interface';
 import { handleApiError } from '@/helpers/axios-error.helper';
+import { ApiResponse } from '@/interfaces/base.response';
 
-export const useClients = () => {
+interface BackendResponse {
+  status: number;
+  message: string;
+  data: Client[];
+  totalData?: number;
+  pagination?: {
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  timestamp: string;
+}
+
+export const useClients = (page: number = 1, limit: number = 10) => {
   const queryClient = useQueryClient();
 
   const {
-    data: clients = [],
+    data,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: ['clients'],
-    queryFn: clientsApi.getAll,
+    queryKey: ['clients', page, limit],
+    queryFn: async (): Promise<BackendResponse> => {
+      const response = await clientsApi.get<BackendResponse>('/', {
+        params: { page, limit }
+      });
+      return response.data;
+    },
     staleTime: 1000 * 60 * 5,
   });
 
+  const clients = data?.data || [];
+  const total = data?.totalData || 0;
+  const totalPages = data?.pagination?.totalPages || 0;
+
   const createClient = useMutation({
-    mutationFn: (data: CreateClientDto) => clientsApi.create(data),
+    mutationFn: async (clientData: CreateClientDto): Promise<Client> => {
+      const { data } = await clientsApi.post<ApiResponse<Client>>('/', clientData);
+      return data.data!;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
@@ -28,8 +55,10 @@ export const useClients = () => {
   });
 
   const updateClient = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateClientDto }) =>
-      clientsApi.update(id, data),
+    mutationFn: async ({ id, data: clientData }: { id: string; data: UpdateClientDto }): Promise<Client> => {
+      const { data } = await clientsApi.patch<ApiResponse<Client>>(`/${id}`, clientData);
+      return data.data!;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
@@ -39,7 +68,9 @@ export const useClients = () => {
   });
 
   const deleteClient = useMutation({
-    mutationFn: (id: string) => clientsApi.delete(id),
+    mutationFn: async (id: string): Promise<void> => {
+      await clientsApi.delete(`/${id}`);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
@@ -50,6 +81,9 @@ export const useClients = () => {
 
   return {
     clients,
+    total,
+    totalPages,
+    currentPage: page,
     isLoading,
     error: error?.message,
     refetch,
@@ -66,7 +100,11 @@ export const useClient = (id: string) => {
     error,
   } = useQuery({
     queryKey: ['clients', id],
-    queryFn: () => clientsApi.getById(id),
+    queryFn: async (): Promise<Client | undefined> => {
+      if (!id) return undefined;
+      const { data } = await clientsApi.get<ApiResponse<Client>>(`/${id}`);
+      return data.data;
+    },
     enabled: !!id,
   });
 

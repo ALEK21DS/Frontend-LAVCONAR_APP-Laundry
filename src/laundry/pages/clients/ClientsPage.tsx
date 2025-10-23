@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import React, { useMemo, useState, useCallback } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Card } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useClients } from '@/laundry/hooks/useClients';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { ClientForm } from './ui/ClientForm';
 import { ClientDetailsModal } from './ui/ClientDetailsModal';
 
@@ -14,13 +15,23 @@ type ClientsPageProps = {
 };
 
 export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigation }) => {
-  const { clients, isLoading, createClient, updateClient } = useClients();
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const { clients, isLoading, createClient, updateClient, refetch, total, totalPages, currentPage } = useClients(page, limit);
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [initialValues, setInitialValues] = useState<any | undefined>(undefined);
+
+  // Recargar la lista de clientes cada vez que la pantalla recibe foco
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const demoClients = [
     { 
@@ -67,13 +78,62 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
     },
   ];
 
-  const base = clients && clients.length > 0 ? clients : demoClients;
+  const base = clients || [];
 
   const filtered = useMemo(() => {
+    let result = base;
+    
+    // Filtrar por estado
+    if (statusFilter === 'active') {
+      result = result.filter((c: any) => c.is_active === true);
+    } else if (statusFilter === 'inactive') {
+      result = result.filter((c: any) => c.is_active === false);
+    }
+    
+    // Filtrar por búsqueda
     const q = query.trim().toLowerCase();
-    if (!q) return base;
-    return base.filter((c: any) => [c.name, c.email, c.identification_number, c.acronym].filter(Boolean).some(v => String(v).toLowerCase().includes(q)));
-  }, [base, query]);
+    if (q) {
+      result = result.filter((c: any) => 
+        [c.name, c.email, c.identification_number, c.acronym]
+          .filter(Boolean)
+          .some(v => String(v).toLowerCase().includes(q))
+      );
+    }
+    
+    return result;
+  }, [base, query, statusFilter]);
+
+  const toggleStatusFilter = () => {
+    if (statusFilter === 'all') {
+      setStatusFilter('active');
+    } else if (statusFilter === 'active') {
+      setStatusFilter('inactive');
+    } else {
+      setStatusFilter('all');
+    }
+  };
+
+  const getStatusFilterLabel = () => {
+    switch (statusFilter) {
+      case 'active':
+        return 'Activos';
+      case 'inactive':
+        return 'Inactivos';
+      default:
+        return 'Todos';
+    }
+  };
+
+  const getStatusFilterColor = () => {
+    switch (statusFilter) {
+      case 'active':
+        return '#10B981'; // Verde
+      case 'inactive':
+        return '#6B7280'; // Gris
+      default:
+        return '#2563EB'; // Azul
+    }
+  };
 
   const openCreate = () => {
     setEditingId(null);
@@ -124,21 +184,37 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
           </TouchableOpacity>
         </View>
 
-        <View className="mb-4 flex-row items-center bg-white border border-gray-200 rounded-lg px-3">
-          <IonIcon name="search-outline" size={18} color="#6B7280" />
-          <TextInput className="flex-1 h-10 ml-2 text-gray-900" placeholder="Buscar por nombre, cédula, email o acrónimo" placeholderTextColor="#9CA3AF" value={query} onChangeText={setQuery} autoCorrect={false} />
-          {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery('')}>
-              <IonIcon name="close-circle" size={18} color="#9CA3AF" />
-            </TouchableOpacity>
-          )}
+        <View className="mb-4 flex-row items-center">
+          <View className="flex-1 flex-row items-center bg-white border border-gray-200 rounded-lg px-3">
+            <IonIcon name="search-outline" size={18} color="#6B7280" />
+            <TextInput className="flex-1 h-10 ml-2 text-gray-900" placeholder="Buscar por nombre, cédula, email o acrónimo" placeholderTextColor="#9CA3AF" value={query} onChangeText={setQuery} autoCorrect={false} />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={() => setQuery('')}>
+                <IonIcon name="close-circle" size={18} color="#9CA3AF" />
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          <TouchableOpacity 
+            onPress={toggleStatusFilter}
+            className="ml-2 px-3 h-10 rounded-lg items-center justify-center"
+            style={{ backgroundColor: getStatusFilterColor() }}
+          >
+            <Text className="text-white text-xs font-semibold">
+              {getStatusFilterLabel()}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <ScrollView className="flex-1">
-          {isLoading && clients.length === 0 && <Text className="text-gray-500">Cargando clientes...</Text>}
-          {!isLoading && filtered.length === 0 && <Text className="text-gray-500">No se encontraron clientes.</Text>}
-
-          <View className="-mx-1 flex-row flex-wrap">
+          {isLoading && clients.length === 0 ? (
+            <View className="flex-1 items-center justify-center py-20">
+              <ActivityIndicator size="large" color="#2563EB" />
+            </View>
+          ) : !isLoading && filtered.length === 0 ? (
+            <Text className="text-gray-500">No se encontraron clientes.</Text>
+          ) : (
+            <View className="-mx-1 flex-row flex-wrap">
             {filtered.map((client: any) => (
               <View key={client.id} className="w-full px-1 mb-2">
                 <TouchableOpacity
@@ -164,8 +240,53 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
                 </TouchableOpacity>
               </View>
             ))}
-          </View>
+            </View>
+          )}
         </ScrollView>
+
+        {/* Controles de paginación */}
+        {totalPages > 1 && (
+          <View className="border-t border-gray-200 bg-white p-4">
+            <View className="flex-row items-center justify-between">
+              <TouchableOpacity
+                onPress={() => setPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className={`flex-row items-center px-4 py-2 rounded-lg ${
+                  currentPage === 1 ? 'bg-gray-100' : 'bg-blue-600'
+                }`}
+              >
+                <IonIcon 
+                  name="chevron-back" 
+                  size={18} 
+                  color={currentPage === 1 ? '#9CA3AF' : '#FFFFFF'} 
+                />
+              </TouchableOpacity>
+
+              <View className="flex-row items-center">
+                <Text className="text-gray-600 font-medium">
+                  Página {currentPage} de {totalPages}
+                </Text>
+                <Text className="text-gray-400 text-sm ml-2">
+                  ({total} total)
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className={`flex-row items-center px-4 py-2 rounded-lg ${
+                  currentPage === totalPages ? 'bg-gray-100' : 'bg-blue-600'
+                }`}
+              >
+                <IonIcon 
+                  name="chevron-forward" 
+                  size={18} 
+                  color={currentPage === totalPages ? '#9CA3AF' : '#FFFFFF'} 
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Modal de Detalles */}

@@ -7,22 +7,52 @@ export const formatPhone = (phone: string): string => {
   return phone;
 };
 
-export const formatDate = (date: string | Date): string => {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
+/**
+ * Formatea una fecha en formato español
+ * @param dateString - Fecha en formato string o Date
+ * @param includeTime - Si incluir la hora (por defecto false)
+ * @returns Fecha formateada en español
+ */
+export const formatDate = (dateString: Date | string, includeTime: boolean = false): string => {
+  try {
+    const date = new Date(dateString);
+
+    if (includeTime) {
+      return date.toLocaleString('es-ES', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } else {
+      return date.toLocaleDateString('es-ES', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    }
+  } catch {
+    return 'Fecha no disponible';
+  }
 };
 
-export const formatDateTime = (date: string | Date): string => {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  return `${day}/${month}/${year} ${hours}:${minutes}`;
+/**
+ * Formatea fecha y hora completa en español
+ * @param dateString - Fecha en formato string o Date
+ * @returns Fecha y hora formateada
+ */
+export const formatDateTime = (dateString: Date | string): string => {
+  return formatDate(dateString, true);
+};
+
+/**
+ * Formatea solo la fecha sin hora en español
+ * @param dateString - Fecha en formato string o Date
+ * @returns Fecha formateada sin hora
+ */
+export const formatDateOnly = (dateString: Date | string): string => {
+  return formatDate(dateString, false);
 };
 
 export const formatCurrency = (amount: number): string => {

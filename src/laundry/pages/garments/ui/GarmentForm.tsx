@@ -1,21 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { Button, Input, Card } from '@/components/common';
 
 interface GarmentFormProps {
   rfidCode: string;
-  onSubmit: (data: { rfidCode: string; description: string; color: string; observations: string }) => void;
-  onCancel?: () => void;
+  onSubmit: (data: { rfidCode: string; description: string; color: string; observations: string; weight?: number }) => void;
+  submitting?: boolean;
+  initialValues?: {
+    description?: string;
+    color?: string;
+    weight?: string;
+    observations?: string;
+  };
   // Opcionales para escaneo integrado desde la página padre
   onScan?: () => void;
   isScanning?: boolean;
 }
 
-export const GarmentForm: React.FC<GarmentFormProps> = ({ rfidCode, onSubmit, onCancel, onScan, isScanning = false }) => {
-  const [description, setDescription] = useState('');
-  const [color, setColor] = useState('');
-  const [observations, setObservations] = useState('');
+export const GarmentForm: React.FC<GarmentFormProps> = ({ 
+  rfidCode, 
+  onSubmit, 
+  submitting = false, 
+  initialValues,
+  onScan, 
+  isScanning = false 
+}) => {
+  const [description, setDescription] = useState(initialValues?.description || '');
+  const [color, setColor] = useState(initialValues?.color || '');
+  const [weight, setWeight] = useState(initialValues?.weight || '');
+  const [observations, setObservations] = useState(initialValues?.observations || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Actualizar campos si cambian los valores iniciales
+  useEffect(() => {
+    if (initialValues) {
+      setDescription(initialValues.description || '');
+      setColor(initialValues.color || '');
+      setWeight(initialValues.weight || '');
+      setObservations(initialValues.observations || '');
+    }
+  }, [initialValues]);
 
   const handleSubmit = async () => {
     if (!description.trim()) {
@@ -23,18 +47,22 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({ rfidCode, onSubmit, on
       return;
     }
 
+    const weightValue = weight ? parseFloat(weight) : undefined;
+    if (weight && isNaN(weightValue!)) {
+      Alert.alert('Error', 'El peso debe ser un número válido');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      // TODO: Implementar llamada al API para crear prenda
-      console.log('Creating garment:', { rfidCode, description, color, observations });
-      
-      // Simular creación exitosa
-      setTimeout(() => {
-        Alert.alert('Éxito', 'Prenda registrada correctamente', [
-          { text: 'OK', onPress: () => onSubmit({ rfidCode, description, color, observations }) }
-        ]);
-        setIsSubmitting(false);
-      }, 500);
+      onSubmit({ 
+        rfidCode, 
+        description, 
+        color, 
+        observations,
+        weight: weightValue
+      });
+      setIsSubmitting(false);
     } catch (error) {
       Alert.alert('Error', 'No se pudo registrar la prenda');
       setIsSubmitting(false);
@@ -82,6 +110,15 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({ rfidCode, onSubmit, on
         />
 
         <Input
+          label="Peso (kg)"
+          placeholder="Ej: 0.5"
+          value={weight}
+          onChangeText={setWeight}
+          keyboardType="decimal-pad"
+          icon="scale-outline"
+        />
+
+        <Input
           label="Observaciones"
           placeholder="Información adicional sobre la prenda..."
           value={observations}
@@ -93,24 +130,12 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({ rfidCode, onSubmit, on
         <View className="h-4" />
 
         <Button
-          title="Crear Prenda"
+          title={initialValues ? "Actualizar Prenda" : "Crear Prenda"}
           onPress={handleSubmit}
-          isLoading={isSubmitting}
+          isLoading={isSubmitting || submitting}
           fullWidth
-          style={{ backgroundColor: '#1f4eed' }}
+          style={{ backgroundColor: initialValues ? '#F59E0B' : '#1f4eed' }}
         />
-
-        {onCancel && (
-          <>
-            <View className="h-3" />
-            <Button
-              title="Cancelar"
-              onPress={onCancel}
-              variant="outline"
-              fullWidth
-            />
-          </>
-        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );

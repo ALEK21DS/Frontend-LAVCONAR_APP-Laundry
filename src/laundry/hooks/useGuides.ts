@@ -1,24 +1,50 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { guidesApi } from '../api/guides/guides.api';
-import { CreateGuideDto, UpdateGuideStatusDto } from '../interfaces/guides/guides.interface';
+import { Guide, CreateGuideDto, UpdateGuideStatusDto } from '../interfaces/guides/guides.interface';
 import { handleApiError } from '@/helpers/axios-error.helper';
+import { ApiResponse } from '@/interfaces/base.response';
 
-export const useGuides = () => {
+interface BackendResponse {
+  status: number;
+  message: string;
+  data: Guide[];
+  totalData?: number;
+  pagination?: {
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  timestamp: string;
+}
+
+export const useGuides = (page: number = 1, limit: number = 10) => {
   const queryClient = useQueryClient();
 
   const {
-    data: guides = [],
+    data,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: ['guides'],
-    queryFn: guidesApi.getAll,
+    queryKey: ['guides', page, limit],
+    queryFn: async (): Promise<BackendResponse> => {
+      const response = await guidesApi.get<BackendResponse>('/get-all-guides', {
+        params: { page, limit }
+      });
+      return response.data;
+    },
     staleTime: 1000 * 60 * 5,
   });
 
+  const guides = data?.data || [];
+  const total = data?.totalData || 0;
+  const totalPages = data?.pagination?.totalPages || 0;
+
   const createGuide = useMutation({
-    mutationFn: (data: CreateGuideDto) => guidesApi.create(data),
+    mutationFn: async (guideData: CreateGuideDto): Promise<Guide> => {
+      const { data } = await guidesApi.post<ApiResponse<Guide>>('/', guideData);
+      return data.data!;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['guides'] });
     },
@@ -28,8 +54,10 @@ export const useGuides = () => {
   });
 
   const updateGuideStatus = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateGuideStatusDto }) =>
-      guidesApi.updateStatus(id, data),
+    mutationFn: async ({ id, data: statusData }: { id: string; data: UpdateGuideStatusDto }): Promise<Guide> => {
+      const { data } = await guidesApi.patch<ApiResponse<Guide>>(`/${id}/status`, statusData);
+      return data.data!;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['guides'] });
     },
@@ -40,6 +68,9 @@ export const useGuides = () => {
 
   return {
     guides,
+    total,
+    totalPages,
+    currentPage: page,
     isLoading,
     error: error?.message,
     refetch,
@@ -56,7 +87,10 @@ export const useTodayGuides = () => {
     refetch,
   } = useQuery({
     queryKey: ['guides', 'today'],
-    queryFn: guidesApi.getTodayGuides,
+    queryFn: async (): Promise<Guide[]> => {
+      const response = await guidesApi.get<ApiResponse<Guide[]>>('/today');
+      return response.data.data || [];
+    },
     staleTime: 1000 * 60 * 1,
     refetchInterval: 1000 * 60 * 2,
   });

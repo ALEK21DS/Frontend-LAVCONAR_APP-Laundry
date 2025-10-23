@@ -30,6 +30,8 @@ export const validateClientData = (data: {
   email: string;
   identification_number: string;
   phone?: string;
+  address?: string;
+  acronym?: string;
 }): ValidationResult => {
   if (!validateRequired(data.name)) {
     return { isValid: false, error: 'El nombre es requerido' };
@@ -55,8 +57,28 @@ export const validateClientData = (data: {
     return { isValid: false, error: 'La cédula/RUC debe tener al menos 10 caracteres' };
   }
 
-  if (data.phone && !validateMinLength(data.phone, 7)) {
+  if (!data.phone || !validateRequired(data.phone)) {
+    return { isValid: false, error: 'El teléfono es requerido' };
+  }
+
+  if (!validateMinLength(data.phone, 7)) {
     return { isValid: false, error: 'El teléfono debe tener al menos 7 dígitos' };
+  }
+
+  if (!data.address || !validateRequired(data.address)) {
+    return { isValid: false, error: 'La dirección es requerida' };
+  }
+
+  if (!validateMinLength(data.address, 5)) {
+    return { isValid: false, error: 'La dirección debe tener al menos 5 caracteres' };
+  }
+
+  if (!data.acronym || !validateRequired(data.acronym)) {
+    return { isValid: false, error: 'El acrónimo es requerido' };
+  }
+
+  if (!validateMinLength(data.acronym, 2)) {
+    return { isValid: false, error: 'El acrónimo debe tener al menos 2 caracteres' };
   }
 
   return { isValid: true };

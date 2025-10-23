@@ -1,22 +1,17 @@
-import { apiClient } from '@/helpers/axios-instance.helper';
-import { ApiResponse } from '@/interfaces/base.response';
+import axios from 'axios';
+import { useConfigStore } from '@/config/store/config.store';
 
-export interface BranchOffice {
-  id: string;
-  name: string;
-  code: string;
-  address: string;
-  phone: string;
-  status: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+const getBaseUrl = () => useConfigStore.getState().apiBaseUrl;
 
-export const branchOfficesApi = {
-  getAll: async (): Promise<BranchOffice[]> => {
-    const { data } = await apiClient.get<ApiResponse<BranchOffice[]>>('/admin-branch-offices');
-    return data.data || [];
-  },
-};
+// API SIN autenticación para sucursales (se usa antes del login)
+// Nota: No usa createAuthenticatedAxiosInstance porque no requiere token
+export const branchOfficesApi = axios.create({
+  timeout: 10000,
+});
+
+// Interceptor para actualizar baseURL dinámicamente
+branchOfficesApi.interceptors.request.use((config) => {
+  config.baseURL = `${getBaseUrl()}/admin-branch-offices`;
+  return config;
+});
 

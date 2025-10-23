@@ -1,38 +1,36 @@
-import { apiClient } from '@/helpers/axios-instance.helper';
+import axios from 'axios';
+import { useConfigStore } from '@/config/store/config.store';
 import { LoginCredentials, LoginResponse } from '../interfaces/auth.response';
 import { ApiResponse } from '@/interfaces/base.response';
+
+const getBaseUrl = () => useConfigStore.getState().apiBaseUrl;
+
+// API sin autenticación (login, refresh)
+const authApiClient = axios.create({
+  timeout: 10000,
+});
+
+// Interceptor para actualizar baseURL dinámicamente
+authApiClient.interceptors.request.use((config) => {
+  config.baseURL = `${getBaseUrl()}/auth`;
+  return config;
+});
 
 // Modo demo: evita llamadas reales al backend para logout
 const USE_DEMO_AUTH = false;
 
 export const authApi = {
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
-    console.log('🔐 Intentando login con:', {
-      username: credentials.username,
-      branchOfficeId: credentials.sucursalId,
-    });
+    const { data } = await authApiClient.post<ApiResponse<LoginResponse>>(
+      '/login',
+      {
+        username: credentials.username,
+        password: credentials.password,
+        branchOfficeId: credentials.sucursalId, // El backend valida que coincida con la sucursal asignada
+      }
+    );
     
-    try {
-      const { data } = await apiClient.post<ApiResponse<LoginResponse>>(
-        '/auth/login',
-        {
-          username: credentials.username,
-          password: credentials.password,
-          branchOfficeId: credentials.sucursalId, // El backend valida que coincida con la sucursal asignada
-        }
-      );
-      
-      console.log('✅ Login exitoso:', data);
-      return data.data!;
-    } catch (error: any) {
-      console.log('❌ Error detallado:', {
-        message: error.message,
-        code: error.code,
-        response: error.response?.data,
-        status: error.response?.status,
-      });
-      throw error;
-    }
+    return data.data!;
   },
 
   logout: async (refreshToken: string): Promise<void> => {
@@ -40,12 +38,12 @@ export const authApi = {
       await new Promise(resolve => setTimeout(resolve, 150));
       return;
     }
-    await apiClient.post('/auth/logout', { refreshToken });
+    await authApiClient.post('/logout', { refreshToken });
   },
 
   validateToken: async (): Promise<boolean> => {
     try {
-      const { data } = await apiClient.get<ApiResponse<{ valid: boolean }>>('/auth/validate');
+      const { data } = await authApiClient.get<ApiResponse<{ valid: boolean }>>('/validate');
       return data.data?.valid || false;
     } catch (error) {
       return false;

@@ -11,8 +11,11 @@ import { GuideForm } from '@/laundry/pages/guides/ui/GuideForm';
 import { ProcessForm } from '@/laundry/pages/processes/ui/ProcessForm';
 import { GarmentForm } from '@/laundry/pages/garments/ui/GarmentForm';
 import { useClients } from '@/laundry/hooks/useClients';
+import { useGarments } from '@/laundry/hooks/useGarments';
 import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
 import { GuideSelectionModal } from '@/laundry/components/GuideSelectionModal';
+import { garmentsApi } from '@/laundry/api/garments/garments.api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type ScanClothesPageProps = {
   navigation: NativeStackNavigationProp<any>;
@@ -30,6 +33,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const mode = route?.params?.mode || 'guide'; // 'garment' o 'guide'
   const serviceType = route?.params?.serviceType || 'industrial';
   const { scannedTags, addScannedTag, clearScannedTags, isScanning, setIsScanning } = useTagStore();
+  const { createGarment, updateGarment } = useGarments();
   const seenSetRef = useRef<Set<string>>(new Set());
   const isScanningRef = useRef<boolean>(false);
   const [isStopping, setIsStopping] = useState(false);
@@ -52,6 +56,109 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   // Estados para el flujo de servicio personal (registro prenda por prenda)
   const [registeredGarments, setRegisteredGarments] = useState<Array<{id: string, description: string, rfidCode: string, category?: string, color?: string}>>([]);
   const [showActionButtons, setShowActionButtons] = useState(false);
+  
+  // Estados para manejar prenda existente
+  const [existingGarment, setExistingGarment] = useState<any | null>(null);
+  const [isCheckingRfid, setIsCheckingRfid] = useState(false);
+  const isCheckingRef = useRef(false);
+
+  // Función para verificar si un RFID ya está registrado en el backend
+  const checkRfidInBackend = useCallback(async (rfidCode: string) => {
+    // Evitar llamadas duplicadas
+    if (isCheckingRef.current) {
+      console.log('⏸️ Ya hay una verificación en progreso, ignorando...');
+      return null;
+    }
+    
+    isCheckingRef.current = true;
+    setIsCheckingRfid(true);
+    try {
+      // Verificar token antes de hacer la petición
+      const token = await AsyncStorage.getItem('auth-token');
+      console.log('🔑 Token presente:', token ? 'SÍ' : 'NO');
+      
+      if (!token) {
+        console.error('🔒 No hay token de autenticación');
+        Alert.alert('Sesión expirada', 'Por favor, vuelve a iniciar sesión');
+        return null;
+      }
+      
+      console.log('🔍 Verificando RFID en backend:', rfidCode);
+      const response = await garmentsApi.get<any>('/get-all-garments', {
+        params: { 
+          search: rfidCode, // Usar search en lugar de rfid_code
+          limit: 100 // Traer más para buscar localmente
+        }
+      });
+      
+      console.log('📦 Respuesta completa del backend:', response.data);
+      
+      const garments = response.data?.data || [];
+      console.log('📦 Prendas encontradas:', garments.length);
+      
+      if (garments.length > 0) {
+        // Buscar localmente la prenda con el RFID exacto
+        const normalizedScanned = rfidCode.trim().toUpperCase();
+        
+        const foundGarment = garments.find((g: any) => {
+          const normalizedFound = g.rfid_code.trim().toUpperCase();
+          return normalizedFound === normalizedScanned;
+        });
+        
+        if (foundGarment) {
+          console.log('✅ Prenda encontrada con RFID coincidente:', {
+            id: foundGarment.id,
+            rfid_code: foundGarment.rfid_code,
+            description: foundGarment.description,
+            weight: foundGarment.weight,
+            color: foundGarment.color
+          });
+          return foundGarment; // Retorna la prenda si existe
+        } else {
+          console.log('⚠️ Ninguna prenda coincide con RFID:', normalizedScanned);
+          console.log('📋 RFIDs en respuesta:', garments.map((g: any) => g.rfid_code));
+          return null; // No encontrada
+        }
+      }
+      console.log('❌ Prenda NO encontrada para:', rfidCode);
+      return null; // No existe
+    } catch (error: any) {
+      const errorStatus = error?.response?.status;
+      
+      // Error 404 es NORMAL cuando no existe la prenda
+      if (errorStatus === 404) {
+        console.log('✅ Confirmado: Prenda NO existe en backend (404)');
+        return null; // No existe, es comportamiento esperado
+      }
+      
+      // Error 401: Token expirado o inválido
+      if (errorStatus === 401) {
+        console.error('🔒 Token expirado o inválido - Limpiando sesión');
+        await AsyncStorage.multiRemove(['auth-token', 'auth-user']);
+        Alert.alert(
+          'Sesión expirada', 
+          'Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.',
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('Login')
+            }
+          ]
+        );
+        return null;
+      }
+      
+      // Otros errores sí son problemas reales
+      console.error('❌ Error inesperado al verificar RFID:', error.message);
+      console.error('❌ Error status:', errorStatus);
+      console.error('❌ Error response:', error?.response?.data);
+      
+      return null;
+    } finally {
+      isCheckingRef.current = false;
+      setIsCheckingRfid(false);
+    }
+  }, [navigation]);
 
   const applyReaderPower = useCallback(async (rangeDbm: number) => {
     // Mapear sensibilidad a potencia real del lector (0-30 aprox. segun SDK)
@@ -68,6 +175,21 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   useEffect(() => {
     applyReaderPower(scanRange);
   }, [scanRange, applyReaderPower]);
+
+  // Log cuando se abre el modal de prenda
+  useEffect(() => {
+    if (garmentModalOpen) {
+      const currentRfid = scannedTags[scannedTags.length - 1]?.epc || '';
+      console.log('📝 Modal de prenda abierto:');
+      console.log('  - RFID escaneado:', currentRfid);
+      console.log('  - Prenda existente:', existingGarment ? 'SÍ' : 'NO');
+      if (existingGarment) {
+        console.log('  - ID prenda:', existingGarment.id);
+        console.log('  - RFID prenda:', existingGarment.rfid_code);
+        console.log('  - Descripción:', existingGarment.description);
+      }
+    }
+  }, [garmentModalOpen, existingGarment, scannedTags]);
 
   // Ya no se requiere proceso ni descripción para este flujo
 
@@ -132,7 +254,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       Alert.alert('Error', 'No se pudo iniciar el escaneo RFID');
       setIsScanning(false);
     }
-  }, [addScannedTag, setIsScanning]);
+  }, [addScannedTag, setIsScanning, stopScanning, mode, serviceType]);
 
   useEffect(() => {
     clearScannedTags();
@@ -169,7 +291,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleContinueToGuides = () => {
+  const handleContinueToGuides = async () => {
     stopScanning();
     if (scannedTags.length === 0) {
       Alert.alert('Sin lecturas', 'Escanea al menos una prenda para continuar.');
@@ -177,11 +299,12 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     }
     
     if (mode === 'garment') {
-      setGarmentModalOpen(true);
+      // Llamar a handleRegisterGarment que ya hace la verificación
+      await handleRegisterGarment();
     } else if (mode === 'guide') {
       if (serviceType === 'personal') {
-        // Flujo personal: abrir formulario de prenda directamente
-        setGarmentModalOpen(true);
+        // Flujo personal: verificar y abrir formulario
+        await handleRegisterGarment();
       } else {
         // Flujo industrial: abrir formulario de guía
         setGuideModalOpen(true);
@@ -213,32 +336,94 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
 
   const handleCloseGarmentModal = () => {
     setGarmentModalOpen(false);
+    setExistingGarment(null);
     clearScannedTags();
     seenSetRef.current.clear();
     // Permanecer en la página de escaneo para registrar otra prenda
   };
 
   // Funciones para el flujo de servicio personal
-  const handleRegisterGarment = () => {
-    setShowActionButtons(false);
-    setGarmentModalOpen(true);
+  const handleRegisterGarment = async () => {
+    if (scannedTags.length === 0) {
+      console.log('⚠️ No hay tags escaneados');
+      return;
+    }
+    
+    // Evitar llamadas múltiples
+    if (garmentModalOpen) {
+      console.log('⏸️ Modal ya está abierto, ignorando...');
+      return;
+    }
+    
+    const currentTag = scannedTags[scannedTags.length - 1];
+    console.log('🔎 Iniciando registro/actualización de prenda para RFID:', currentTag.epc);
+    
+    // Verificar si ya existe en el backend
+    const existingGarmentData = await checkRfidInBackend(currentTag.epc);
+    
+    if (existingGarmentData) {
+      // Si existe, abrir directamente el formulario de actualización
+      console.log('⚠️ Prenda existente detectada para RFID:', currentTag.epc);
+      console.log('✏️ Abriendo modal de actualización automáticamente');
+      
+      setExistingGarment(existingGarmentData);
+      setShowActionButtons(false);
+      setGarmentModalOpen(true);
+    } else {
+      // Si no existe, abrir modal para crear
+      console.log('➕ Prenda nueva, abriendo formulario de creación');
+      setExistingGarment(null);
+      setShowActionButtons(false);
+      setGarmentModalOpen(true);
+    }
   };
 
-  const handleGarmentSubmit = (garmentData: any) => {
+  const handleGarmentSubmit = async (garmentData: any) => {
     if (scannedTags.length > 0) {
       const currentTag = scannedTags[scannedTags.length - 1];
-      const newGarment = {
-        id: `garment-${Date.now()}`,
-        description: garmentData.description || 'Sin descripción',
-        rfidCode: currentTag.epc,
-        category: garmentData.category,
-        color: garmentData.color,
-      };
       
-      setRegisteredGarments(prev => [...prev, newGarment]);
-      setGarmentModalOpen(false);
-      clearScannedTags();
-      // Continuar en la página de escaneo, listo para escanear otra prenda
+      try {
+        if (existingGarment) {
+          // Actualizar prenda existente
+          await updateGarment.mutateAsync({
+            id: existingGarment.id,
+            data: {
+              description: garmentData.description,
+              color: garmentData.color,
+              weight: garmentData.weight,
+              observations: garmentData.observations,
+            }
+          });
+          Alert.alert('Éxito', 'Prenda actualizada correctamente');
+        } else {
+          // Crear nueva prenda
+          await createGarment.mutateAsync({
+            rfid_code: currentTag.epc,
+            description: garmentData.description,
+            color: garmentData.color,
+            weight: garmentData.weight,
+            observations: garmentData.observations,
+          });
+          Alert.alert('Éxito', 'Prenda registrada correctamente');
+        }
+        
+        const newGarment = {
+          id: existingGarment?.id || `garment-${Date.now()}`,
+          description: garmentData.description || 'Sin descripción',
+          rfidCode: currentTag.epc,
+          category: garmentData.category,
+          color: garmentData.color,
+        };
+        
+        setRegisteredGarments(prev => [...prev, newGarment]);
+        setGarmentModalOpen(false);
+        setExistingGarment(null);
+        clearScannedTags();
+        // Continuar en la página de escaneo, listo para escanear otra prenda
+      } catch (error) {
+        console.error('Error al guardar prenda:', error);
+        Alert.alert('Error', 'No se pudo guardar la prenda');
+      }
     }
   };
 
@@ -667,30 +852,54 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         <View className="flex-1 bg-black/40" />
         <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl p-4" style={{ elevation: 8 }}>
           <View className="flex-row items-center mb-4">
-            <Text className="text-xl font-bold text-gray-900 flex-1">
-              {(() => {
-                if (mode === 'guide' && serviceType === 'personal' && scannedTags.length > 0) {
-                  const currentTag = scannedTags[scannedTags.length - 1];
-                  const isAlreadyRegistered = isRfidCodeAlreadyRegistered(currentTag?.epc);
-                  return isAlreadyRegistered ? "Editar Prenda" : "Registrar Prenda";
-                }
-                return "Registrar Prenda";
-              })()}
-            </Text>
+            <View className="flex-row items-center flex-1">
+              <Icon 
+                name={existingGarment ? "create-outline" : "shirt-outline"} 
+                size={24} 
+                color={existingGarment ? "#F59E0B" : "#3B82F6"} 
+              />
+              <Text className="text-xl font-bold text-gray-900 ml-2">
+                {existingGarment ? "Actualizar Prenda" : "Registrar Prenda"}
+              </Text>
+            </View>
             <TouchableOpacity onPress={handleCloseGarmentModal}>
               <Icon name="close" size={22} color="#111827" />
             </TouchableOpacity>
           </View>
+          
+          {isCheckingRfid && (
+            <View className="mb-4 p-3 bg-blue-50 rounded-lg">
+              <Text className="text-sm text-blue-700">Verificando código RFID...</Text>
+            </View>
+          )}
+          
+          {existingGarment && (
+            <View className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <View className="flex-row items-center mb-2">
+                <Icon name="warning-outline" size={18} color="#F59E0B" />
+                <Text className="text-sm font-semibold text-yellow-800 ml-2">
+                  Prenda Existente
+                </Text>
+              </View>
+              <Text className="text-xs text-yellow-700 mb-2">
+                Este código RFID ya está registrado. Los cambios actualizarán la prenda existente.
+              </Text>
+              <Text className="text-xs text-yellow-600 font-mono">
+                RFID: {existingGarment.rfid_code}
+              </Text>
+            </View>
+          )}
+          
           <GarmentForm
-            rfidCode={scannedTags[0]?.epc || ''}
-            onSubmit={(() => {
-              if (mode === 'guide' && serviceType === 'personal' && scannedTags.length > 0) {
-                const currentTag = scannedTags[scannedTags.length - 1];
-                const isAlreadyRegistered = isRfidCodeAlreadyRegistered(currentTag?.epc);
-                return isAlreadyRegistered ? handleUpdateExistingGarment : handleGarmentSubmit;
-              }
-              return handleCloseGarmentModal;
-            })()}
+            rfidCode={scannedTags[scannedTags.length - 1]?.epc || ''}
+            initialValues={existingGarment ? {
+              description: existingGarment.description || '',
+              color: existingGarment.color || '',
+              weight: existingGarment.weight ? String(existingGarment.weight) : '',
+              observations: existingGarment.observations || '',
+            } : undefined}
+            submitting={createGarment.isPending || updateGarment.isPending}
+            onSubmit={handleGarmentSubmit}
           />
         </View>
       </Modal>

@@ -32,23 +32,31 @@ export const Input: React.FC<InputProps> = ({
 
   return (
     <View className={`mb-4 ${containerClassName}`}>
-      {label && <Text className="text-sm font-medium text-gray-700 mb-2">{label}</Text>}
+      {label && (
+        <Text 
+          className="text-sm font-medium mb-2"
+          style={{ color: error ? '#EF4444' : '#374151' }}
+        >
+          {label}
+        </Text>
+      )}
 
       <View
         className={`
           flex-row items-center
           border rounded-lg px-4
-          ${
-            isFocused
-              ? 'border-primary-DEFAULT'
-              : error
-              ? 'border-danger-DEFAULT'
-              : variant === 'dark'
-              ? 'border-gray-600'
-              : 'border-gray-300'
-          }
-          ${error ? 'bg-danger-DEFAULT/5' : variant === 'dark' ? 'bg-[#1b1f25]' : 'bg-white'}
-        `.trim()}>
+          ${variant === 'dark' ? 'bg-[#1b1f25]' : 'bg-white'}
+        `.trim()}
+        style={{
+          borderColor: isFocused 
+            ? '#3B82F6' 
+            : error 
+            ? '#EF4444' 
+            : variant === 'dark' 
+            ? '#4B5563' 
+            : '#D1D5DB',
+          backgroundColor: error ? '#FEF2F2' : variant === 'dark' ? '#1b1f25' : '#FFFFFF'
+        }}>
         {icon && (
           <Icon
             name={icon}
@@ -88,7 +96,7 @@ export const Input: React.FC<InputProps> = ({
         )}
       </View>
 
-      {error && <Text className="text-sm text-danger-DEFAULT mt-1">{error}</Text>}
+      {error && <Text className="text-sm mt-1" style={{ color: '#EF4444' }}>{error}</Text>}
     </View>
   );
 };
