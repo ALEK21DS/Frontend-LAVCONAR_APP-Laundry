@@ -4,7 +4,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Container, Button, Card, Dropdown } from '@/components/common';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useTagStore } from '@/laundry/store/tag.store';
-import { useTags } from '@/laundry/hooks/useTags';
+import { useTags } from '@/laundry/hooks/tags';
 import { rfidModule } from '@/lib/rfid/rfid.module';
 import { PROCESSES } from '@/constants';
 import Icon from 'react-native-vector-icons/Ionicons';

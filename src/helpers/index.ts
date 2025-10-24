@@ -52,6 +52,7 @@ export {
   STATUS_TRANSLATIONS,
   ROLES_TRANSLATIONS,
   AUDIT_ACTION_TRANSLATIONS,
+  ENTITY_TRANSLATIONS,
 } from './enum-translations';
 
 // Mapeadores de estado (específicos de la app móvil)

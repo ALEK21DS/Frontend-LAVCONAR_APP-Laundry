@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Input, Button, Dropdown } from '@/components/common';
 import { useAuth } from '@/auth/hooks/useAuth';
-import { useBranchOffices } from '@/laundry/hooks/useBranchOffices';
+import { useBranchOffices } from '@/laundry/hooks/branch-offices';
 import { validateLoginData } from '@/helpers/validators.helper';
 import { LoginCredentials } from '@/auth/interfaces/auth.response';
 import { AuthLayout } from '@/auth/layouts/AuthLayout';

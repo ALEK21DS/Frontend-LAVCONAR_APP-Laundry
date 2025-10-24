@@ -112,7 +112,7 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
               <View className="w-1/2 px-2 mb-4">
                 <Text className="text-xs text-gray-500 mb-1">Número de Identificación</Text>
                 <View className="flex-row items-center">
-                  <IonIcon name="hash-outline" size={16} color="#4B5563" />
+                  <IonIcon name="card-outline" size={16} color="#4B5563" />
                   <Text className="text-sm text-gray-800 ml-2">{client.identification_number || 'N/A'}</Text>
                 </View>
               </View>

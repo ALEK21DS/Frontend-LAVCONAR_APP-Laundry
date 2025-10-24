@@ -8,7 +8,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { GarmentForm } from './ui/GarmentForm';
 import { rfidModule } from '@/lib/rfid/rfid.module';
 import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
-import { useGarments } from '@/laundry/hooks/useGarments';
+import { useGarments, useCreateGarment, useUpdateGarment, useDeleteGarment } from '@/laundry/hooks/garments';
 import { garmentsApi } from '@/laundry/api/garments/garments.api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -17,7 +17,12 @@ type GarmentsPageProps = { navigation: NativeStackNavigationProp<any> };
 export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
-  const { garments, isLoading, createGarment, refetch, total, totalPages, currentPage } = useGarments(page, limit);
+  
+  // Hooks modulares
+  const { garments, isLoading, refetch, total, totalPages, currentPage } = useGarments({ page, limit });
+  const { createGarmentAsync, isCreating } = useCreateGarment();
+  const { updateGarmentAsync, isUpdating } = useUpdateGarment();
+  const { deleteGarment, isDeleting } = useDeleteGarment();
   const [query, setQuery] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [rfidCode, setRfidCode] = useState('');
@@ -167,7 +172,7 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
           </View>
           <GarmentForm
             rfidCode={rfidCode}
-            submitting={createGarment.isPending}
+            submitting={isCreating}
             onScan={async () => {
               try {
                 if (isScanning) {
@@ -306,7 +311,7 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
                  }
                  
                  // Si no existe, crear normalmente
-                 await createGarment.mutateAsync({
+                 await createGarmentAsync({
                    rfid_code: finalRfidCode,
                    description: data.description,
                    color: data.color,
@@ -321,7 +326,7 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
                  // Error 404 es OK (no existe, podemos crear)
                  if (errorStatus === 404) {
                    try {
-                     await createGarment.mutateAsync({
+                     await createGarmentAsync({
                        rfid_code: data.rfidCode || rfidCode,
                        description: data.description,
                        color: data.color,

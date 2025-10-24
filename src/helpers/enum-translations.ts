@@ -232,8 +232,17 @@ export const ROLES_TRANSLATIONS: Dictionary = {
 // ACCIONES DE AUDITORÍA
 export const AUDIT_ACTION_TRANSLATIONS: Dictionary = {
   CREATE: "Crear",
+  CREATED: "Creado",
   UPDATE: "Actualizar",
+  UPDATED: "Actualizado",
   DELETE: "Eliminar",
+  DELETED: "Eliminado",
+  SCAN: "Escanear",
+  SCANNED: "Escaneado",
+  COMPLETE: "Completar",
+  COMPLETED: "Completado",
+  START: "Iniciar",
+  STARTED: "Iniciado",
   LOGIN: "Iniciar Sesión",
   LOGOUT: "Cerrar Sesión",
   PASSWORD_RESET: "Restablecer Contraseña",
@@ -241,6 +250,30 @@ export const AUDIT_ACTION_TRANSLATIONS: Dictionary = {
   PASSWORD_CHANGED: "Contraseña Cambiada",
   TOKEN_REFRESH: "Actualizar Token",
   SESSION_EXPIRED: "Sesión Expirada",
+};
+
+// ENTIDADES DEL SISTEMA (para auditorías)
+export const ENTITY_TRANSLATIONS: Dictionary = {
+  CLIENT: "Cliente",
+  CLIENTS: "Cliente",
+  GUIDE: "Guía",
+  GUIDES: "Guía",
+  GARMENT: "Prenda",
+  GARMENTS: "Prenda",
+  PROCESS: "Proceso",
+  PROCESSES: "Proceso",
+  TAG: "Tag RFID",
+  TAGS: "Tag RFID",
+  USER: "Usuario",
+  USERS: "Usuario",
+  BRANCH_OFFICE: "Sucursal",
+  BRANCH_OFFICES: "Sucursal",
+  AUTHORIZATION_REQUEST: "Solicitud de autorización",
+  AUTHORIZATION_REQUESTS: "Solicitud de autorización",
+  VEHICLE: "Vehículo",
+  VEHICLES: "Vehículo",
+  MACHINE: "Máquina",
+  MACHINES: "Máquina",
 };
 
 // Objeto con todas las traducciones para facilitar el acceso
@@ -271,6 +304,7 @@ const ENUM_TRANSLATIONS = {
   active_inactive: STATUS_TRANSLATIONS,
   roles: ROLES_TRANSLATIONS,
   audit_action: AUDIT_ACTION_TRANSLATIONS,
+  entity: ENTITY_TRANSLATIONS,
 } as const;
 
 /**

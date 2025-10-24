@@ -3,7 +3,12 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, ActivityInd
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Card } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { useClients } from '@/laundry/hooks/useClients';
+import { 
+  useClients, 
+  useCreateClient, 
+  useUpdateClient, 
+  useDeleteClient 
+} from '@/laundry/hooks/clients';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { ClientForm } from './ui/ClientForm';
@@ -17,7 +22,13 @@ type ClientsPageProps = {
 export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigation }) => {
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
-  const { clients, isLoading, createClient, updateClient, refetch, total, totalPages, currentPage } = useClients(page, limit);
+  
+  // Hooks modulares
+  const { clients, isLoading, refetch, total, totalPages, currentPage } = useClients({ page, limit });
+  const { createClientAsync, isCreating } = useCreateClient();
+  const { updateClientAsync, isUpdating } = useUpdateClient();
+  const { deleteClient, isDeleting } = useDeleteClient();
+  
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [formOpen, setFormOpen] = useState(false);
@@ -164,8 +175,22 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
   };
 
   const handleDelete = () => {
-    // TODO: Implementar eliminación con el backend
-    console.log('Eliminar cliente:', selectedClient?.id);
+    if (!selectedClient?.id) {
+      console.error('No hay cliente seleccionado para eliminar');
+      return;
+    }
+    
+    console.log('Eliminar cliente:', selectedClient.id);
+    deleteClient(selectedClient.id, {
+      onSuccess: () => {
+        console.log('✅ Cliente eliminado exitosamente');
+        setSelectedClient(null);
+        setDetailsOpen(false);
+      },
+      onError: (error: any) => {
+        console.error('❌ Error al eliminar cliente:', error.message || error);
+      }
+    });
   };
 
   return (
@@ -308,7 +333,26 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
               <IonIcon name="close" size={22} color="#111827" />
             </TouchableOpacity>
           </View>
-          <ClientForm initialValues={initialValues} submitting={createClient.isPending || updateClient.isPending} onSubmit={async data => { if (editingId) { await updateClient.mutateAsync({ id: editingId, data }); } else { await createClient.mutateAsync(data); } setFormOpen(false); }} />
+          <ClientForm 
+            initialValues={initialValues} 
+            submitting={isCreating || isUpdating} 
+            onSubmit={async (data) => {
+              try {
+                if (editingId) {
+                  await updateClientAsync({ id: editingId, data });
+                  console.log('✅ Cliente actualizado exitosamente');
+                } else {
+                  await createClientAsync(data);
+                  console.log('✅ Cliente creado exitosamente');
+                }
+                setFormOpen(false);
+                setEditingId(null);
+                setInitialValues(undefined);
+              } catch (error) {
+                console.error('❌ Error al guardar cliente:', error);
+              }
+            }} 
+          />
         </View>
       </Modal>
     </MainLayout>

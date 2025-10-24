@@ -5,13 +5,13 @@ import { Card } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useAuth } from '@/auth/hooks/useAuth';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useDashboardStats, useRecentActivity } from '@/laundry/hooks/useDashboard';
+import { useDashboardStats, useRecentActivity } from '@/laundry/hooks/dashboard';
 
  type DashboardPageProps = { navigation: NativeStackNavigationProp<any> };
 
  export const DashboardPage: React.FC<DashboardPageProps> = ({ navigation }) => {
   // Obtener estadísticas reales del backend
-  const stats = useDashboardStats();
+  const { stats, isLoading: statsLoading } = useDashboardStats();
   const { data: activities = [], isLoading: activitiesLoading, refetch: refetchActivities } = useRecentActivity();
   const [refreshing, setRefreshing] = React.useState(false);
 
@@ -82,20 +82,40 @@ import { useDashboardStats, useRecentActivity } from '@/laundry/hooks/useDashboa
               <View className="flex-1 items-center justify-center py-8">
                 <ActivityIndicator size="large" color="#1f4eed" />
               </View>
+            ) : activities.length === 0 ? (
+              <Card variant="outlined" padding="lg">
+                <View className="items-center py-4">
+                  <Icon name="time-outline" size={48} color="#9CA3AF" />
+                  <Text className="text-gray-500 mt-2">No hay actividad reciente</Text>
+                </View>
+              </Card>
             ) : (
               <View className="-mx-2 flex-row flex-wrap">
-                {activities.slice(0, 5).map(item => (
+                {activities.map((item) => (
                   <View key={item.id} className="w-full px-2 mb-3">
                     <Card variant="elevated" padding="md">
-                      <View className="flex-row items-center">
-                        <View className="bg-gray-100 rounded-lg p-2 mr-3">
-                          <Icon name={item.icon as any} size={18} color="#6B7280" />
-                        </View>
-                        <View className="flex-1">
-                          <Text className="text-gray-900 font-medium">{item.title}</Text>
-                          <Text className="text-gray-500 text-xs mt-0.5">{item.subtitle}</Text>
+                      {/* Título con badge al lado */}
+                      <View className="flex-row items-center justify-between mb-2">
+                        <Text className="text-gray-900 text-sm font-medium flex-1 mr-2">
+                          {item.title}
+                        </Text>
+                        <View 
+                          className="px-2.5 py-1 rounded-full"
+                          style={{ backgroundColor: `${item.actionColor}20` }}
+                        >
+                          <Text 
+                            className="text-xs font-semibold"
+                            style={{ color: item.actionColor }}
+                          >
+                            {item.actionLabel}
+                          </Text>
                         </View>
                       </View>
+                      
+                      {/* Fecha y hora */}
+                      <Text className="text-gray-500 text-xs">
+                        {item.description}
+                      </Text>
                     </Card>
                   </View>
                 ))}

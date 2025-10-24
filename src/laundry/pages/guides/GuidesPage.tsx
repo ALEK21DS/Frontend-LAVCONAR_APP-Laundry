@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Alert, Acti
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Card } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { useGuides } from '@/laundry/hooks/useGuides';
+import { useGuides, useCreateGuide, useUpdateGuideStatus } from '@/laundry/hooks/guides';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { GuideForm } from './ui/GuideForm';
@@ -18,7 +18,11 @@ import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
 export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any) => {
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
-  const { guides, isLoading, createGuide, refetch, total, totalPages, currentPage } = useGuides(page, limit);
+  
+  // Hooks modulares
+  const { guides, isLoading, refetch, total, totalPages, currentPage } = useGuides({ page, limit });
+  const { createGuideAsync, isCreating } = useCreateGuide();
+  const { updateGuideStatusAsync, isUpdating } = useUpdateGuideStatus();
   const [query, setQuery] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);

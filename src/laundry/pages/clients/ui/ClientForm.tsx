@@ -5,7 +5,7 @@ import { Input, Button, Card } from '@/components/common';
 import { CreateClientDto } from '@/laundry/interfaces/clients/clients.interface';
 import { validateClientData } from '@/helpers/validators.helper';
 import { useAuthStore } from '@/auth/store/auth.store';
-import { useBranchOffices } from '@/laundry/hooks/useBranchOffices';
+import { useBranchOffices } from '@/laundry/hooks/branch-offices';
 
 interface ClientFormProps {
   initialValues?: Partial<CreateClientDto>;

@@ -7,7 +7,7 @@ import { useAuthStore } from '@/auth/store/auth.store';
 import { SUCURSALES } from '@/constants';
 import { GUIDE_STATUS, GUIDE_STATUS_LABELS, SERVICE_PRIORITIES, WASHING_TYPES } from '@/constants/processes';
 import { ClientForm } from '@/laundry/pages/clients/ui/ClientForm';
-import { useClients } from '@/laundry/hooks/useClients';
+import { useClients } from '@/laundry/hooks/clients';
 import { GuideDetailForm } from './GuideDetailForm';
 
 type Option = { label: string; value: string };

@@ -7,7 +7,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { ProcessForm } from './ui/ProcessForm';
 import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
-import { useWashingProcesses } from '@/laundry/hooks/useWashingProcesses';
+import { useWashingProcesses } from '@/laundry/hooks/washing-processes';
 import { translateEnum } from '@/helpers/enum-translations';
 
 type ProcessesPageProps = { navigation: NativeStackNavigationProp<any> };
