@@ -41,7 +41,7 @@ npm start
 npm run android
 ```
 
-📖 **[Ver Guía Completa de Instalación en C72](INSTALACION_C72.md)**
+📖 **[Ver Guía Completa de Instalación en C72](docs/INSTALACION_C72.md)**
 
 ## 👤 Usuario Demo
 
@@ -157,15 +157,60 @@ const subscription = rfidModule.addTagListener((tag) => {
 
 📖 **[Ver Documentación del Módulo RFID](android/app/libs/README.md)**
 
-## 🔌 Integración con API
+## 🔌 Configuración de la API
 
-### Configuración de URL Base
+### Variables de Entorno
 
-Editar `src/constants/index.ts`:
+Crea un archivo `.env` en la raíz del proyecto:
 
-```typescript
-export const API_BASE_URL = 'https://tu-api.com';
+```env
+# URL del backend API
+API_BASE_URL=http://localhost:3002/api
 ```
+
+#### Según el Entorno de Desarrollo:
+
+**1. Desarrollo con ADB reverse (Recomendado para C72 por USB)**
+```env
+API_BASE_URL=http://localhost:3002/api
+```
+**Nota:** Ejecuta `adb reverse tcp:3002 tcp:3002` cada vez que conectes el dispositivo.
+
+**2. Desarrollo con WiFi (C72 y PC en la misma red)**
+```env
+API_BASE_URL=http://TU_IP_LOCAL:3002/api
+```
+**Ejemplo:** `API_BASE_URL=http://192.168.1.100:3002/api`
+
+Para encontrar tu IP:
+- Windows: `ipconfig`
+- Mac/Linux: `ifconfig`
+
+**3. Desarrollo con emulador Android**
+```env
+API_BASE_URL=http://10.0.2.2:3002/api
+```
+
+**4. Producción**
+```env
+API_BASE_URL=https://api.tudominio.com/api
+```
+
+### ⚠️ Importante
+
+- Después de modificar el `.env`, reinicia Metro con:
+  ```bash
+  npx react-native start --reset-cache
+  ```
+
+- El archivo `.env` NO se sube a git (ya está en `.gitignore`)
+
+- **Para ADB reverse**: Ejecuta cada vez que conectes el dispositivo:
+  ```bash
+  adb reverse tcp:3002 tcp:3002
+  ```
+  
+  *¿Por qué cada vez?* El túnel `adb reverse` no es persistente y se pierde al desconectar el USB o reiniciar el dispositivo.
 
 ## 🏛️ Arquitectura
 
@@ -248,10 +293,12 @@ plugins: ['nativewind/babel']
 
 ## 📚 Documentación Adicional
 
-- **[Guía de Instalación en C72](INSTALACION_C72.md)** - Configuración completa del dispositivo
+- **[Guía de Instalación en C72](docs/INSTALACION_C72.md)** - Configuración completa del dispositivo C72
+- **[Guía de Desarrollo](docs/DEVELOPMENT_GUIDE.md)** - Especificaciones técnicas completas
+- **[Modo Demo](docs/MODO_DEMO.md)** - Desarrollo sin backend
+- **[Integración Backend - Procesos](docs/INTEGRACION_BACKEND_PROCESOS.md)** - Documentación de procesos pendientes
 - **[Configuración Android](android/README.md)** - Detalles de la configuración Android
 - **[Módulo RFID](android/app/libs/README.md)** - Integración del SDK RFID
-- **[Guía de Desarrollo](DEVELOPMENT_GUIDE.md)** - Especificaciones técnicas completas
 
 ## 🔒 Seguridad
 

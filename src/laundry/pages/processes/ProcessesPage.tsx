@@ -1,31 +1,53 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Card } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { ProcessForm } from './ui/ProcessForm';
 import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
+import { useWashingProcesses } from '@/laundry/hooks/useWashingProcesses';
+import { translateEnum } from '@/helpers/enum-translations';
 
 type ProcessesPageProps = { navigation: NativeStackNavigationProp<any> };
 
 export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [processTypeModalOpen, setProcessTypeModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
-  // Datos demo de procesos
-  const demo = [
-    { id: 'p-001', guide_number: 'G-0001', name: 'Lavado', status: 'IN_PROCESS' },
-    { id: 'p-002', guide_number: 'G-0002', name: 'Secado', status: 'COMPLETED' },
-  ];
+  // Debounce de búsqueda
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+      setPage(1); // Resetear a la primera página al buscar
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // Obtener procesos del backend con paginación
+  const { washingProcesses, total, totalPages, currentPage, isLoading, refetch } = useWashingProcesses({
+    page,
+    limit,
+    search: debouncedQuery,
+  });
+
+  // Refrescar al entrar a la pantalla
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return demo;
-    return demo.filter(p => [p.name, p.guide_number, p.status].some(v => v.toLowerCase().includes(q)));
-  }, [query]);
+    // El filtrado ya lo hace el backend con el parámetro search
+    return washingProcesses;
+  }, [washingProcesses]);
 
   const openCreate = () => { setProcessTypeModalOpen(true); };
 
@@ -75,33 +97,132 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
           )}
         </View>
 
-        <ScrollView className="flex-1">
-          {filtered.length === 0 && <Text className="text-gray-500">No se encontraron procesos.</Text>}
-
-          <View className="-mx-1 flex-row flex-wrap">
-            {filtered.map(p => (
-              <View key={p.id} className="w-full px-1 mb-2">
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={openProcessTypeModal}
-                >
-                  <Card padding="md" variant="default">
-                    <View className="flex-row items-center">
-                      <View className="bg-green-50 rounded-lg p-2 mr-3">
-                        <IonIcon name="construct-outline" size={20} color="#10B981" />
-                      </View>
-                      <View className="flex-1">
-                        <Text className="text-gray-900 font-semibold">{p.name}</Text>
-                        <Text className="text-gray-500 text-xs">{p.guide_number}</Text>
-                      </View>
-                      <Text className="text-gray-600 text-xs">{p.status}</Text>
-                    </View>
-                  </Card>
-                </TouchableOpacity>
-              </View>
-            ))}
+        {isLoading ? (
+          <View className="flex-1 items-center justify-center">
+            <ActivityIndicator size="large" color="#1f4eed" />
           </View>
-        </ScrollView>
+        ) : (
+          <>
+            <ScrollView className="flex-1">
+              {filtered.length === 0 && (
+                <Text className="text-gray-500 text-center mt-8">
+                  No se encontraron procesos.
+                </Text>
+              )}
+
+              <View className="-mx-1 flex-row flex-wrap">
+                {filtered.map(p => (
+                  <View key={p.id} className="w-full px-1 mb-2">
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={openProcessTypeModal}
+                    >
+                      <Card padding="md" variant="default">
+                        <View className="flex-row items-center">
+                          <View className="bg-purple-50 rounded-lg p-2 mr-3">
+                            <IonIcon name="construct-outline" size={20} color="#8B5CF6" />
+                          </View>
+                          <View className="flex-1">
+                            <Text className="text-gray-900 font-semibold">
+                              {p.guide?.guide_number || p.machine_code || 'Sin código'}
+                            </Text>
+                            <Text className="text-gray-500 text-xs">
+                              {translateEnum(p.process_type, 'process_type') || 'Sin tipo'}
+                            </Text>
+                            {p.guide?.client?.name && (
+                              <Text className="text-gray-400 text-xs mt-1">
+                                Cliente: {p.guide.client.name}
+                              </Text>
+                            )}
+                          </View>
+                          <View className="items-end">
+                            {/* Badge de estado */}
+                            <View className={`flex-row items-center px-2 py-1 rounded-full ${
+                              p.status === 'COMPLETED' ? 'bg-green-100' :
+                              p.status === 'IN_PROGRESS' ? 'bg-blue-100' :
+                              p.status === 'PENDING' ? 'bg-yellow-100' :
+                              p.status === 'CANCELLED' ? 'bg-red-100' :
+                              p.status === 'FAILED' ? 'bg-red-100' :
+                              'bg-gray-100'
+                            }`}>
+                              <View className={`w-2 h-2 rounded-full mr-1 ${
+                                p.status === 'COMPLETED' ? 'bg-green-500' :
+                                p.status === 'IN_PROGRESS' ? 'bg-blue-500' :
+                                p.status === 'PENDING' ? 'bg-yellow-500' :
+                                p.status === 'CANCELLED' ? 'bg-red-500' :
+                                p.status === 'FAILED' ? 'bg-red-500' :
+                                'bg-gray-500'
+                              }`} />
+                              <Text className={`text-xs font-medium ${
+                                p.status === 'COMPLETED' ? 'text-green-700' :
+                                p.status === 'IN_PROGRESS' ? 'text-blue-700' :
+                                p.status === 'PENDING' ? 'text-yellow-700' :
+                                p.status === 'CANCELLED' ? 'text-red-700' :
+                                p.status === 'FAILED' ? 'text-red-700' :
+                                'text-gray-700'
+                              }`}>
+                                {translateEnum(p.status, 'process_status') || 'Sin estado'}
+                              </Text>
+                            </View>
+                            {p.garment_quantity && (
+                              <Text className="text-gray-400 text-xs mt-1">
+                                {p.garment_quantity} prendas
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      </Card>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+
+            {/* Paginación */}
+            {totalPages > 1 && (
+              <View className="border-t border-gray-200 bg-white p-4">
+                <View className="flex-row items-center justify-between">
+                  <TouchableOpacity
+                    onPress={() => setPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className={`flex-row items-center px-4 py-2 rounded-lg ${
+                      currentPage === 1 ? 'bg-gray-100' : 'bg-blue-600'
+                    }`}
+                  >
+                    <IonIcon 
+                      name="chevron-back" 
+                      size={18} 
+                      color={currentPage === 1 ? '#9CA3AF' : '#FFFFFF'} 
+                    />
+                  </TouchableOpacity>
+                  
+                  <View className="flex-row items-center">
+                    <Text className="text-gray-600 font-medium">
+                      Página {currentPage} de {totalPages}
+                    </Text>
+                    <Text className="text-gray-400 text-sm ml-2">
+                      ({total} total)
+                    </Text>
+                  </View>
+                  
+                  <TouchableOpacity
+                    onPress={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className={`flex-row items-center px-4 py-2 rounded-lg ${
+                      currentPage === totalPages ? 'bg-gray-100' : 'bg-blue-600'
+                    }`}
+                  >
+                    <IonIcon 
+                      name="chevron-forward" 
+                      size={18} 
+                      color={currentPage === totalPages ? '#9CA3AF' : '#FFFFFF'} 
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </>
+        )}
       </View>
 
       {/* Modal de Selección de Tipo de Proceso */}

@@ -3,5 +3,5 @@ module.exports = {
     ios: {},
     android: {},
   },
-  assets: ['./assets/fonts/'],
+  // assets: ['./assets/fonts/'], // Descomentado cuando se agreguen fuentes personalizadas
 };
