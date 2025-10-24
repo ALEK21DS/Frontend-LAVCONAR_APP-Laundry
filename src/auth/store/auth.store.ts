@@ -5,6 +5,7 @@ import { User } from '../interfaces/user.interface';
 import { LoginCredentials } from '../interfaces/auth.response';
 import { loginAction, loginDemoAction } from '../actions/login.action';
 import { logoutAction } from '../actions/logout.action';
+import { refreshAction } from '../actions/refresh.action';
 
 interface AuthStore {
   user: User | null;
@@ -18,6 +19,7 @@ interface AuthStore {
   login: (credentials: LoginCredentials) => Promise<void>;
   loginDemo: (credentials: LoginCredentials) => Promise<void>;
   logout: () => Promise<void>;
+  checkAuthStatus: () => Promise<{ success: boolean; message: string }>;
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
   clearError: () => void;
@@ -105,6 +107,41 @@ export const useAuthStore = create<AuthStore>()(
             isAuthenticated: false,
             error: null,
           });
+        }
+      },
+
+      checkAuthStatus: async () => {
+        try {
+          const response = await refreshAction();
+          
+          set({
+            user: response.user,
+            token: response.accessToken,
+            refreshToken: response.refreshToken,
+            isAuthenticated: true,
+          });
+
+          return {
+            success: true,
+            message: 'Sesión renovada exitosamente',
+          };
+        } catch (error) {
+          console.error('Error al verificar sesión:', error);
+          
+          // Limpiar todo si el refresh falla
+          await AsyncStorage.multiRemove(['auth-token', 'auth-refresh-token', 'auth-storage']);
+          
+          set({
+            user: null,
+            token: null,
+            refreshToken: null,
+            isAuthenticated: false,
+          });
+
+          return {
+            success: false,
+            message: 'Sesión expirada',
+          };
         }
       },
 

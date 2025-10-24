@@ -24,6 +24,9 @@ interface GuideFormProps {
   showScanButton?: boolean;
   isScanning?: boolean;
   onNavigate?: (route: string, params?: any) => void;
+  // Valores iniciales opcionales
+  initialServiceType?: string;
+  initialTotalWeight?: number;
 }
 
 export const GuideForm: React.FC<GuideFormProps> = ({
@@ -38,12 +41,14 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   showScanButton = true,
   isScanning = false,
   onNavigate,
+  initialServiceType = '',
+  initialTotalWeight = 0,
 }) => {
   const { user } = useAuthStore();
   const branchOfficeName = user?.sucursalId || 'Sucursal';
 
   // Estado local para campos del servicio y fechas
-  const [serviceType, setServiceType] = useState<string>('');
+  const [serviceType, setServiceType] = useState<string>(initialServiceType);
   const [chargeType, setChargeType] = useState<string>('');
   const [condition, setCondition] = useState<string>('');
   const [personalEmployee, setPersonalEmployee] = useState<string>('');
@@ -55,7 +60,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   const [sealNumber, setSealNumber] = useState<string>('');
   const [collectionDate, setCollectionDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [deliveryDate, setDeliveryDate] = useState<string>('');
-  const [totalWeight, setTotalWeight] = useState<string>('');
+  const [totalWeight, setTotalWeight] = useState<string>(initialTotalWeight > 0 ? initialTotalWeight.toString() : '');
   const totalGarments = guideItems.length;
   const [status, setStatus] = useState<string>(GUIDE_STATUS.RECEIVED);
   const [notes, setNotes] = useState<string>('');

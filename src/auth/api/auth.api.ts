@@ -41,6 +41,14 @@ export const authApi = {
     await authApiClient.post('/logout', { refreshToken });
   },
 
+  refresh: async (refreshToken: string): Promise<LoginResponse> => {
+    const { data } = await authApiClient.post<ApiResponse<LoginResponse>>(
+      '/refresh',
+      { refreshToken }
+    );
+    return data.data!;
+  },
+
   validateToken: async (): Promise<boolean> => {
     try {
       const { data } = await authApiClient.get<ApiResponse<{ valid: boolean }>>('/validate');

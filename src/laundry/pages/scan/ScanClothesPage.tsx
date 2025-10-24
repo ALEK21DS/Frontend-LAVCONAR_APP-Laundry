@@ -57,13 +57,31 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const [selectedProcessType, setSelectedProcessType] = useState<string>('');
   
   // Estados para el flujo de servicio personal (registro prenda por prenda)
-  const [registeredGarments, setRegisteredGarments] = useState<Array<{id: string, description: string, rfidCode: string, category?: string, color?: string}>>([]);
+  const [registeredGarments, setRegisteredGarments] = useState<Array<{id: string, description: string, rfidCode: string, category?: string, color?: string, weight?: number}>>([]);
   const [showActionButtons, setShowActionButtons] = useState(false);
+  
+  // Obtener lista de clientes
+  const { clients, isLoading: isLoadingClients } = useClients({ limit: 100 });
   
   // Estados para manejar prenda existente
   const [existingGarment, setExistingGarment] = useState<any | null>(null);
   const [isCheckingRfid, setIsCheckingRfid] = useState(false);
   const isCheckingRef = useRef(false);
+  
+  // Set para rastrear RFIDs que están siendo procesados (prevenir race conditions)
+  const processingRfidsRef = useRef<Set<string>>(new Set());
+
+  // Función para verificar si un código RFID ya está registrado en la lista local
+  const isRfidCodeAlreadyRegistered = useCallback((rfidCode: string) => {
+    return registeredGarments.some(garment => garment.rfidCode === rfidCode);
+  }, [registeredGarments]);
+
+  // Calcular peso total de las prendas registradas
+  const calculateTotalWeight = useCallback(() => {
+    return registeredGarments.reduce((total, garment) => {
+      return total + (garment.weight || 0);
+    }, 0);
+  }, [registeredGarments]);
 
   // Función para verificar si un RFID ya está registrado en el backend
   const checkRfidInBackend = useCallback(async (rfidCode: string) => {
@@ -184,13 +202,95 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     try {
       setIsScanning(true);
       isScanningRef.current = true;
-      const subscription = rfidModule.addTagListener((tag: ScannedTag) => {
+      const subscription = rfidModule.addTagListener(async (tag: ScannedTag) => {
         if (!isScanningRef.current) return;
         // Filtro de RSSI mínimo
         if (typeof tag.rssi === 'number' && tag.rssi < MIN_RSSI) {
           return;
         }
-        // Deduplicación por EPC en memoria
+        
+        // En modo "guide" con servicio personal, lógica especial
+        if (mode === 'guide' && serviceType === 'personal') {
+          // PRIMERO: Verificar si ya está en la lista de registradas (duplicado local)
+          if (isRfidCodeAlreadyRegistered(tag.epc)) {
+            stopScanning();
+            Alert.alert(
+              'Prenda duplicada',
+              'Esta prenda ya fue agregada a la guía',
+              [{ text: 'OK' }]
+            );
+            return;
+          }
+          
+          // SEGUNDO: Verificar si ya está siendo procesado (race condition)
+          if (processingRfidsRef.current.has(tag.epc)) {
+            return; // Ya se está procesando, ignorar
+          }
+          
+          // TERCERO: Verificar deduplicación en seenSet
+          if (seenSetRef.current.has(tag.epc)) {
+            return;
+          }
+          
+          seenSetRef.current.add(tag.epc);
+          processingRfidsRef.current.add(tag.epc); // Marcar como procesando
+          
+          stopScanning();
+          
+          try {
+            // CUARTO: Verificar si existe en el backend
+            const existingGarmentData = await checkRfidInBackend(tag.epc);
+            
+            if (existingGarmentData) {
+              // Si existe en BD, agregar directamente a la lista de registradas SIN alert
+              const newGarment = {
+                id: existingGarmentData.id,
+                description: existingGarmentData.description || 'Sin descripción',
+                rfidCode: tag.epc,
+                color: existingGarmentData.color,
+                weight: existingGarmentData.weight,
+              };
+              
+              // Verificar duplicados dentro del setState para evitar race conditions
+              let wasDuplicate = false;
+              setRegisteredGarments(prev => {
+                // VERIFICACIÓN CRÍTICA: Si ya existe, no agregar
+                const isDuplicate = prev.some(g => g.rfidCode === newGarment.rfidCode);
+                if (isDuplicate) {
+                  wasDuplicate = true;
+                  return prev; // Retornar el estado anterior sin cambios
+                }
+                return [...prev, newGarment];
+              });
+              
+              // Si fue duplicado, limpiar referencias y mostrar alert
+              if (wasDuplicate) {
+                seenSetRef.current.delete(tag.epc);
+                processingRfidsRef.current.delete(tag.epc);
+                setTimeout(() => {
+                  Alert.alert(
+                    'Prenda duplicada',
+                    'Esta prenda ya fue agregada a la guía',
+                    [{ text: 'OK' }]
+                  );
+                }, 100);
+              }
+              
+              // NO agregar a scannedTags
+              // La prenda se agregó silenciosamente y está lista para el siguiente escaneo
+            } else {
+              // Si NO existe en BD, agregar a scannedTags y mostrar botón de registro
+              addScannedTag(tag);
+              setShowActionButtons(true);
+            }
+          } finally {
+            // Remover de processingRfids después de completar
+            processingRfidsRef.current.delete(tag.epc);
+          }
+          return;
+        }
+        
+        // Para otros modos: Deduplicación por EPC en memoria
         if (seenSetRef.current.has(tag.epc)) return;
         seenSetRef.current.add(tag.epc);
         addScannedTag(tag);
@@ -198,12 +298,6 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         // En modo "garment", detener automáticamente después de escanear una prenda
         if (mode === 'garment') {
           stopScanning();
-        }
-        
-        // En modo "guide" con servicio personal, detener y mostrar botones de acción
-        if (mode === 'guide' && serviceType === 'personal') {
-          stopScanning();
-          setShowActionButtons(true);
         }
         // En modo "guide" industrial y "process", permitir escaneo continuo de múltiples prendas
       });
@@ -217,11 +311,12 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       Alert.alert('Error', 'No se pudo iniciar el escaneo RFID');
       setIsScanning(false);
     }
-  }, [addScannedTag, setIsScanning, stopScanning, mode, serviceType]);
+  }, [addScannedTag, setIsScanning, stopScanning, mode, serviceType, checkRfidInBackend, isRfidCodeAlreadyRegistered]);
 
   useEffect(() => {
     clearScannedTags();
     seenSetRef.current.clear();
+    processingRfidsRef.current.clear();
 
     // Suscribir al gatillo hardware del C72
     const emitter = new NativeEventEmitter();
@@ -293,15 +388,19 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
 
   const handleCloseGuideModal = () => {
     setGuideModalOpen(false);
-    clearScannedTags();
-    seenSetRef.current.clear();
+    clearAllScannedData();
   };
 
   const handleCloseGarmentModal = () => {
     setGarmentModalOpen(false);
     setExistingGarment(null);
-    clearScannedTags();
-    seenSetRef.current.clear();
+    // Limpiar el último tag para permitir re-escaneo
+    if (scannedTags.length > 0) {
+      const lastTag = scannedTags[scannedTags.length - 1];
+      seenSetRef.current.delete(lastTag.epc);
+      processingRfidsRef.current.delete(lastTag.epc);
+    }
+    clearAllScannedData();
     // Permanecer en la página de escaneo para registrar otra prenda
   };
 
@@ -339,6 +438,8 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       const currentTag = scannedTags[scannedTags.length - 1];
       
       try {
+        let savedGarmentId = existingGarment?.id;
+        
         if (existingGarment) {
           // Actualizar prenda existente
           await updateGarmentAsync({
@@ -350,35 +451,53 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
               observations: garmentData.observations,
             }
           });
-          Alert.alert('Éxito', 'Prenda actualizada correctamente');
+          Alert.alert('Prenda actualizada', `${garmentData.description} actualizada y agregada a la guía`);
         } else {
           // Crear nueva prenda
-          await createGarmentAsync({
+          const newGarmentResponse = await createGarmentAsync({
             rfid_code: currentTag.epc,
             description: garmentData.description,
             color: garmentData.color,
             weight: garmentData.weight,
             observations: garmentData.observations,
           });
-          Alert.alert('Éxito', 'Prenda registrada correctamente');
+          savedGarmentId = newGarmentResponse.id;
+          Alert.alert('Prenda registrada', `${garmentData.description} registrada y agregada a la guía`);
         }
         
         const newGarment = {
-          id: existingGarment?.id || `garment-${Date.now()}`,
+          id: savedGarmentId || `garment-${Date.now()}`,
           description: garmentData.description || 'Sin descripción',
           rfidCode: currentTag.epc,
           category: garmentData.category,
           color: garmentData.color,
+          weight: garmentData.weight,
         };
         
-        setRegisteredGarments(prev => [...prev, newGarment]);
+        // Verificar duplicados dentro del setState para evitar race conditions
+        setRegisteredGarments(prev => {
+          const isDuplicate = prev.some(g => g.rfidCode === newGarment.rfidCode);
+          if (isDuplicate) {
+            return prev; // No agregar si ya existe
+          }
+          return [...prev, newGarment];
+        });
+        
         setGarmentModalOpen(false);
         setExistingGarment(null);
-        clearScannedTags();
+        
+        // Limpiar del processingRfids antes de limpiar todo
+        processingRfidsRef.current.delete(currentTag.epc);
+        clearAllScannedData();
+        
         // Continuar en la página de escaneo, listo para escanear otra prenda
       } catch (error) {
         console.error('Error al guardar prenda:', error);
         Alert.alert('Error', 'No se pudo guardar la prenda');
+        
+        // Limpiar del processingRfids incluso si hay error
+        processingRfidsRef.current.delete(currentTag.epc);
+        clearAllScannedData();
       }
     }
   };
@@ -388,7 +507,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     // Convertir prendas registradas a tags y abrir formulario de guía
     const garmentTags = registeredGarments.map(g => ({ epc: g.rfidCode, rssi: -50, timestamp: Date.now() }));
     // Agregar los tags al store
-    clearScannedTags();
+    clearAllScannedData();
     garmentTags.forEach(tag => addScannedTag(tag));
     setGuideModalOpen(true);
   };
@@ -396,21 +515,25 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const removeRegisteredGarment = (garmentId: string) => {
     const garment = registeredGarments.find(g => g.id === garmentId);
     if (garment) {
-      // Remover del seenSet para permitir re-escaneo
+      // Remover del seenSet y processingRfids para permitir re-escaneo
       seenSetRef.current.delete(garment.rfidCode);
+      processingRfidsRef.current.delete(garment.rfidCode);
     }
     setRegisteredGarments(prev => prev.filter(g => g.id !== garmentId));
-  };
-
-  // Función para verificar si un código RFID ya está registrado
-  const isRfidCodeAlreadyRegistered = (rfidCode: string) => {
-    return registeredGarments.some(garment => garment.rfidCode === rfidCode);
   };
 
   // Función para obtener la prenda existente por código RFID
   const getExistingGarmentByRfid = (rfidCode: string) => {
     return registeredGarments.find(garment => garment.rfidCode === rfidCode);
   };
+
+  // Función para limpiar completamente todos los estados
+  const clearAllScannedData = useCallback(() => {
+    clearScannedTags();
+    seenSetRef.current.clear();
+    processingRfidsRef.current.clear();
+    setShowActionButtons(false);
+  }, [clearScannedTags]);
 
   // Función para manejar la edición de prenda existente
   const handleEditExistingGarment = () => {
@@ -620,10 +743,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
                     Código Escaneado
                   </Text>
                   <TouchableOpacity 
-                    onPress={() => {
-                      clearScannedTags();
-                      setShowActionButtons(false);
-                    }}
+                    onPress={clearAllScannedData}
                     className="flex-row items-center bg-red-50 px-3 py-1 rounded-lg"
                   >
                     <Icon name="close-circle-outline" size={16} color="#EF4444" />
@@ -691,7 +811,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
                       </View>
                     </Card>
                   )}
-                  keyExtractor={item => item.id}
+                  keyExtractor={item => item.rfidCode}
                 />
               )}
             </View>
@@ -761,7 +881,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             icon={<Icon name="arrow-forward-circle-outline" size={16} color="white" />}
           />
 
-          <Button title="Limpiar Lista" onPress={clearScannedTags} variant="outline" fullWidth size="sm" />
+          <Button title="Limpiar Lista" onPress={clearAllScannedData} variant="outline" fullWidth size="sm" />
         </View>
       )}
 
@@ -788,7 +908,14 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             </TouchableOpacity>
           </View>
           <GuideForm
-            clientOptions={[{ label: 'Cliente Demo', value: 'client-demo-1' }]}
+            clientOptions={
+              isLoadingClients
+                ? [{ label: 'Cargando clientes...', value: '' }]
+                : clients.map(client => ({
+                    label: client.name,
+                    value: client.id,
+                  }))
+            }
             selectedClientId={selectedClientId}
             onChangeClient={setSelectedClientId}
             guideItems={scannedTags.map(t => ({ tagEPC: t.epc, proceso: '' }))}
@@ -800,6 +927,8 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
               // @ts-ignore
               navigation.navigate(route, params);
             }}
+            initialServiceType={serviceType === 'industrial' ? 'INDUSTRIAL' : 'PERSONAL'}
+            initialTotalWeight={calculateTotalWeight()}
           />
         </View>
       </Modal>
