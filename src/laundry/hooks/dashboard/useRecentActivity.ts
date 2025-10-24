@@ -109,19 +109,37 @@ const getResourceName = (audit: OperationAudit): string => {
     if (audit.previous_data?.guide_number) {
       return audit.previous_data.guide_number;
     }
+    if (audit.previous_data?.rfid_code) {
+      return `RFID ${audit.previous_data.rfid_code.substring(0, 12)}...`;
+    }
+    if (audit.previous_data?.description) {
+      return audit.previous_data.description;
+    }
   }
   
   // Para CREATE y UPDATE, obtener de new_data
   if (audit.new_data) {
+    // Nombre (para clientes, sucursales, etc.)
     if (audit.new_data.name) {
       return audit.new_data.name;
     }
+    // Número de guía
     if (audit.new_data.guide_number) {
       return audit.new_data.guide_number;
     }
+    // Código RFID (para prendas escaneadas con RFID)
+    if (audit.new_data.rfid_code) {
+      return `RFID ${audit.new_data.rfid_code.substring(0, 12)}...`;
+    }
+    // Descripción (para prendas)
+    if (audit.new_data.description) {
+      return audit.new_data.description;
+    }
+    // EPC (para tags)
     if (audit.new_data.epc) {
       return `EPC ${audit.new_data.epc.substring(0, 16)}...`;
     }
+    // Tipo de prenda (como último recurso para prendas)
     if (audit.new_data.garment_type) {
       return translateEnum(audit.new_data.garment_type, 'garment_type') || audit.new_data.garment_type;
     }
@@ -194,13 +212,20 @@ export const useRecentActivity = () => {
         
         // Transformar las auditorías en items de actividad
         return audits.map(transformAuditToActivity);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error al obtener actividad reciente:', error);
-        // En caso de error, retornar array vacío
+        
+        // Si es un error 404, no hay auditorías aún (retornar array vacío)
+        if (error?.response?.status === 404) {
+          return [];
+        }
+        
+        // Para cualquier otro error, retornar array vacío para evitar romper el dashboard
         return [];
       }
     },
     staleTime: 1000 * 60 * 2, // 2 minutos (actualizar más frecuente)
     refetchInterval: 1000 * 60 * 5, // Refrescar cada 5 minutos
+    retry: false, // No reintentar en caso de error
   });
 };

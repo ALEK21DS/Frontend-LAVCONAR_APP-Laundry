@@ -1,6 +1,5 @@
 import { useClients } from '../clients';
-import { useGuides } from '../guides';
-import { useGarments } from '../garments';
+import { useGuides, useGarments } from '../guides';
 import { useWashingProcesses } from '../washing-processes';
 
 /**

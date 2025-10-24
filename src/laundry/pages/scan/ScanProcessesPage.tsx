@@ -4,7 +4,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Container, Button, Card, Dropdown } from '@/components/common';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useTagStore } from '@/laundry/store/tag.store';
-import { useTags } from '@/laundry/hooks/tags';
+import { useUpdateTag } from '@/laundry/hooks/tags';
 import { rfidModule } from '@/lib/rfid/rfid.module';
 import { PROCESSES } from '@/constants';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -15,7 +15,7 @@ type ScanProcessesPageProps = {
 };
 
 export const ScanProcessesPage: React.FC<ScanProcessesPageProps> = ({ navigation }) => {
-  const { updateTag } = useTags();
+  const { updateTagAsync, isUpdating } = useUpdateTag();
   const { scannedTags, addScannedTag, clearScannedTags, isScanning, setIsScanning } = useTagStore();
 
   const [selectedProcess, setSelectedProcess] = useState<string>('');
@@ -71,7 +71,7 @@ export const ScanProcessesPage: React.FC<ScanProcessesPageProps> = ({ navigation
     try {
       await Promise.all(
         scannedTags.map(tag =>
-          updateTag.mutateAsync({
+          updateTagAsync({
             epc: tag.epc,
             data: { proceso: selectedProcess },
           })
@@ -200,7 +200,7 @@ export const ScanProcessesPage: React.FC<ScanProcessesPageProps> = ({ navigation
           <Button
             title={`Asignar Proceso (${scannedTags.length})`}
             onPress={handleAssignProcess}
-            isLoading={updateTag.isPending}
+            isLoading={isUpdating}
             fullWidth
             size="lg"
             icon={<Icon name="checkmark-circle-outline" size={20} color="white" />}
@@ -212,7 +212,7 @@ export const ScanProcessesPage: React.FC<ScanProcessesPageProps> = ({ navigation
             onPress={clearScannedTags}
             variant="outline"
             fullWidth
-            disabled={updateTag.isPending}
+            disabled={isUpdating}
           />
         </View>
       )}

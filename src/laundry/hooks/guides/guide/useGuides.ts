@@ -20,16 +20,18 @@ interface UseGuidesParams {
   limit?: number;
   search?: string;
   status?: string;
+  enabled?: boolean;
 }
 
 /**
- * Hook para obtener la lista de guías con paginación
+ * Hook para obtener la lista paginada de guías
  */
 export const useGuides = ({ 
   page = 1, 
-  limit = 10,
-  search,
-  status 
+  limit = 10, 
+  search, 
+  status,
+  enabled = true 
 }: UseGuidesParams = {}) => {
   const {
     data,
@@ -37,19 +39,21 @@ export const useGuides = ({
     error,
     refetch,
   } = useQuery({
-    queryKey: ['guides', page, limit, search, status],
+    queryKey: ['guides', { page, limit, search, status }],
     queryFn: async (): Promise<BackendResponse> => {
       const response = await guidesApi.get<BackendResponse>('/get-all-guides', {
-        params: { 
-          page, 
+        params: {
+          page,
           limit,
-          ...(search && { search }),
-          ...(status && { status }),
+          search,
+          status,
         }
       });
       return response.data;
     },
     staleTime: 1000 * 60 * 5, // 5 minutos
+    retry: false,
+    enabled,
   });
 
   const guides = data?.data || [];

@@ -7,7 +7,7 @@ import { useAuthStore } from '@/auth/store/auth.store';
 import { SUCURSALES } from '@/constants';
 import { GUIDE_STATUS, GUIDE_STATUS_LABELS, SERVICE_PRIORITIES, WASHING_TYPES } from '@/constants/processes';
 import { ClientForm } from '@/laundry/pages/clients/ui/ClientForm';
-import { useClients } from '@/laundry/hooks/clients';
+import { useCreateClient } from '@/laundry/hooks/clients';
 import { GuideDetailForm } from './GuideDetailForm';
 
 type Option = { label: string; value: string };
@@ -77,7 +77,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   const [totalBundlesReceived, setTotalBundlesReceived] = useState<string>('0');
   const [bundlesDiscrepancy, setBundlesDiscrepancy] = useState<string>('0');
   const [vehiclePlate, setVehiclePlate] = useState<string>('');
-  const { createClient } = useClients();
+  const { createClientAsync, isCreating } = useCreateClient();
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
@@ -435,9 +435,9 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             </TouchableOpacity>
           </View>
           <ClientForm
-            submitting={createClient.isPending}
+            submitting={isCreating}
             onSubmit={async data => {
-              const newClient = await createClient.mutateAsync(data);
+              const newClient = await createClientAsync(data);
               if (newClient?.id) {
                 onChangeClient(newClient.id);
               }

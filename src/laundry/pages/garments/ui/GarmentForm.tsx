@@ -7,6 +7,7 @@ interface GarmentFormProps {
   onSubmit: (data: { rfidCode: string; description: string; color: string; observations: string; weight?: number }) => void;
   submitting?: boolean;
   initialValues?: {
+    rfidCode?: string;
     description?: string;
     color?: string;
     weight?: string;

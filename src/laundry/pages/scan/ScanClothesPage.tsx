@@ -11,7 +11,7 @@ import { GuideForm } from '@/laundry/pages/guides/ui/GuideForm';
 import { ProcessForm } from '@/laundry/pages/processes/ui/ProcessForm';
 import { GarmentForm } from '@/laundry/pages/garments/ui/GarmentForm';
 import { useClients } from '@/laundry/hooks/clients';
-import { useGarments } from '@/laundry/hooks/garments';
+import { useGarments, useCreateGarment, useUpdateGarment } from '@/laundry/hooks/guides';
 import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
 import { GuideSelectionModal } from '@/laundry/components/GuideSelectionModal';
 import { garmentsApi } from '@/laundry/api/garments/garments.api';
@@ -33,7 +33,10 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const mode = route?.params?.mode || 'guide'; // 'garment' o 'guide'
   const serviceType = route?.params?.serviceType || 'industrial';
   const { scannedTags, addScannedTag, clearScannedTags, isScanning, setIsScanning } = useTagStore();
-  const { createGarment, updateGarment } = useGarments();
+  
+  // Hooks modulares
+  const { createGarmentAsync, isCreating } = useCreateGarment();
+  const { updateGarmentAsync, isUpdating } = useUpdateGarment();
   const seenSetRef = useRef<Set<string>>(new Set());
   const isScanningRef = useRef<boolean>(false);
   const [isStopping, setIsStopping] = useState(false);
@@ -66,7 +69,6 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const checkRfidInBackend = useCallback(async (rfidCode: string) => {
     // Evitar llamadas duplicadas
     if (isCheckingRef.current) {
-      console.log('⏸️ Ya hay una verificación en progreso, ignorando...');
       return null;
     }
     
@@ -75,26 +77,20 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     try {
       // Verificar token antes de hacer la petición
       const token = await AsyncStorage.getItem('auth-token');
-      console.log('🔑 Token presente:', token ? 'SÍ' : 'NO');
       
       if (!token) {
-        console.error('🔒 No hay token de autenticación');
         Alert.alert('Sesión expirada', 'Por favor, vuelve a iniciar sesión');
         return null;
       }
       
-      console.log('🔍 Verificando RFID en backend:', rfidCode);
       const response = await garmentsApi.get<any>('/get-all-garments', {
         params: { 
-          search: rfidCode, // Usar search en lugar de rfid_code
-          limit: 100 // Traer más para buscar localmente
+          search: rfidCode,
+          limit: 100
         }
       });
       
-      console.log('📦 Respuesta completa del backend:', response.data);
-      
       const garments = response.data?.data || [];
-      console.log('📦 Prendas encontradas:', garments.length);
       
       if (garments.length > 0) {
         // Buscar localmente la prenda con el RFID exacto
@@ -106,34 +102,20 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         });
         
         if (foundGarment) {
-          console.log('✅ Prenda encontrada con RFID coincidente:', {
-            id: foundGarment.id,
-            rfid_code: foundGarment.rfid_code,
-            description: foundGarment.description,
-            weight: foundGarment.weight,
-            color: foundGarment.color
-          });
           return foundGarment; // Retorna la prenda si existe
-        } else {
-          console.log('⚠️ Ninguna prenda coincide con RFID:', normalizedScanned);
-          console.log('📋 RFIDs en respuesta:', garments.map((g: any) => g.rfid_code));
-          return null; // No encontrada
         }
       }
-      console.log('❌ Prenda NO encontrada para:', rfidCode);
       return null; // No existe
     } catch (error: any) {
       const errorStatus = error?.response?.status;
       
       // Error 404 es NORMAL cuando no existe la prenda
       if (errorStatus === 404) {
-        console.log('✅ Confirmado: Prenda NO existe en backend (404)');
         return null; // No existe, es comportamiento esperado
       }
       
       // Error 401: Token expirado o inválido
       if (errorStatus === 401) {
-        console.error('🔒 Token expirado o inválido - Limpiando sesión');
         await AsyncStorage.multiRemove(['auth-token', 'auth-user']);
         Alert.alert(
           'Sesión expirada', 
@@ -147,11 +129,6 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         );
         return null;
       }
-      
-      // Otros errores sí son problemas reales
-      console.error('❌ Error inesperado al verificar RFID:', error.message);
-      console.error('❌ Error status:', errorStatus);
-      console.error('❌ Error response:', error?.response?.data);
       
       return null;
     } finally {
@@ -176,20 +153,6 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     applyReaderPower(scanRange);
   }, [scanRange, applyReaderPower]);
 
-  // Log cuando se abre el modal de prenda
-  useEffect(() => {
-    if (garmentModalOpen) {
-      const currentRfid = scannedTags[scannedTags.length - 1]?.epc || '';
-      console.log('📝 Modal de prenda abierto:');
-      console.log('  - RFID escaneado:', currentRfid);
-      console.log('  - Prenda existente:', existingGarment ? 'SÍ' : 'NO');
-      if (existingGarment) {
-        console.log('  - ID prenda:', existingGarment.id);
-        console.log('  - RFID prenda:', existingGarment.rfid_code);
-        console.log('  - Descripción:', existingGarment.description);
-      }
-    }
-  }, [garmentModalOpen, existingGarment, scannedTags]);
 
   // Ya no se requiere proceso ni descripción para este flujo
 
@@ -345,33 +308,26 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   // Funciones para el flujo de servicio personal
   const handleRegisterGarment = async () => {
     if (scannedTags.length === 0) {
-      console.log('⚠️ No hay tags escaneados');
       return;
     }
     
     // Evitar llamadas múltiples
     if (garmentModalOpen) {
-      console.log('⏸️ Modal ya está abierto, ignorando...');
       return;
     }
     
     const currentTag = scannedTags[scannedTags.length - 1];
-    console.log('🔎 Iniciando registro/actualización de prenda para RFID:', currentTag.epc);
     
     // Verificar si ya existe en el backend
     const existingGarmentData = await checkRfidInBackend(currentTag.epc);
     
     if (existingGarmentData) {
       // Si existe, abrir directamente el formulario de actualización
-      console.log('⚠️ Prenda existente detectada para RFID:', currentTag.epc);
-      console.log('✏️ Abriendo modal de actualización automáticamente');
-      
       setExistingGarment(existingGarmentData);
       setShowActionButtons(false);
       setGarmentModalOpen(true);
     } else {
       // Si no existe, abrir modal para crear
-      console.log('➕ Prenda nueva, abriendo formulario de creación');
       setExistingGarment(null);
       setShowActionButtons(false);
       setGarmentModalOpen(true);
@@ -385,7 +341,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       try {
         if (existingGarment) {
           // Actualizar prenda existente
-          await updateGarment.mutateAsync({
+          await updateGarmentAsync({
             id: existingGarment.id,
             data: {
               description: garmentData.description,
@@ -397,7 +353,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           Alert.alert('Éxito', 'Prenda actualizada correctamente');
         } else {
           // Crear nueva prenda
-          await createGarment.mutateAsync({
+          await createGarmentAsync({
             rfid_code: currentTag.epc,
             description: garmentData.description,
             color: garmentData.color,
@@ -898,7 +854,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
               weight: existingGarment.weight ? String(existingGarment.weight) : '',
               observations: existingGarment.observations || '',
             } : undefined}
-            submitting={createGarment.isPending || updateGarment.isPending}
+            submitting={isCreating || isUpdating}
             onSubmit={handleGarmentSubmit}
           />
         </View>

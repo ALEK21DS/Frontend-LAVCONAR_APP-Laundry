@@ -12,11 +12,9 @@
 // Clientes
 export * from './clients';
 
-// Guías
+// Guías (incluye guías, prendas, detalles de guías, escaneos RFID)
+// Todos unificados bajo /admin-guides endpoint
 export * from './guides';
-
-// Prendas
-export * from './garments';
 
 // Tags RFID
 export * from './tags';
@@ -29,4 +27,3 @@ export * from './branch-offices';
 
 // Dashboard
 export * from './dashboard';
-
