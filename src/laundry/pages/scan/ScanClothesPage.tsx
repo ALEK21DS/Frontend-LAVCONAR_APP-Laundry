@@ -42,7 +42,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const [isStopping, setIsStopping] = useState(false);
   const [guideModalOpen, setGuideModalOpen] = useState(false);
   const [garmentModalOpen, setGarmentModalOpen] = useState(false);
-  const [selectedClientId, setSelectedClientId] = useState<string>('client-demo-1');
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [processModalOpen, setProcessModalOpen] = useState(false);
   const [selectedGuideId, setSelectedGuideId] = useState<string>('');
   // Para servicio personal, usar sensibilidad media (-65) para detección confiable a corta distancia
@@ -388,7 +388,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
 
   const handleCloseGuideModal = () => {
     setGuideModalOpen(false);
-    clearAllScannedData();
+    clearAllScannedData(); // Esta función ya limpia registeredGarments
   };
 
   const handleCloseGarmentModal = () => {
@@ -507,7 +507,12 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     // Convertir prendas registradas a tags y abrir formulario de guía
     const garmentTags = registeredGarments.map(g => ({ epc: g.rfidCode, rssi: -50, timestamp: Date.now() }));
     // Agregar los tags al store
-    clearAllScannedData();
+    // NO limpiar registeredGarments aquí porque se necesita para calcular el peso
+    clearScannedTags();
+    seenSetRef.current.clear();
+    processingRfidsRef.current.clear();
+    setShowActionButtons(false);
+    // Agregar tags sin limpiar registeredGarments
     garmentTags.forEach(tag => addScannedTag(tag));
     setGuideModalOpen(true);
   };
@@ -533,6 +538,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     seenSetRef.current.clear();
     processingRfidsRef.current.clear();
     setShowActionButtons(false);
+    setRegisteredGarments([]); // Limpiar prendas registradas en servicio personal
   }, [clearScannedTags]);
 
   // Función para manejar la edición de prenda existente
@@ -922,13 +928,14 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             onRemoveItem={() => {}}
             onScan={() => {}}
             onSubmit={handleCloseGuideModal}
+            onCancel={handleCloseGuideModal}
             showScanButton={false}
             onNavigate={(route: string, params?: any) => {
               // @ts-ignore
               navigation.navigate(route, params);
             }}
             initialServiceType={serviceType === 'industrial' ? 'INDUSTRIAL' : 'PERSONAL'}
-            initialTotalWeight={calculateTotalWeight()}
+            initialTotalWeight={serviceType === 'personal' ? calculateTotalWeight() : 0}
           />
         </View>
       </Modal>

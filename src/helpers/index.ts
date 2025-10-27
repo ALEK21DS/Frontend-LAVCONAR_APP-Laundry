@@ -66,11 +66,25 @@ export {
 
 // Validadores
 export {
+  // Validaciones genéricas
   validateEmail,
   validatePhone,
   validateRequired,
   validateMinLength,
   validateMaxLength,
+  // Validaciones numéricas
+  isValidInteger,
+  isValidDecimal,
+  isPositive,
+  isNonNegative,
+  safeParseInt,
+  safeParseFloat,
+  // Sanitización
+  sanitizeNumericInput,
+  sanitizeDecimalInput,
+  // Validaciones de fechas
+  isValidDate,
+  // Validaciones de formularios completos
   validateClientData,
   validateLoginData,
   type ValidationResult,

@@ -38,6 +38,7 @@ export interface CreateRfidScanDto {
   scanned_quantity: number;
   scanned_rfid_codes: string[];
   unexpected_codes?: string[];
+  // user_id: NO se envía, el backend lo obtiene del token JWT
   location?: string;
   differences_detected?: string;
 }

@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, TextInput, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, TextInput, Modal, Alert } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Button, Input, Dropdown } from '@/components/common';
 import { ScanForm } from '@/laundry/pages/scan/ui/ScanForm';
+import { sanitizeDecimalInput, isNonNegative } from '@/helpers/validators.helper';
 
 type GuideDetailFormProps = {
-  onSubmit: (data: any) => void;
+  onSubmit: (data: any) => void | Promise<void>;
   onCancel: () => void;
   submitting?: boolean;
+  guideData: any; // Datos de la guía guardados en memoria
   initialValues?: any;
   scannedTags?: string[];
   onNavigate?: (route: string, params?: any) => void;
@@ -17,15 +19,15 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
   onSubmit,
   onCancel,
   submitting = false,
+  guideData,
   initialValues,
   scannedTags = [],
   onNavigate
 }) => {
   const [formData, setFormData] = useState({
-    guide_id: initialValues?.guide_id || '',
     garment_type: initialValues?.garment_type || '',
     predominant_color: initialValues?.predominant_color || '',
-    requested_services: initialValues?.requested_services || [],
+    requested_services: initialValues?.requested_services || ['WASH'],
     initial_state_description: initialValues?.initial_state_description || '',
     additional_cost: initialValues?.additional_cost || '0',
     observations: initialValues?.observations || '',
@@ -39,7 +41,6 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
     branch_office_name: initialValues?.branch_office_name || 'Sucursal',
   });
 
-  const [showGuideDropdown, setShowGuideDropdown] = useState(false);
   const [showScanForm, setShowScanForm] = useState(false);
 
   const garmentTypes = [
@@ -53,17 +54,17 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
   ];
 
   const colors = [
-    { label: 'Blanco', value: 'blanco' },
+    { label: 'Blanco', value: 'WHITE' },
     { label: 'Colores Claros', value: 'LIGHT_COLORS' },
     { label: 'Colores Oscuros', value: 'DARK_COLORS' },
     { label: 'Mixto', value: 'MIXED' },
   ];
 
   const serviceOptions = [
-    { label: 'Lavado', value: 'lavado' },
-    { label: 'Secado', value: 'secado' },
-    { label: 'Planchado', value: 'planchado' },
-    { label: 'Limpieza', value: 'limpieza' },
+    { label: 'Lavado', value: 'WASH' },
+    { label: 'Secado', value: 'DRY' },
+    { label: 'Planchado', value: 'IRON' },
+    { label: 'Limpieza', value: 'CLEAN' },
   ];
 
   const handleServiceToggle = (service: string) => {
@@ -75,8 +76,30 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
     }));
   };
 
-  const handleSubmit = () => {
-    onSubmit(formData);
+  const handleSubmit = async () => {
+    // Validar campos obligatorios
+    if (!formData.garment_type) {
+      Alert.alert('Error', 'Debe seleccionar un tipo de prenda');
+      return;
+    }
+    if (!formData.predominant_color) {
+      Alert.alert('Error', 'Debe seleccionar un color predominante');
+      return;
+    }
+    if (formData.requested_services.length === 0) {
+      Alert.alert('Error', 'Debe seleccionar al menos un servicio');
+      return;
+    }
+    
+    // Validar costo adicional si existe
+    if (formData.additional_cost && formData.additional_cost !== '0') {
+      if (!isNonNegative(formData.additional_cost)) {
+        Alert.alert('Error', 'El costo adicional debe ser un número válido mayor o igual a 0');
+        return;
+      }
+    }
+
+    // Abrir el formulario de escaneo y pasar todos los datos
     setShowScanForm(true);
   };
 
@@ -87,25 +110,6 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
     >
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         <View className="p-4">
-          {/* Guía */}
-          <View className="mb-4">
-            <Text className="text-sm font-medium text-gray-700 mb-2">Guía *</Text>
-            <TouchableOpacity
-              className="flex-row items-center bg-white border border-gray-300 rounded-lg px-3 py-3"
-              onPress={() => setShowGuideDropdown(!showGuideDropdown)}
-            >
-              <IonIcon name="search-outline" size={18} color="#6B7280" />
-              <Text className="flex-1 ml-2 text-gray-900">
-                {formData.guide_id || 'Buscar guía por número...'}
-              </Text>
-              <IonIcon 
-                name={showGuideDropdown ? 'chevron-up' : 'chevron-down'} 
-                size={18} 
-                color="#6B7280" 
-              />
-            </TouchableOpacity>
-          </View>
-
           {/* Sucursal - Campo de solo lectura */}
           <View className="mb-4">
             <Input
@@ -118,7 +122,7 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
 
           {/* Tipo de Prenda */}
           <View className="mb-4">
-            <Text className="text-sm font-medium text-gray-700 mb-2">Tipo de Prenda</Text>
+            <Text className="text-sm font-medium text-gray-700 mb-2">Tipo de Prenda *</Text>
             <Dropdown
               options={garmentTypes}
               value={formData.garment_type}
@@ -129,7 +133,7 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
 
           {/* Color Predominante */}
           <View className="mb-4">
-            <Text className="text-sm font-medium text-gray-700 mb-2">Color Predominante</Text>
+            <Text className="text-sm font-medium text-gray-700 mb-2">Color Predominante *</Text>
             <Dropdown
               options={colors}
               value={formData.predominant_color}
@@ -140,7 +144,7 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
 
           {/* Servicios Solicitados */}
           <View className="mb-4">
-            <Text className="text-sm font-medium text-gray-700 mb-2">Servicios Solicitados</Text>
+            <Text className="text-sm font-medium text-gray-700 mb-2">Servicios Solicitados *</Text>
             <View className="flex-row flex-wrap">
               {serviceOptions.map((service) => (
                 <TouchableOpacity
@@ -188,9 +192,9 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
             <Text className="text-sm font-medium text-gray-700 mb-2">Costo Adicional ($)</Text>
             <Input
               value={formData.additional_cost}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, additional_cost: text }))}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, additional_cost: sanitizeDecimalInput(text) }))}
               placeholder="0"
-              keyboardType="numeric"
+              keyboardType="decimal-pad"
             />
           </View>
 
@@ -283,11 +287,12 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
           {/* Botón */}
           <View className="flex-row">
             <Button
-              title="Guardar"
+              title="Continuar a Escaneo"
               variant="primary"
               onPress={handleSubmit}
               isLoading={submitting}
               fullWidth
+              disabled={!formData.garment_type || !formData.predominant_color || formData.requested_services.length === 0}
             />
           </View>
         </View>
@@ -322,7 +327,8 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
             }}
             onCancel={() => setShowScanForm(false)}
             submitting={false}
-            initialValues={{ guide_id: formData.guide_id }}
+            guideData={guideData}
+            guideGarmentData={formData}
             scannedTags={scannedTags}
             onNavigate={onNavigate}
           />

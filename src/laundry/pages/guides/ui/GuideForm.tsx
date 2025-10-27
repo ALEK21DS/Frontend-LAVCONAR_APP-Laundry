@@ -9,8 +9,9 @@ import { GUIDE_STATUS, GUIDE_STATUS_LABELS, SERVICE_PRIORITIES, WASHING_TYPES } 
 import { ClientForm } from '@/laundry/pages/clients/ui/ClientForm';
 import { useCreateClient } from '@/laundry/hooks/clients';
 import { useBranchOffices } from '@/laundry/hooks/branch-offices';
-import { useCreateGuide } from '@/laundry/hooks/guides';
+import { useCreateGuide, useCreateGuideGarment } from '@/laundry/hooks/guides';
 import { GuideDetailForm } from './GuideDetailForm';
+import { isValidDate, sanitizeNumericInput, sanitizeDecimalInput, isNonNegative, safeParseInt, safeParseFloat } from '@/helpers/validators.helper';
 
 type Option = { label: string; value: string };
 
@@ -22,6 +23,7 @@ interface GuideFormProps {
   onRemoveItem: (epc: string) => void;
   onScan: () => void;
   onSubmit: () => void;
+  onCancel?: () => void;
   submitting?: boolean;
   showScanButton?: boolean;
   isScanning?: boolean;
@@ -39,6 +41,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   onRemoveItem,
   onScan,
   onSubmit,
+  onCancel,
   submitting,
   showScanButton = true,
   isScanning = false,
@@ -81,7 +84,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   const [notes, setNotes] = useState<string>('');
   const [clientModalOpen, setClientModalOpen] = useState(false);
   const [showDetailForm, setShowDetailForm] = useState(false);
-  const [createdGuideId, setCreatedGuideId] = useState<string>('');
+  const [savedGuideData, setSavedGuideData] = useState<any>(null);
 
   // Nuevos campos basados en las imágenes y schema
   const [servicePriority, setServicePriority] = useState<string>('NORMAL');
@@ -94,12 +97,13 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   const [driverId, setDriverId] = useState<string>('');
   
   // Gestión de paquetes
-  const [totalBundlesExpected, setTotalBundlesExpected] = useState<string>('0');
-  const [totalBundlesReceived, setTotalBundlesReceived] = useState<string>('0');
-  const [bundlesDiscrepancy, setBundlesDiscrepancy] = useState<string>('0');
+  const [totalBundlesExpected, setTotalBundlesExpected] = useState<string>('');
+  const [totalBundlesReceived, setTotalBundlesReceived] = useState<string>('');
+  const [bundlesDiscrepancy, setBundlesDiscrepancy] = useState<string>('');
   const [vehiclePlate, setVehiclePlate] = useState<string>('');
   const { createClientAsync, isCreating } = useCreateClient();
   const { createGuideAsync, isCreating: isCreatingGuide } = useCreateGuide();
+  const { createGuideGarmentAsync, isCreating: isCreatingGuideGarment } = useCreateGuideGarment();
 
   // Función para formatear fecha mientras se escribe (dd/mm/yyyy)
   const formatDateInput = (text: string): string => {
@@ -389,7 +393,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
                 label="Paquetes Esperados"
                 placeholder="0"
                 value={totalBundlesExpected}
-                onChangeText={setTotalBundlesExpected}
+                onChangeText={(text) => setTotalBundlesExpected(sanitizeNumericInput(text))}
                 keyboardType="numeric"
               />
             </View>
@@ -398,7 +402,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
                 label="Paquetes Recibidos"
                 placeholder="0"
                 value={totalBundlesReceived}
-                onChangeText={setTotalBundlesReceived}
+                onChangeText={(text) => setTotalBundlesReceived(sanitizeNumericInput(text))}
                 keyboardType="numeric"
               />
             </View>
@@ -409,7 +413,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
                 label="Discrepancia"
                 placeholder="0"
                 value={bundlesDiscrepancy}
-                onChangeText={setBundlesDiscrepancy}
+                onChangeText={(text) => setBundlesDiscrepancy(sanitizeNumericInput(text))}
                 keyboardType="numeric"
               />
             </View>
@@ -517,13 +521,20 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             Alert.alert('Error', 'Debe ingresar la fecha de recolección');
             return;
           }
-          if (guideItems.length === 0) {
-            Alert.alert('Error', 'Debe escanear al menos una prenda');
+          
+          // Validar que la fecha de recolección sea válida
+          if (!isValidDate(collectionDate)) {
+            Alert.alert('Error', 'La fecha de recolección no es válida. Use formato dd/mm/aaaa');
             return;
           }
           
-          // Validar que la fecha de entrega no sea anterior a la fecha de recolección
-          if (deliveryDate && collectionDate) {
+          // Validar fecha de entrega si existe
+          if (deliveryDate) {
+            if (!isValidDate(deliveryDate)) {
+              Alert.alert('Error', 'La fecha de entrega no es válida. Use formato dd/mm/aaaa');
+              return;
+            }
+            
             const deliveryDateObj = parseDateFromDisplay(deliveryDate);
             const collectionDateObj = parseDateFromDisplay(collectionDate);
             
@@ -533,8 +544,32 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             }
           }
           
-          try {
-            // Preparar datos de la guía para el backend
+          if (guideItems.length === 0) {
+            Alert.alert('Error', 'Debe escanear al menos una prenda');
+            return;
+          }
+          
+          // Validar peso si existe
+          if (totalWeight && !isNonNegative(totalWeight)) {
+            Alert.alert('Error', 'El peso total debe ser un número válido mayor o igual a 0');
+            return;
+          }
+          
+          // Validar campos numéricos opcionales
+          if (totalBundlesExpected && !isNonNegative(totalBundlesExpected)) {
+            Alert.alert('Error', 'Los bultos esperados deben ser un número válido mayor o igual a 0');
+            return;
+          }
+          if (totalBundlesReceived && !isNonNegative(totalBundlesReceived)) {
+            Alert.alert('Error', 'Los bultos recibidos deben ser un número válido mayor o igual a 0');
+            return;
+          }
+          if (bundlesDiscrepancy && !isNonNegative(bundlesDiscrepancy)) {
+            Alert.alert('Error', 'La discrepancia debe ser un número válido mayor o igual a 0');
+            return;
+          }
+          
+            // Guardar datos de la guía en memoria (no crear en BD aún)
             const guideData = {
               client_id: selectedClientId,
               branch_office_id: branchOfficeId,
@@ -543,20 +578,18 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               collection_date: formatDateToISO(collectionDate, true), // Con hora actual
               delivery_date: deliveryDate ? formatDateToISO(deliveryDate, false) : undefined, // Sin hora (00:00)
               general_condition: condition as any,
-              total_weight: totalWeight ? parseFloat(totalWeight) : undefined,
+              total_weight: safeParseFloat(totalWeight),
               total_garments: totalGarments,
               notes: notes || undefined,
+              // Campos opcionales numéricos
+              total_bundles_expected: safeParseInt(totalBundlesExpected),
+              total_bundles_received: safeParseInt(totalBundlesReceived),
+              bundles_discrepancy: safeParseInt(bundlesDiscrepancy),
             };
 
-            // Crear la guía en el backend
-            const createdGuide = await createGuideAsync(guideData);
-            
-            // Si la guía se creó exitosamente, guardar el ID y continuar al formulario de detalles
-            setCreatedGuideId(createdGuide.id);
+            // Guardar en estado y continuar al formulario de detalles
+            setSavedGuideData(guideData);
             setShowDetailForm(true);
-          } catch (error: any) {
-            Alert.alert('Error', error.message || 'No se pudo crear la guía');
-          }
         }}
         isLoading={isCreatingGuide || !!submitting}
         fullWidth
@@ -607,13 +640,12 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           </View>
           <GuideDetailForm
             onSubmit={(data) => {
-              console.log('Detalle de guía creado:', data);
-              // No cerrar el modal aquí, el ScanForm se abrirá desde GuideDetailForm
+              // No hacer nada aquí, solo cerrar y pasar datos al ScanForm
             }}
             onCancel={() => setShowDetailForm(false)}
             submitting={false}
+            guideData={savedGuideData}
             initialValues={{ 
-              guide_id: createdGuideId,
               // Pasar datos de la guía principal
               total_weight: totalWeight,
               total_garments: totalGarments,
