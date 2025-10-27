@@ -75,12 +75,13 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   };
   const [collectionDate, setCollectionDate] = useState<string>(formatDateToDisplay(new Date()));
   const [deliveryDate, setDeliveryDate] = useState<string>('');
-  const [totalWeight, setTotalWeight] = useState<string>(initialTotalWeight > 0 ? initialTotalWeight.toString() : '');
+  const [totalWeight, setTotalWeight] = useState<string>(initialTotalWeight > 0 ? initialTotalWeight.toFixed(2) : '');
   const totalGarments = guideItems.length;
   const [status, setStatus] = useState<string>(GUIDE_STATUS.RECEIVED);
   const [notes, setNotes] = useState<string>('');
   const [clientModalOpen, setClientModalOpen] = useState(false);
   const [showDetailForm, setShowDetailForm] = useState(false);
+  const [createdGuideId, setCreatedGuideId] = useState<string>('');
 
   // Nuevos campos basados en las imágenes y schema
   const [servicePriority, setServicePriority] = useState<string>('NORMAL');
@@ -127,6 +128,25 @@ export const GuideForm: React.FC<GuideFormProps> = ({
     const month = parseInt(parts[1], 10) - 1; // Los meses en JS son 0-indexed
     const year = parseInt(parts[2], 10);
     return new Date(year, month, day);
+  };
+
+  // Función para formatear peso con máximo 2 decimales
+  const formatWeightInput = (text: string): string => {
+    // Permitir solo números y un punto decimal
+    const cleaned = text.replace(/[^0-9.]/g, '');
+    
+    // Si hay más de un punto, quedarse solo con el primero
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      return `${parts[0]}.${parts.slice(1).join('')}`;
+    }
+    
+    // Limitar a 2 decimales
+    if (parts.length === 2) {
+      return `${parts[0]}.${parts[1].slice(0, 2)}`;
+    }
+    
+    return cleaned;
   };
 
   // Función para convertir dd/mm/yyyy a ISO string para el backend
@@ -259,7 +279,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               label="Peso Total (kg)"
               placeholder="0.00"
               value={totalWeight}
-              onChangeText={setTotalWeight}
+              onChangeText={(text) => setTotalWeight(formatWeightInput(text))}
               keyboardType="decimal-pad"
             />
           </View>
@@ -528,24 +548,13 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               notes: notes || undefined,
             };
 
-            console.log('📤 Enviando guía al backend:', guideData);
-
             // Crear la guía en el backend
             const createdGuide = await createGuideAsync(guideData);
             
-            console.log('✅ Guía creada exitosamente:', createdGuide);
-            
-            Alert.alert('Éxito', 'Guía creada exitosamente', [
-              {
-                text: 'OK',
-                onPress: () => {
-                  // Llamar a onSubmit para cerrar el modal o navegar
-                  onSubmit();
-                },
-              },
-            ]);
+            // Si la guía se creó exitosamente, guardar el ID y continuar al formulario de detalles
+            setCreatedGuideId(createdGuide.id);
+            setShowDetailForm(true);
           } catch (error: any) {
-            console.error('❌ Error al crear guía:', error);
             Alert.alert('Error', error.message || 'No se pudo crear la guía');
           }
         }}
@@ -604,7 +613,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             onCancel={() => setShowDetailForm(false)}
             submitting={false}
             initialValues={{ 
-              guide_id: `GUIDE-${Date.now()}`,
+              guide_id: createdGuideId,
               // Pasar datos de la guía principal
               total_weight: totalWeight,
               total_garments: totalGarments,
