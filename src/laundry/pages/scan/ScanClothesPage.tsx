@@ -60,8 +60,8 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const [registeredGarments, setRegisteredGarments] = useState<Array<{id: string, description: string, rfidCode: string, category?: string, color?: string, weight?: number}>>([]);
   const [showActionButtons, setShowActionButtons] = useState(false);
   
-  // Obtener lista de clientes
-  const { clients, isLoading: isLoadingClients } = useClients({ limit: 100 });
+  // Obtener lista de clientes (máximo 50 según validación del backend)
+  const { clients, isLoading: isLoadingClients } = useClients({ limit: 50 });
   
   // Estados para manejar prenda existente
   const [existingGarment, setExistingGarment] = useState<any | null>(null);

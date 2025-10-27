@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, Modal, TextInput, ActivityInd
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Button, Card } from '@/components/common';
 import { GUIDE_STATUS_LABELS, GUIDE_STATUS_COLORS } from '@/constants/processes';
+import { formatDateTime } from '@/helpers/formatters.helper';
 
 interface GuideDetailsModalProps {
   visible: boolean;
@@ -122,10 +123,35 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
                 </View>
               </View>
 
-              <View>
-                <Text className="text-xs text-gray-500 mb-1">Fecha de Creación</Text>
-                <Text className="text-base text-gray-900">{guide.created_at}</Text>
+              <View className="mb-3">
+                <Text className="text-xs text-gray-500 mb-1">Fecha de Recolección</Text>
+                <Text className="text-base text-gray-900">{guide.collection_date ? formatDateTime(guide.collection_date) : 'N/A'}</Text>
               </View>
+
+              {guide.service_priority && (
+                <View>
+                  <Text className="text-xs text-gray-500 mb-1">Prioridad</Text>
+                  <View className={`px-3 py-1.5 rounded-full self-start ${
+                    guide.service_priority === 'HIGH' ? 'bg-red-100' :
+                    guide.service_priority === 'URGENT' ? 'bg-red-200' :
+                    guide.service_priority === 'NORMAL' ? 'bg-blue-100' :
+                    'bg-gray-100'
+                  }`}>
+                    <Text className={`text-sm font-medium ${
+                      guide.service_priority === 'HIGH' ? 'text-red-700' :
+                      guide.service_priority === 'URGENT' ? 'text-red-800' :
+                      guide.service_priority === 'NORMAL' ? 'text-blue-700' :
+                      'text-gray-700'
+                    }`}>
+                      {guide.service_priority === 'HIGH' ? 'Alta' :
+                       guide.service_priority === 'URGENT' ? 'Urgente' :
+                       guide.service_priority === 'NORMAL' ? 'Normal' :
+                       guide.service_priority === 'LOW' ? 'Baja' :
+                       guide.service_priority}
+                    </Text>
+                  </View>
+                </View>
+              )}
             </Card>
 
             {/* Información Adicional */}
@@ -135,9 +161,18 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
                 <Text className="text-lg font-semibold text-gray-900 ml-2">Prendas</Text>
               </View>
 
-              <View>
-                <Text className="text-xs text-gray-500 mb-1">Total de Prendas</Text>
-                <Text className="text-base text-gray-900 font-medium">{guide.total_garments || 'N/A'}</Text>
+              <View className="flex-row -mx-2">
+                <View className="flex-1 px-2">
+                  <Text className="text-xs text-gray-500 mb-1">Total de Prendas</Text>
+                  <Text className="text-base text-gray-900 font-medium">{guide.total_garments || 'N/A'}</Text>
+                </View>
+
+                {guide.total_weight && (
+                  <View className="flex-1 px-2">
+                    <Text className="text-xs text-gray-500 mb-1">Peso Total</Text>
+                    <Text className="text-base text-gray-900 font-medium">{guide.total_weight} kg</Text>
+                  </View>
+                )}
               </View>
             </Card>
           </ScrollView>

@@ -12,7 +12,7 @@ export const useCreateGuide = () => {
 
   const mutation = useMutation({
     mutationFn: async (guideData: CreateGuideDto): Promise<Guide> => {
-      const { data } = await guidesApi.post<ApiResponse<Guide>>('/', guideData);
+      const { data } = await guidesApi.post<ApiResponse<Guide>>('/create-guide', guideData);
       return data.data!;
     },
     onSuccess: () => {

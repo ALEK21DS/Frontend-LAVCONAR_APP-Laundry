@@ -34,6 +34,9 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
     quantity: initialValues?.total_garments?.toString() || '1',
     label_printed: initialValues?.label_printed || false,
     incidents: initialValues?.incidents || '',
+    // Sucursal del usuario logueado
+    branch_office_id: initialValues?.branch_office_id || '',
+    branch_office_name: initialValues?.branch_office_name || 'Sucursal',
   });
 
   const [showGuideDropdown, setShowGuideDropdown] = useState(false);
@@ -101,6 +104,16 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
                 color="#6B7280" 
               />
             </TouchableOpacity>
+          </View>
+
+          {/* Sucursal - Campo de solo lectura */}
+          <View className="mb-4">
+            <Input
+              label="Sucursal"
+              value={formData.branch_office_name}
+              editable={false}
+              className="bg-gray-50"
+            />
           </View>
 
           {/* Tipo de Prenda */}

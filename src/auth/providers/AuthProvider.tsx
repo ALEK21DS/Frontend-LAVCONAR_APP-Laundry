@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const AuthProvider = ({ children }: PropsWithChildren) => {
   const { checkAuthStatus, isAuthenticated, refreshToken } = useAuthStore();
   const [hasRefreshToken, setHasRefreshToken] = React.useState(false);
+  const [initialCheckDone, setInitialCheckDone] = React.useState(false);
 
   // Verificar si hay refresh token al iniciar
   useEffect(() => {
@@ -20,12 +21,16 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     checkToken();
   }, [isAuthenticated, refreshToken]);
 
+  // Query para verificar el estado de autenticación
   useQuery({
     queryKey: ['auth-check'],
     queryFn: async () => {
       try {
-        return await checkAuthStatus();
+        const result = await checkAuthStatus();
+        setInitialCheckDone(true);
+        return result;
       } catch (error) {
+        setInitialCheckDone(true);
         // Silenciar errores de refresh si no hay token
         return { success: false, message: 'No refresh token' };
       }
