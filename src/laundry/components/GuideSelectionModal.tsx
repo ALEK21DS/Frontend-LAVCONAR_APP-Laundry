@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, Modal, FlatList, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, FlatList, TextInput, Alert } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { Card } from '@/components/common';
+import { Card, Button } from '@/components/common';
+import { useScanQr } from '@/laundry/hooks/guides';
 
 interface Guide {
   id: string;
@@ -30,6 +31,9 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
   serviceType = 'industrial',
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showQrScanner, setShowQrScanner] = useState(false);
+  const [scannedGuide, setScannedGuide] = useState<Guide | null>(null);
+  const { scanQrAsync, isScanning } = useScanQr();
 
   const filteredGuides = useMemo(() => {
     if (!searchQuery.trim()) return guides;
@@ -136,7 +140,7 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
 
           {/* Search */}
           <View className="px-6 py-4">
-            <View className="flex-row items-center bg-gray-100 rounded-lg px-3 py-2">
+            <View className="flex-row items-center bg-gray-100 rounded-lg px-3 py-2 mb-3">
               <Icon name="search-outline" size={18} color="#6B7280" />
               <TextInput
                 className="flex-1 ml-2 text-gray-900"
@@ -152,6 +156,49 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
                 </TouchableOpacity>
               )}
             </View>
+            
+            {/* Botón Escanear QR */}
+            <TouchableOpacity
+              onPress={() => {
+                // TODO: Implementar escaneo real de QR con cámara
+                Alert.alert(
+                  'Escaneo QR',
+                  'Esta función abrirá la cámara para escanear el código QR de la guía',
+                  [
+                    {
+                      text: 'Cancelar',
+                      style: 'cancel'
+                    },
+                    {
+                      text: 'Simular Escaneo (Demo)',
+                      onPress: async () => {
+                        try {
+                          // Simulación de datos QR
+                          const mockQrData = JSON.stringify({
+                            type: 'guide',
+                            id: guides[0]?.id || 'guide-demo',
+                            data: {
+                              guideNumber: guides[0]?.guide_number || 'G-2025-0001',
+                              scannedAt: new Date().toISOString(),
+                            },
+                            timestamp: new Date().toISOString(),
+                          });
+                          
+                          const guide = await scanQrAsync(mockQrData);
+                          setScannedGuide(guide);
+                        } catch (error: any) {
+                          Alert.alert('Error', error.message || 'No se pudo escanear el código QR');
+                        }
+                      }
+                    }
+                  ]
+                );
+              }}
+              className="bg-blue-500 p-4 rounded-lg flex-row items-center justify-center"
+            >
+              <Icon name="qr-code-outline" size={20} color="white" />
+              <Text className="text-white font-semibold ml-2">Escanear Código QR</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Guides List */}
@@ -177,6 +224,112 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
           </View>
         </View>
       </View>
+      
+      {/* Modal de Detalles de Guía Escaneada */}
+      <Modal
+        visible={!!scannedGuide}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setScannedGuide(null)}
+      >
+        <View className="flex-1 bg-black/60 justify-center items-center">
+          <View className="bg-white rounded-3xl mx-4 w-11/12 max-w-md" style={{ elevation: 10 }}>
+            {/* Header */}
+            <View className="bg-blue-500 p-6 rounded-t-3xl">
+              <View className="flex-row items-center justify-between mb-2">
+                <View className="flex-row items-center flex-1">
+                  <Icon name="qr-code-outline" size={28} color="white" />
+                  <Text className="text-white text-2xl font-bold ml-3">
+                    Guía Encontrada
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setScannedGuide(null)}
+                  className="w-8 h-8 rounded-full bg-white/20 items-center justify-center"
+                >
+                  <Icon name="close" size={20} color="white" />
+                </TouchableOpacity>
+              </View>
+              <Text className="text-blue-100 text-sm">
+                Datos obtenidos del código QR
+              </Text>
+            </View>
+
+            {/* Body */}
+            {scannedGuide && (
+              <View className="p-6">
+                {/* Número de Guía */}
+                <View className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <Text className="text-sm text-blue-600 font-medium mb-1">Número de Guía</Text>
+                  <Text className="text-2xl font-bold text-blue-900">
+                    {scannedGuide.guide_number}
+                  </Text>
+                </View>
+
+                {/* Información Principal */}
+                <View className="space-y-3 mb-6">
+                  <View className="flex-row justify-between py-2 border-b border-gray-100">
+                    <Text className="text-sm text-gray-600">Cliente:</Text>
+                    <Text className="text-sm font-semibold text-gray-900">
+                      {scannedGuide.client_name}
+                    </Text>
+                  </View>
+                  
+                  <View className="flex-row justify-between py-2 border-b border-gray-100">
+                    <Text className="text-sm text-gray-600">Total Prendas:</Text>
+                    <Text className="text-sm font-semibold text-gray-900">
+                      {scannedGuide.total_garments}
+                    </Text>
+                  </View>
+                  
+                  <View className="flex-row justify-between py-2 border-b border-gray-100">
+                    <Text className="text-sm text-gray-600">Estado:</Text>
+                    <View 
+                      className="px-3 py-1 rounded-full"
+                      style={{ backgroundColor: `${getStatusColor(scannedGuide.status)}20` }}
+                    >
+                      <Text 
+                        className="text-xs font-bold"
+                        style={{ color: getStatusColor(scannedGuide.status) }}
+                      >
+                        {scannedGuide.status}
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  <View className="flex-row justify-between py-2">
+                    <Text className="text-sm text-gray-600">Fecha de Creación:</Text>
+                    <Text className="text-sm font-medium text-gray-900">
+                      {new Date(scannedGuide.created_at).toLocaleDateString('es-ES')}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Botones */}
+                <View className="flex-row space-x-2">
+                  <TouchableOpacity
+                    onPress={() => setScannedGuide(null)}
+                    className="flex-1 bg-gray-100 p-4 rounded-lg items-center"
+                  >
+                    <Text className="text-gray-700 font-semibold">Cancelar</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    onPress={() => {
+                      onSelectGuide(scannedGuide.id);
+                      setScannedGuide(null);
+                    }}
+                    className="flex-1 bg-blue-500 p-4 rounded-lg flex-row items-center justify-center"
+                  >
+                    <Icon name="arrow-forward-circle-outline" size={20} color="white" />
+                    <Text className="text-white font-semibold ml-2">Continuar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 };

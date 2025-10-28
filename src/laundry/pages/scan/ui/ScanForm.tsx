@@ -72,13 +72,10 @@ export const ScanForm: React.FC<ScanFormProps> = ({
 
     try {
       // ========== PASO 1: CREAR GUÍA ==========
-      console.log('📤 1. Creando guía...');
       createdGuide = await createGuideAsync(guideData);
-      console.log('✅ Guía creada:', createdGuide.guide_number);
 
       try {
         // ========== PASO 2: CREAR DETALLE ==========
-        console.log('📤 2. Creando detalle de guía...');
         const guideGarmentPayload = {
           guide_id: createdGuide.id,
           branch_offices_id: guideGarmentData.branch_office_id,
@@ -94,12 +91,9 @@ export const ScanForm: React.FC<ScanFormProps> = ({
           label_printed: guideGarmentData.label_printed || false,
         };
         await createGuideGarmentAsync(guideGarmentPayload);
-        console.log('✅ Detalle de guía creado');
 
         try {
           // ========== PASO 3: CREAR ESCANEO RFID ==========
-          console.log('📤 3. Creando escaneo RFID...');
-          
           // NOTA: user_id NO se envía, el backend lo obtiene del token JWT
           
           const rfidScanData = {
@@ -113,9 +107,7 @@ export const ScanForm: React.FC<ScanFormProps> = ({
             differences_detected: formData.differences_detected || undefined,
           };
           
-          console.log('📤 Datos a enviar:', JSON.stringify(rfidScanData, null, 2));
           await createRfidScanAsync(rfidScanData);
-          console.log('✅ Escaneo RFID creado');
 
           // ✅ TODO EXITOSO
           onSubmit(formData);
@@ -124,11 +116,6 @@ export const ScanForm: React.FC<ScanFormProps> = ({
           }
 
         } catch (scanError: any) {
-          console.error('❌ Error en paso 3 (Escaneo RFID):', scanError);
-          console.error('❌ Error response:', scanError.response?.data);
-          console.error('❌ Error status:', scanError.response?.status);
-          console.error('❌ Error message:', scanError.message);
-          
           const errorMessage = scanError.response?.data?.message || scanError.message;
           Alert.alert(
             'Error - Contacte al Superadmin',
@@ -137,7 +124,6 @@ export const ScanForm: React.FC<ScanFormProps> = ({
         }
 
       } catch (detailError: any) {
-        console.error('❌ Error en paso 2 (Detalle):', detailError);
         Alert.alert(
           'Error - Contacte al Superadmin',
           `Guía creada: ${createdGuide.guide_number}\n\n❌ Error al crear detalle\n\nContacte al superadmin para completar manualmente el detalle y escaneo.`
@@ -145,7 +131,6 @@ export const ScanForm: React.FC<ScanFormProps> = ({
       }
 
     } catch (guideError: any) {
-      console.error('❌ Error en paso 1 (Guía):', guideError);
       Alert.alert('Error', guideError.message || 'No se pudo crear la guía. Intente nuevamente.');
     }
   };

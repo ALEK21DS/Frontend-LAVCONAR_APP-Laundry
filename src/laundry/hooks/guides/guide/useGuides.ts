@@ -20,6 +20,7 @@ interface UseGuidesParams {
   limit?: number;
   search?: string;
   status?: string;
+  service_type?: 'INDUSTRIAL' | 'PERSONAL';
   enabled?: boolean;
 }
 
@@ -31,6 +32,7 @@ export const useGuides = ({
   limit = 10, 
   search, 
   status,
+  service_type,
   enabled = true 
 }: UseGuidesParams = {}) => {
   const {
@@ -39,17 +41,28 @@ export const useGuides = ({
     error,
     refetch,
   } = useQuery({
-    queryKey: ['guides', { page, limit, search, status }],
+    queryKey: ['guides', { page, limit, search, status, service_type }],
     queryFn: async (): Promise<BackendResponse> => {
       const response = await guidesApi.get<BackendResponse>('/get-all-guides', {
         params: {
           page,
           limit,
           search,
-          status,
+          // status: NO soportado por el backend, filtraremos en frontend
+          service_type,
         }
       });
-      return response.data;
+      
+      // Filtrar por status en frontend si se proporciona
+      let filteredData = response.data.data || [];
+      if (status) {
+        filteredData = filteredData.filter(guide => guide.status === status);
+      }
+      
+      return {
+        ...response.data,
+        data: filteredData,
+      };
     },
     staleTime: 1000 * 60 * 5, // 5 minutos
     retry: false,

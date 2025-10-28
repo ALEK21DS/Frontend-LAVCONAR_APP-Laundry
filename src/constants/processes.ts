@@ -11,21 +11,41 @@ export const PROCESSES = [
 
 // Estados de guía según backend
 export const GUIDE_STATUS = {
+  // Servicio Personal
+  SENT: 'SENT',
+  IN_PROCESS: 'IN_PROCESS',
+  WASHING: 'WASHING',
+  DRYING: 'DRYING',
+  IRONING: 'IRONING',
+  FOLDING: 'FOLDING',
+  PACKAGING: 'PACKAGING',
+  LOADING: 'LOADING',
+  RECEIVED_AT_LOCAL: 'RECEIVED_AT_LOCAL',
+  DELIVERED_TO_CUSTOMER: 'DELIVERED_TO_CUSTOMER',
+  // Servicio Industrial
   COLLECTED: 'COLLECTED',
   IN_TRANSIT: 'IN_TRANSIT',
   RECEIVED: 'RECEIVED',
-  IN_PROCESS: 'IN_PROCESS',
-  COMPLETED: 'COMPLETED',
-  DELIVERED: 'DELIVERED',
+  SHIPPING: 'SHIPPING',
 };
 
 export const GUIDE_STATUS_LABELS = {
+  // Servicio Personal
+  SENT: 'Enviada',
+  IN_PROCESS: 'En Proceso',
+  WASHING: 'Lavado',
+  DRYING: 'Secado',
+  IRONING: 'Planchado',
+  FOLDING: 'Doblado',
+  PACKAGING: 'Empaque',
+  LOADING: 'Carga',
+  RECEIVED_AT_LOCAL: 'Recibida en Local',
+  DELIVERED_TO_CUSTOMER: 'Entregada al Cliente',
+  // Servicio Industrial
   COLLECTED: 'Recolectada',
   IN_TRANSIT: 'En Tránsito',
   RECEIVED: 'Recibida',
-  IN_PROCESS: 'En Proceso',
-  COMPLETED: 'Completada',
-  DELIVERED: 'Entregada',
+  SHIPPING: 'Embarque',
 };
 
 export const GUIDE_STATUS_COLORS = {

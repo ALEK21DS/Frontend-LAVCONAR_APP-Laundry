@@ -11,7 +11,7 @@ import { GuideForm } from '@/laundry/pages/guides/ui/GuideForm';
 import { ProcessForm } from '@/laundry/pages/processes/ui/ProcessForm';
 import { GarmentForm } from '@/laundry/pages/garments/ui/GarmentForm';
 import { useClients } from '@/laundry/hooks/clients';
-import { useGarments, useCreateGarment, useUpdateGarment } from '@/laundry/hooks/guides';
+import { useGarments, useCreateGarment, useUpdateGarment, useGuides } from '@/laundry/hooks/guides';
 import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
 import { GuideSelectionModal } from '@/laundry/components/GuideSelectionModal';
 import { garmentsApi } from '@/laundry/api/garments/garments.api';
@@ -60,8 +60,44 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const [registeredGarments, setRegisteredGarments] = useState<Array<{id: string, description: string, rfidCode: string, category?: string, color?: string, weight?: number}>>([]);
   const [showActionButtons, setShowActionButtons] = useState(false);
   
+  // Mapear el tipo de proceso al estado de guía que debe mostrar
+  const getTargetStatusByProcessType = (processType: string): string => {
+    if (serviceType === 'personal') {
+      const personalMapping: Record<string, string> = {
+        'IN_PROCESS': 'SENT',
+        'WASHING': 'IN_PROCESS',
+        'DRYING': 'WASHING',
+        'IRONING': 'DRYING',
+        'FOLDING': 'IRONING',
+        'PACKAGING': 'FOLDING',
+        'LOADING': 'PACKAGING',
+        'DELIVERY': 'LOADING',
+      };
+      return personalMapping[processType] || processType;
+    } else {
+      const industrialMapping: Record<string, string> = {
+        'IN_PROCESS': 'COLLECTED',
+        'WASHING': 'IN_PROCESS',
+        'DRYING': 'WASHING',
+        'PACKAGING': 'DRYING',
+        'LOADING': 'PACKAGING',
+        'DELIVERY': 'LOADING',
+      };
+      return industrialMapping[processType] || processType;
+    }
+  };
+  
   // Obtener lista de clientes (máximo 50 según validación del backend)
   const { clients, isLoading: isLoadingClients } = useClients({ limit: 50 });
+  
+  // Obtener guías filtradas por servicio y estado para procesos
+  const targetStatus = selectedProcessType ? getTargetStatusByProcessType(selectedProcessType) : undefined;
+  const { guides: guidesForProcess, isLoading: isLoadingGuides } = useGuides({
+    limit: 50,
+    status: targetStatus,
+    service_type: serviceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL',
+    enabled: !!selectedProcessType, // Solo cargar cuando se selecciona un proceso
+  });
   
   // Estados para manejar prenda existente
   const [existingGarment, setExistingGarment] = useState<any | null>(null);
@@ -599,31 +635,6 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     });
   };
 
-  // Datos demo de guías (esto vendría del backend)
-  const getGuidesByProcessType = (processType: string) => {
-    const demoGuides = [
-      { id: 'g-001', guide_number: 'G-0001', client_name: 'Cliente A', status: 'RECEIVED', created_at: '2024-01-15', total_garments: 15 },
-      { id: 'g-002', guide_number: 'G-0002', client_name: 'Cliente B', status: 'IN_PROCESS', created_at: '2024-01-14', total_garments: 8 },
-      { id: 'g-003', guide_number: 'G-0003', client_name: 'Cliente C', status: 'WASHING', created_at: '2024-01-13', total_garments: 12 },
-      { id: 'g-004', guide_number: 'G-0004', client_name: 'Cliente D', status: 'DRYING', created_at: '2024-01-12', total_garments: 20 },
-      { id: 'g-005', guide_number: 'G-0005', client_name: 'Cliente E', status: 'PACKAGING', created_at: '2024-01-11', total_garments: 6 },
-    ];
-
-    // Mapear el tipo de proceso al estado de guía que debe mostrar
-    const statusMapping: Record<string, string> = {
-      'IN_PROCESS': 'RECEIVED',
-      'WASHING': 'IN_PROCESS',
-      'DRYING': 'WASHING',
-      'PACKAGING': 'DRYING',
-      'SHIPPING': 'PACKAGING',
-      'LOADING': 'SHIPPING',
-      'DELIVERY': 'LOADING',
-    };
-
-    const targetStatus = statusMapping[processType] || processType;
-    return demoGuides.filter(guide => guide.status === targetStatus);
-  };
-
   const renderScannedTag = ({ item, index }: { item: ScannedTag; index: number }) => (
     <Card variant="outlined" className="mb-2">
       <View className="flex-row justify-between items-center">
@@ -1037,7 +1048,15 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         onClose={() => setGuideSelectionModalOpen(false)}
         onSelectGuide={handleGuideSelect}
         processType={selectedProcessType}
-        guides={getGuidesByProcessType(selectedProcessType)}
+        guides={guidesForProcess.map(g => ({
+          id: g.id,
+          guide_number: g.guide_number,
+          client_name: g.client_name || 'Cliente desconocido',
+          status: g.status,
+          created_at: g.created_at,
+          total_garments: g.total_garments || 0,
+        }))}
+        serviceType={serviceType}
       />
     </Container>
   );

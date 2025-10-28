@@ -8,6 +8,7 @@ import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
 import { GuideSelectionModal } from '@/laundry/components/GuideSelectionModal';
 import { GuideStatusConfirmationModal } from '@/laundry/components/GuideStatusConfirmationModal';
 import { ServiceTypeModal } from '@/laundry/components/ServiceTypeModal';
+import { useGuides } from '@/laundry/hooks/guides';
 
 interface MainLayoutProps {
   activeTab: 'Dashboard' | 'Clients' | 'ScanClothes' | 'Guides' | 'Processes';
@@ -25,6 +26,42 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
   const [selectedServiceType, setSelectedServiceType] = useState<'industrial' | 'personal'>('industrial');
   const [selectedGuideForConfirmation, setSelectedGuideForConfirmation] = useState<any>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  
+  // Mapear el tipo de proceso al estado de guía que debe mostrar
+  const getTargetStatusByProcessType = (processType: string, serviceType: 'industrial' | 'personal'): string => {
+    if (serviceType === 'personal') {
+      const personalMapping: Record<string, string> = {
+        'IN_PROCESS': 'SENT',           // EN PROCESO muestra guías ENVIADAS
+        'WASHING': 'IN_PROCESS',        // LAVADO muestra guías EN PROCESO
+        'DRYING': 'WASHING',            // SECADO muestra guías LAVADAS
+        'IRONING': 'DRYING',            // PLANCHADO muestra guías SECAS
+        'FOLDING': 'IRONING',           // DOBLADO muestra guías PLANCHADAS
+        'PACKAGING': 'FOLDING',         // EMPAQUE muestra guías DOBLADAS
+        'LOADING': 'PACKAGING',         // CARGA muestra guías EMPACADAS
+        'DELIVERY': 'LOADING',          // ENTREGA muestra guías CARGADAS
+      };
+      return personalMapping[processType] || processType;
+    } else {
+      const industrialMapping: Record<string, string> = {
+        'IN_PROCESS': 'COLLECTED',      // EN PROCESO muestra guías RECOLECTADAS
+        'WASHING': 'IN_PROCESS',        // LAVADO muestra guías EN PROCESO
+        'DRYING': 'WASHING',            // SECADO muestra guías LAVADAS
+        'PACKAGING': 'DRYING',          // EMPAQUE muestra guías SECAS
+        'LOADING': 'PACKAGING',         // CARGA muestra guías EMPACADAS
+        'DELIVERY': 'LOADING',          // ENTREGA muestra guías CARGADAS
+      };
+      return industrialMapping[processType] || processType;
+    }
+  };
+  
+  // Obtener guías filtradas por servicio y estado
+  const targetStatus = selectedProcessType ? getTargetStatusByProcessType(selectedProcessType, selectedServiceType) : undefined;
+  const { guides: guidesForProcess, isLoading: isLoadingGuides } = useGuides({
+    limit: 50,
+    status: targetStatus,
+    service_type: selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL',
+    enabled: guideSelectionModalOpen, // Solo cargar cuando el modal está abierto
+  });
 
   const handleNavigate = (route: MainLayoutProps['activeTab'], params?: any) => {
     onNavigate(route, params);
@@ -34,7 +71,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
     setSelectedServiceType(serviceType);
     setServiceTypeModalOpen(false);
     setProcessTypeModalOpen(true);
-    console.log('Tipo de servicio seleccionado:', serviceType);
   };
 
   const handleProcessTypeSelect = (processType: string) => {
@@ -50,7 +86,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
     
     // Para LAVADO, SECADO, PLANCHADO, DOBLADO y EMBARQUE, mostrar modal de confirmación
     if (selectedProcessType === 'WASHING' || selectedProcessType === 'DRYING' || selectedProcessType === 'IRONING' || selectedProcessType === 'FOLDING' || selectedProcessType === 'SHIPPING') {
-      const selectedGuide = getGuidesByProcessType(selectedProcessType).find(g => g.id === guideId);
+      const selectedGuide = guidesForProcess.find(g => g.id === guideId);
       
       // Obtener el estado actual correcto según el mapeo
       const getCurrentStatus = () => {
@@ -74,7 +110,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
       };
       
       const currentStatus = getCurrentStatus();
-      console.log('🔍 Debug - currentStatus:', currentStatus, 'selectedProcessType:', selectedProcessType, 'selectedServiceType:', selectedServiceType);
       
       setSelectedGuideForConfirmation({ ...selectedGuide, id: guideId, status: currentStatus });
       setConfirmationModalOpen(true);
@@ -129,54 +164,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
     return statusMapping[processType] || 'IN_PROCESS';
   };
 
-  // Datos demo de guías (esto vendría del backend)
-  const getGuidesByProcessType = (processType: string) => {
-    const demoGuides = [
-      { id: 'g-001', guide_number: 'G-0001', client_name: 'Cliente A', status: 'RECEIVED', created_at: '2024-01-15', total_garments: 15 },
-      { id: 'g-002', guide_number: 'G-0002', client_name: 'Cliente B', status: 'IN_PROCESS', created_at: '2024-01-14', total_garments: 8 },
-      { id: 'g-003', guide_number: 'G-0003', client_name: 'Cliente C', status: 'WASHING', created_at: '2024-01-13', total_garments: 12 },
-      { id: 'g-004', guide_number: 'G-0004', client_name: 'Cliente D', status: 'DRYING', created_at: '2024-01-12', total_garments: 20 },
-      { id: 'g-005', guide_number: 'G-0005', client_name: 'Cliente E', status: 'IRONING', created_at: '2024-01-11', total_garments: 6 },
-      { id: 'g-006', guide_number: 'G-0006', client_name: 'Cliente F', status: 'FOLDING', created_at: '2024-01-10', total_garments: 10 },
-      { id: 'g-007', guide_number: 'G-0007', client_name: 'Cliente G', status: 'PACKAGING', created_at: '2024-01-09', total_garments: 12 },
-      { id: 'g-008', guide_number: 'G-0008', client_name: 'Cliente H', status: 'SHIPPING', created_at: '2024-01-08', total_garments: 14 },
-      { id: 'g-009', guide_number: 'G-0009', client_name: 'Cliente I', status: 'LOADING', created_at: '2024-01-07', total_garments: 18 },
-    ];
-
-    // Mapear el tipo de proceso al estado de guía que debe mostrar
-    // Diferente mapeo según el tipo de servicio
-    const getStatusMapping = () => {
-      if (selectedServiceType === 'personal') {
-        // Para servicio personal: incluye PLANCHADO y DOBLADO
-        return {
-          'IN_PROCESS': 'RECEIVED',      // EN PROCESO muestra guías RECIBIDAS
-          'WASHING': 'IN_PROCESS',       // LAVADO muestra guías EN PROCESO
-          'DRYING': 'WASHING',           // SECADO muestra guías LAVADAS
-          'IRONING': 'DRYING',           // PLANCHADO muestra guías SECAS
-          'FOLDING': 'IRONING',          // DOBLADO muestra guías PLANCHADAS
-          'PACKAGING': 'FOLDING',        // EMPAQUE muestra guías DOBLADAS
-          'SHIPPING': 'PACKAGING',       // EMBARQUE muestra guías EMPACADAS
-          'LOADING': 'SHIPPING',         // CARGA muestra guías EMBARCADAS
-          'DELIVERY': 'LOADING',         // ENTREGA muestra guías CARGADAS
-        };
-      } else {
-        // Para servicio industrial: sin PLANCHADO y DOBLADO
-        return {
-          'IN_PROCESS': 'RECEIVED',      // EN PROCESO muestra guías RECIBIDAS
-          'WASHING': 'IN_PROCESS',       // LAVADO muestra guías EN PROCESO
-          'DRYING': 'WASHING',           // SECADO muestra guías LAVADAS
-          'PACKAGING': 'DRYING',         // EMPAQUE muestra guías SECAS
-          'SHIPPING': 'PACKAGING',       // EMBARQUE muestra guías EMPACADAS
-          'LOADING': 'SHIPPING',         // CARGA muestra guías EMBARCADAS
-          'DELIVERY': 'LOADING',         // ENTREGA muestra guías CARGADAS
-        };
-      }
-    };
-
-    const statusMapping = getStatusMapping();
-    const targetStatus = statusMapping[processType] || processType;
-    return demoGuides.filter(guide => guide.status === targetStatus);
-  };
 
   return (
     <Container safe padding="none">
@@ -210,7 +197,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
         onClose={() => setGuideSelectionModalOpen(false)}
         onSelectGuide={handleGuideSelect}
         processType={selectedProcessType}
-        guides={getGuidesByProcessType(selectedProcessType)}
+        guides={guidesForProcess.map(g => ({
+          id: g.id,
+          guide_number: g.guide_number,
+          client_name: g.client_name || 'Cliente desconocido',
+          status: g.status,
+          created_at: g.created_at,
+          total_garments: g.total_garments || 0,
+        }))}
         serviceType={selectedServiceType}
       />
 

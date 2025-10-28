@@ -80,7 +80,11 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   const [deliveryDate, setDeliveryDate] = useState<string>('');
   const [totalWeight, setTotalWeight] = useState<string>(initialTotalWeight > 0 ? initialTotalWeight.toFixed(2) : '');
   const totalGarments = guideItems.length;
-  const [status, setStatus] = useState<string>(GUIDE_STATUS.RECEIVED);
+  // Estado inicial según tipo de servicio
+  const getInitialStatus = () => {
+    return initialServiceType === 'PERSONAL' ? GUIDE_STATUS.SENT : GUIDE_STATUS.COLLECTED;
+  };
+  const [status, setStatus] = useState<string>(getInitialStatus());
   const [notes, setNotes] = useState<string>('');
   const [clientModalOpen, setClientModalOpen] = useState(false);
   const [showDetailForm, setShowDetailForm] = useState(false);
@@ -578,6 +582,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               collection_date: formatDateToISO(collectionDate, true), // Con hora actual
               delivery_date: deliveryDate ? formatDateToISO(deliveryDate, false) : undefined, // Sin hora (00:00)
               general_condition: condition as any,
+              status: status as any, // Estado según tipo de servicio (SENT para personal, COLLECTED para industrial)
               total_weight: safeParseFloat(totalWeight),
               total_garments: totalGarments,
               notes: notes || undefined,
