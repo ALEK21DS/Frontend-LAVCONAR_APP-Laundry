@@ -15,6 +15,7 @@ import com.reactnativecommunity.asyncstorage.AsyncStoragePackage
 import com.th3rdwave.safeareacontext.SafeAreaContextPackage
 import com.swmansion.rnscreens.RNScreensPackage
 import com.oblador.vectoricons.VectorIconsPackage
+import org.reactnative.camera.RNCameraPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -27,7 +28,8 @@ class MainApplication : Application(), ReactApplication {
                 SafeAreaContextPackage(),
                 RNScreensPackage(),
                 VectorIconsPackage(),
-                RFIDPackage()
+                RFIDPackage(),
+                RNCameraPackage()
             )
 
         override fun getJSMainModuleName(): String = "index"

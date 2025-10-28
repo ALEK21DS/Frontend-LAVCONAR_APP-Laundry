@@ -80,6 +80,8 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        // Especificar la variante de react-native-camera (general sin ML Kit)
+        missingDimensionStrategy 'react-native-camera', 'general'
     }
     signingConfigs {
         debug {
@@ -121,6 +123,9 @@ dependencies {
 
     // Módulo RFID nativo
     implementation files('libs/DeviceAPI_ver20250209_release.aar')
+    
+    // Cámara para escaneo QR
+    implementation project(':react-native-camera')
 }
 
 // Asegura que las fuentes de react-native-vector-icons se incluyan en el APK

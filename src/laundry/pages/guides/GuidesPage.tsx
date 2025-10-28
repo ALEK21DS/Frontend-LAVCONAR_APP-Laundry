@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Alert, Acti
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Card } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { useGuides, useCreateGuide, useUpdateGuideStatus } from '@/laundry/hooks/guides';
+import { useGuides, useCreateGuide, useUpdateGuideStatus, useScanQr } from '@/laundry/hooks/guides';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { GuideForm } from './ui/GuideForm';
@@ -12,6 +12,7 @@ import { ServiceTypeModal } from '@/laundry/components/ServiceTypeModal';
 import { GarmentForm } from '@/laundry/pages/garments/ui/GarmentForm';
 import { rfidModule } from '@/lib/rfid/rfid.module';
 import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
+import { QrScanner } from '@/laundry/components';
 
  type GuidesPageProps = { navigation: NativeStackNavigationProp<any> };
 
@@ -48,6 +49,10 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const [garmentModalOpen, setGarmentModalOpen] = useState(false);
   const [currentScannedTag, setCurrentScannedTag] = useState<ScannedTag | null>(null);
   const [registeredGarments, setRegisteredGarments] = useState<any[]>([]);
+  
+  // Estados para QR Scanner
+  const [showQrScanner, setShowQrScanner] = useState(false);
+  const { scanQrAsync, isScanning: isScanningQr } = useScanQr();
 
   const demoGuides = [
     { 
@@ -242,6 +247,16 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
       <View className="px-4 pt-4 flex-1">
         <View className="flex-row items-center mb-4">
           <Text className="text-2xl font-bold text-gray-900 flex-1">Guías</Text>
+          
+          {/* Botón Escanear QR */}
+          <TouchableOpacity 
+            onPress={() => setShowQrScanner(true)} 
+            className="w-10 h-10 rounded-lg bg-green-600 items-center justify-center active:bg-green-700 mr-2"
+          >
+            <IonIcon name="qr-code-outline" size={20} color="#ffffff" />
+          </TouchableOpacity>
+          
+          {/* Botón Crear Guía */}
           <TouchableOpacity onPress={openCreate} className="w-10 h-10 rounded-lg bg-blue-600 items-center justify-center active:bg-blue-700">
             <IonIcon name="add" size={20} color="#ffffff" />
           </TouchableOpacity>
@@ -476,10 +491,28 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
           />
         </View>
       </Modal>
+
+      {/* Escáner QR */}
+      {showQrScanner && (
+        <QrScanner
+          visible={showQrScanner}
+          onClose={() => setShowQrScanner(false)}
+          onScan={async (qrData: string) => {
+            setShowQrScanner(false);
+            try {
+              const guide = await scanQrAsync(qrData);
+              setSelectedGuide(guide);
+              setDetailsOpen(true);
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'No se pudo escanear el código QR');
+            }
+          }}
+        />
+      )}
     </MainLayout>
   );
 }
 
- export default GuidesPage;
+export default GuidesPage;
 
 

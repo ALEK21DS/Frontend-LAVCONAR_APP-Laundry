@@ -3,14 +3,15 @@ import { View, Text, TouchableOpacity, Modal, FlatList, TextInput, Alert } from 
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Card, Button } from '@/components/common';
 import { useScanQr } from '@/laundry/hooks/guides';
+import { QrScanner } from './QrScanner';
 
 interface Guide {
   id: string;
   guide_number: string;
-  client_name: string;
+  client_name?: string;
   status: string;
   created_at: string;
-  total_garments: number;
+  total_garments?: number;
 }
 
 interface GuideSelectionModalProps {
@@ -40,7 +41,7 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
     const query = searchQuery.toLowerCase();
     return guides.filter(guide => 
       guide.guide_number.toLowerCase().includes(query) ||
-      guide.client_name.toLowerCase().includes(query)
+      (guide.client_name?.toLowerCase() || '').includes(query)
     );
   }, [guides, searchQuery]);
 
@@ -86,11 +87,11 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
               </Text>
             </View>
             <Text className="text-sm text-gray-600 mb-1">
-              Cliente: {item.client_name}
+              Cliente: {item.client_name || 'Sin cliente'}
             </Text>
             <View className="flex-row items-center justify-between">
               <Text className="text-sm text-gray-500">
-                {item.total_garments} prendas
+                {item.total_garments || 0} prendas
               </Text>
               <View 
                 className="px-2 py-1 rounded-full"
@@ -159,45 +160,14 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
             
             {/* Botón Escanear QR */}
             <TouchableOpacity
-              onPress={() => {
-                // TODO: Implementar escaneo real de QR con cámara
-                Alert.alert(
-                  'Escaneo QR',
-                  'Esta función abrirá la cámara para escanear el código QR de la guía',
-                  [
-                    {
-                      text: 'Cancelar',
-                      style: 'cancel'
-                    },
-                    {
-                      text: 'Simular Escaneo (Demo)',
-                      onPress: async () => {
-                        try {
-                          // Simulación de datos QR
-                          const mockQrData = JSON.stringify({
-                            type: 'guide',
-                            id: guides[0]?.id || 'guide-demo',
-                            data: {
-                              guideNumber: guides[0]?.guide_number || 'G-2025-0001',
-                              scannedAt: new Date().toISOString(),
-                            },
-                            timestamp: new Date().toISOString(),
-                          });
-                          
-                          const guide = await scanQrAsync(mockQrData);
-                          setScannedGuide(guide);
-                        } catch (error: any) {
-                          Alert.alert('Error', error.message || 'No se pudo escanear el código QR');
-                        }
-                      }
-                    }
-                  ]
-                );
-              }}
+              onPress={() => setShowQrScanner(true)}
               className="bg-blue-500 p-4 rounded-lg flex-row items-center justify-center"
+              disabled={isScanning}
             >
               <Icon name="qr-code-outline" size={20} color="white" />
-              <Text className="text-white font-semibold ml-2">Escanear Código QR</Text>
+              <Text className="text-white font-semibold ml-2">
+                {isScanning ? 'Escaneando...' : 'Escanear Código QR'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -224,6 +194,23 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
           </View>
         </View>
       </View>
+      
+      {/* Escáner QR */}
+      {showQrScanner && (
+        <QrScanner
+          visible={showQrScanner}
+          onClose={() => setShowQrScanner(false)}
+          onScan={async (qrData: string) => {
+            setShowQrScanner(false);
+            try {
+              const guide = await scanQrAsync(qrData);
+              setScannedGuide(guide);
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'No se pudo escanear el código QR');
+            }
+          }}
+        />
+      )}
       
       {/* Modal de Detalles de Guía Escaneada */}
       <Modal
@@ -271,14 +258,14 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
                   <View className="flex-row justify-between py-2 border-b border-gray-100">
                     <Text className="text-sm text-gray-600">Cliente:</Text>
                     <Text className="text-sm font-semibold text-gray-900">
-                      {scannedGuide.client_name}
+                      {scannedGuide.client_name || 'Sin cliente'}
                     </Text>
                   </View>
                   
                   <View className="flex-row justify-between py-2 border-b border-gray-100">
                     <Text className="text-sm text-gray-600">Total Prendas:</Text>
                     <Text className="text-sm font-semibold text-gray-900">
-                      {scannedGuide.total_garments}
+                      {scannedGuide.total_garments || 0}
                     </Text>
                   </View>
                   
