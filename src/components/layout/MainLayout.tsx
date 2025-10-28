@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { View, Alert } from 'react-native';
 import { Container } from '@/components/common';
 import { HeaderBar } from './HeaderBar';
 import { BottomNav } from './BottomNav';
@@ -8,7 +8,7 @@ import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
 import { GuideSelectionModal } from '@/laundry/components/GuideSelectionModal';
 import { GuideStatusConfirmationModal } from '@/laundry/components/GuideStatusConfirmationModal';
 import { ServiceTypeModal } from '@/laundry/components/ServiceTypeModal';
-import { useGuides } from '@/laundry/hooks/guides';
+import { useUpdateRfidScan, useGetAllRfidScans } from '@/laundry/hooks/guides/rfid-scan';
 
 interface MainLayoutProps {
   activeTab: 'Dashboard' | 'Clients' | 'ScanClothes' | 'Guides' | 'Processes';
@@ -25,42 +25,46 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
   const [selectedProcessType, setSelectedProcessType] = useState<string>('');
   const [selectedServiceType, setSelectedServiceType] = useState<'industrial' | 'personal'>('industrial');
   const [selectedGuideForConfirmation, setSelectedGuideForConfirmation] = useState<any>(null);
+  const [selectedRfidScan, setSelectedRfidScan] = useState<any>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   
-  // Mapear el tipo de proceso al estado de guía que debe mostrar
-  const getTargetStatusByProcessType = (processType: string, serviceType: 'industrial' | 'personal'): string => {
-    if (serviceType === 'personal') {
-      const personalMapping: Record<string, string> = {
-        'IN_PROCESS': 'SENT',           // EN PROCESO muestra guías ENVIADAS
-        'WASHING': 'IN_PROCESS',        // LAVADO muestra guías EN PROCESO
-        'DRYING': 'WASHING',            // SECADO muestra guías LAVADAS
-        'IRONING': 'DRYING',            // PLANCHADO muestra guías SECAS
-        'FOLDING': 'IRONING',           // DOBLADO muestra guías PLANCHADAS
-        'PACKAGING': 'FOLDING',         // EMPAQUE muestra guías DOBLADAS
-        'LOADING': 'PACKAGING',         // CARGA muestra guías EMPACADAS
-        'DELIVERY': 'LOADING',          // ENTREGA muestra guías CARGADAS
-      };
-      return personalMapping[processType] || processType;
-    } else {
-      const industrialMapping: Record<string, string> = {
-        'IN_PROCESS': 'COLLECTED',      // EN PROCESO muestra guías RECOLECTADAS
-        'WASHING': 'IN_PROCESS',        // LAVADO muestra guías EN PROCESO
-        'DRYING': 'WASHING',            // SECADO muestra guías LAVADAS
-        'PACKAGING': 'DRYING',          // EMPAQUE muestra guías SECAS
-        'LOADING': 'PACKAGING',         // CARGA muestra guías EMPACADAS
-        'DELIVERY': 'LOADING',          // ENTREGA muestra guías CARGADAS
-      };
-      return industrialMapping[processType] || processType;
-    }
+  const { updateRfidScanAsync } = useUpdateRfidScan();
+  
+  // Mapear el tipo de proceso al scan_type ANTERIOR (para filtrar guías)
+  const getPreviousScanTypeForProcess = (processType: string): string => {
+    const previousScanTypeMapping: Record<string, string> = {
+      'RECEIVED': 'COLLECTION',           // Para "Entrega", buscar guías recién creadas (COLLECTION)
+      'IN_PROCESS': 'COLLECTION',         // Para "Recepción en Almacén", buscar guías en COLLECTION
+      'WASHING': 'WAREHOUSE_RECEPTION',   // Para "Pre-lavado", buscar guías en WAREHOUSE_RECEPTION
+      'DRYING': 'PRE_WASH',               // Para "Post-lavado", buscar guías en PRE_WASH
+      'PACKAGING': 'POST_WASH',           // Para "Post-secado", buscar guías en POST_WASH
+      'SHIPPING': 'POST_WASH',            // Para "Embarque", buscar guías en POST_WASH
+      'LOADING': 'POST_DRY',              // Para "Conteo Final", buscar guías en POST_DRY
+      'DELIVERY': 'FINAL_COUNT',          // Para "Entrega", buscar guías en FINAL_COUNT
+    };
+    return previousScanTypeMapping[processType] || 'COLLECTION';
+  };
+
+  // Mapear el tipo de proceso al scan_type NUEVO (para actualizar)
+  const getNewScanTypeFromProcess = (processType: string): string => {
+    const scanTypeMapping: Record<string, string> = {
+      'RECEIVED': 'COLLECTION',           // Entrega → Recibido
+      'IN_PROCESS': 'WAREHOUSE_RECEPTION', // Recepción en Almacén → En Proceso
+      'WASHING': 'PRE_WASH',              // Pre-lavado → Lavado
+      'DRYING': 'POST_WASH',              // Post-lavado → Secado
+      'PACKAGING': 'POST_DRY',            // Post-secado → Empaque
+      'SHIPPING': 'POST_DRY',             // Post-secado → Embarque
+      'LOADING': 'FINAL_COUNT',           // Conteo Final → Carga
+      'DELIVERY': 'DELIVERY',             // Entrega → Entrega
+    };
+    return scanTypeMapping[processType] || 'COLLECTION';
   };
   
-  // Obtener guías filtradas por servicio y estado
-  const targetStatus = selectedProcessType ? getTargetStatusByProcessType(selectedProcessType, selectedServiceType) : undefined;
-  const { guides: guidesForProcess, isLoading: isLoadingGuides } = useGuides({
+  // Obtener RFID scans filtrados por scan_type ANTERIOR
+  const targetScanType = selectedProcessType ? getPreviousScanTypeForProcess(selectedProcessType) : undefined;
+  const { rfidScans, isLoading: isLoadingScans, total } = useGetAllRfidScans({
     limit: 50,
-    status: targetStatus,
-    service_type: selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL',
-    enabled: guideSelectionModalOpen, // Solo cargar cuando el modal está abierto
+    scan_type: targetScanType,
   });
 
   const handleNavigate = (route: MainLayoutProps['activeTab'], params?: any) => {
@@ -81,89 +85,68 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
     setGuideSelectionModalOpen(true);
   };
 
-  const handleGuideSelect = (guideId: string) => {
+  const handleRfidScanSelect = (rfidScanId: string) => {
     setGuideSelectionModalOpen(false);
     
-    // Para LAVADO, SECADO, PLANCHADO, DOBLADO y EMBARQUE, mostrar modal de confirmación
-    if (selectedProcessType === 'WASHING' || selectedProcessType === 'DRYING' || selectedProcessType === 'IRONING' || selectedProcessType === 'FOLDING' || selectedProcessType === 'SHIPPING') {
-      const selectedGuide = guidesForProcess.find(g => g.id === guideId);
-      
-      // Obtener el estado actual correcto según el mapeo
-      const getCurrentStatus = () => {
-        if (selectedServiceType === 'personal') {
-          const personalMapping: Record<string, string> = {
-            'WASHING': 'IN_PROCESS',
-            'DRYING': 'WASHING',
-            'IRONING': 'DRYING',
-            'FOLDING': 'IRONING',
-            'SHIPPING': 'PACKAGING',
-          };
-          return personalMapping[selectedProcessType] || selectedGuide?.status;
-        } else {
-          const industrialMapping: Record<string, string> = {
-            'WASHING': 'IN_PROCESS',
-            'DRYING': 'WASHING',
-            'SHIPPING': 'PACKAGING',
-          };
-          return industrialMapping[selectedProcessType] || selectedGuide?.status;
-        }
-      };
-      
-      const currentStatus = getCurrentStatus();
-      
-      setSelectedGuideForConfirmation({ ...selectedGuide, id: guideId, status: currentStatus });
-      setConfirmationModalOpen(true);
-    } 
-    // Para EMPAQUE, CARGA y ENTREGA, ir al escáner primero (con validación)
-    else if (selectedProcessType === 'PACKAGING' || selectedProcessType === 'LOADING' || selectedProcessType === 'DELIVERY') {
-      onNavigate('ScanClothes', { 
-        mode: 'process', 
-        guideId: guideId,
-        processType: selectedProcessType,
-        serviceType: selectedServiceType
-      });
-    }
-    // Para otros procesos, ir directamente al escáner
-    else {
-      onNavigate('ScanClothes', { 
-        mode: 'process', 
-        guideId: guideId,
-        processType: selectedProcessType,
-        serviceType: selectedServiceType
-      });
-    }
+    const rfidScan = rfidScans.find(scan => scan.id === rfidScanId);
+    if (!rfidScan) return;
+    
+    // Guardar el RFID scan completo
+    setSelectedRfidScan(rfidScan);
+    
+    // Obtener la información de la guía desde el RFID scan
+    const guideId = rfidScan.guide_id;
+    const guideNumber = rfidScan.guide_number;
+    
+    // Mostrar modal de confirmación de cambio de estado
+    setSelectedGuideForConfirmation({
+      id: guideId,
+      guide_number: guideNumber || 'Sin número',
+      status: rfidScan.scan_type || '',
+    });
+    setConfirmationModalOpen(true);
   };
 
   const handleConfirmStatusChange = async () => {
     setIsUpdatingStatus(true);
     
-    // TODO: Aquí se hará la llamada al backend para actualizar el estado
-    // await updateGuideStatus(selectedGuideForConfirmation.id, newStatus);
-    
-    // Simular delay de red
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    setIsUpdatingStatus(false);
-    setConfirmationModalOpen(false);
-    
-    // Después de confirmar el cambio de estado, regresar al Dashboard
-    onNavigate('Dashboard');
+    try {
+      // Obtener el scan type NUEVO correspondiente al proceso seleccionado
+      const newScanType = getNewScanTypeFromProcess(selectedProcessType);
+      
+      if (!selectedRfidScan) {
+        throw new Error('No se encontró el escaneo RFID de la guía');
+      }
+      
+      // Actualizar el scan_type del escaneo RFID
+      // El backend sincronizará automáticamente el estado de la guía y las prendas
+      await updateRfidScanAsync({
+        id: selectedRfidScan.id,
+        data: {
+          guide_id: selectedRfidScan.guide_id,
+          branch_offices_id: selectedRfidScan.branch_offices_id,
+          scan_type: newScanType,
+          scanned_quantity: selectedRfidScan.scanned_quantity,
+          scanned_rfid_codes: selectedRfidScan.scanned_rfid_codes,
+          unexpected_codes: selectedRfidScan.unexpected_codes,
+          differences_detected: selectedRfidScan.differences_detected,
+        }
+      });
+      
+      // El hook useUpdateRfidScan ya invalida y recarga todas las listas automáticamente
+      // Esperar un momento para que se complete la recarga
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setIsUpdatingStatus(false);
+      setConfirmationModalOpen(false);
+      
+      // Volver a abrir el modal de selección de guías para ver los cambios
+      setGuideSelectionModalOpen(true);
+    } catch (error: any) {
+      setIsUpdatingStatus(false);
+      Alert.alert('Error', error.message || 'No se pudo actualizar el estado de la guía');
+    }
   };
-
-  const getNewStatusFromProcess = (processType: string): string => {
-    const statusMapping: Record<string, string> = {
-      'WASHING': 'WASHING',
-      'DRYING': 'DRYING',
-      'IRONING': 'IRONING',
-      'FOLDING': 'FOLDING',
-      'PACKAGING': 'PACKAGING',
-      'SHIPPING': 'SHIPPING',
-      'LOADING': 'LOADING',
-      'DELIVERY': 'DELIVERY',
-    };
-    return statusMapping[processType] || 'IN_PROCESS';
-  };
-
 
   return (
     <Container safe padding="none">
@@ -191,21 +174,23 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
         serviceType={selectedServiceType}
       />
 
-      {/* Modal de Selección de Guías */}
+      {/* Modal de Selección de RFID Scans */}
       <GuideSelectionModal
         visible={guideSelectionModalOpen}
         onClose={() => setGuideSelectionModalOpen(false)}
-        onSelectGuide={handleGuideSelect}
+        onSelectGuide={handleRfidScanSelect}
         processType={selectedProcessType}
-        guides={guidesForProcess.map(g => ({
-          id: g.id,
-          guide_number: g.guide_number,
-          client_name: g.client_name || 'Cliente desconocido',
-          status: g.status,
-          created_at: g.created_at,
-          total_garments: g.total_garments || 0,
+        guides={rfidScans.map((scan: any) => ({
+          id: scan.id,
+          guide_number: scan.guide_number || 'Sin número',
+          client_name: scan.guide?.client_name || 'Sin cliente',
+          total_garments: scan.scanned_quantity || 0,
+          status: scan.scan_type,
+          location: scan.location,
+          created_at: scan.created_at,
         }))}
         serviceType={selectedServiceType}
+        isLoading={isLoadingScans}
       />
 
       {/* Modal de Confirmación de Cambio de Estado */}
@@ -218,7 +203,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
         onConfirm={handleConfirmStatusChange}
         guideNumber={selectedGuideForConfirmation?.guide_number || ''}
         currentStatus={selectedGuideForConfirmation?.status || ''}
-        newStatus={getNewStatusFromProcess(selectedProcessType)}
+        newStatus={getNewScanTypeFromProcess(selectedProcessType)}
         processType={selectedProcessType}
         isLoading={isUpdatingStatus}
       />

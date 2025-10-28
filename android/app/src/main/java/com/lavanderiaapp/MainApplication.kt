@@ -16,6 +16,7 @@ import com.th3rdwave.safeareacontext.SafeAreaContextPackage
 import com.swmansion.rnscreens.RNScreensPackage
 import com.oblador.vectoricons.VectorIconsPackage
 import org.reactnative.camera.RNCameraPackage
+import com.ReactNativeBlobUtil.ReactNativeBlobUtilPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -29,7 +30,8 @@ class MainApplication : Application(), ReactApplication {
                 RNScreensPackage(),
                 VectorIconsPackage(),
                 RFIDPackage(),
-                RNCameraPackage()
+                RNCameraPackage(),
+                ReactNativeBlobUtilPackage()
             )
 
         override fun getJSMainModuleName(): String = "index"

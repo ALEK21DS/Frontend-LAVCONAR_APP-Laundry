@@ -90,3 +90,9 @@ export {
   type ValidationResult,
 } from './validators.helper';
 
+// Supresor de errores
+export {
+  initializeErrorSuppressor,
+  restoreConsole,
+} from './error-suppressor.helper';
+

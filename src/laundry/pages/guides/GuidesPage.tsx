@@ -13,6 +13,7 @@ import { GarmentForm } from '@/laundry/pages/garments/ui/GarmentForm';
 import { rfidModule } from '@/lib/rfid/rfid.module';
 import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
 import { QrScanner } from '@/laundry/components';
+import { translateEnum } from '@/helpers';
 
  type GuidesPageProps = { navigation: NativeStackNavigationProp<any> };
 
@@ -223,7 +224,11 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
     }
     
     // Convertir prendas registradas a formato de tags para el formulario
-    const garmentTags = registeredGarments.map(g => ({ tagEPC: g.rfidCode, proceso: '' }));
+    const garmentTags: ScannedTag[] = registeredGarments.map(g => ({ 
+      epc: g.rfidCode, 
+      timestamp: Date.now(),
+      rssi: 0
+    }));
     setScannedTags(garmentTags);
     setFormOpen(true);
     setRegisteredGarments([]);
@@ -296,7 +301,7 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
                         <Text className="text-gray-900 font-semibold">{g.guide_number}</Text>
                         <Text className="text-gray-500 text-xs">{g.client_name}</Text>
                       </View>
-                      <Text className="text-gray-600 text-xs">{g.status}</Text>
+                      <Text className="text-gray-600 text-xs">{translateEnum(g.status, 'guide_status')}</Text>
                     </View>
                   </Card>
                 </TouchableOpacity>

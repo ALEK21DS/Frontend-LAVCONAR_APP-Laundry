@@ -11,7 +11,7 @@ export const useGarmentsByRfidCodes = (rfidCodes: string[], enabled = true) => {
     queryKey: ['garments-by-rfid-codes', rfidCodes],
     queryFn: async () => {
       const { data } = await guidesApi.post<ApiResponse<any[]>>('/get-garment-by-rfid-codes', {
-        rfidCodes
+        rfid_codes: rfidCodes  // Backend espera rfid_codes con guión bajo
       });
       return data;
     },

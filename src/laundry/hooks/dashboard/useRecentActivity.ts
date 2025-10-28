@@ -213,7 +213,15 @@ export const useRecentActivity = () => {
         // Transformar las auditorías en items de actividad
         return audits.map(transformAuditToActivity);
       } catch (error: any) {
-        console.error('Error al obtener actividad reciente:', error);
+        // Solo mostrar error en consola si NO es un error de red
+        // Los errores de red (Network Error) son normales cuando se pierde conexión
+        const isNetworkError = error?.message?.includes('Network Error') || 
+                               error?.code === 'ECONNABORTED' ||
+                               error?.code === 'ERR_NETWORK';
+        
+        if (!isNetworkError) {
+          console.error('Error al obtener actividad reciente:', error);
+        }
         
         // Si es un error 404, no hay auditorías aún (retornar array vacío)
         if (error?.response?.status === 404) {
@@ -225,7 +233,7 @@ export const useRecentActivity = () => {
       }
     },
     staleTime: 1000 * 60 * 2, // 2 minutos (actualizar más frecuente)
-    refetchInterval: 1000 * 60 * 5, // Refrescar cada 5 minutos
+    refetchInterval: false, // Desactivar refetch automático para evitar spam de errores
     retry: false, // No reintentar en caso de error
   });
 };

@@ -4,6 +4,7 @@ import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Button, Card } from '@/components/common';
 import { GUIDE_STATUS_LABELS, GUIDE_STATUS_COLORS } from '@/constants/processes';
 import { formatDateTime } from '@/helpers/formatters.helper';
+import { usePrintGuide } from '@/laundry/hooks/guides';
 
 interface GuideDetailsModalProps {
   visible: boolean;
@@ -23,6 +24,9 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isWaitingAuth, setIsWaitingAuth] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  
+  // Hook para exportar PDF
+  const { downloadGuidePDF, isPrinting } = usePrintGuide();
 
   // Resetear estados cuando el modal se cierra
   useEffect(() => {
@@ -174,6 +178,128 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
                   </View>
                 )}
               </View>
+            </Card>
+
+            {/* Información de Servicio */}
+            <Card padding="md" variant="outlined" className="mb-4">
+              <View className="flex-row items-center mb-3">
+                <IonIcon name="settings-outline" size={20} color="#8B5CF6" />
+                <Text className="text-lg font-semibold text-gray-900 ml-2">Información de Servicio</Text>
+              </View>
+
+              <View className="mb-3">
+                <Text className="text-xs text-gray-500 mb-1">Tipo de Servicio</Text>
+                <Text className="text-base text-gray-900 font-medium">
+                  {guide.service_type === 'PERSONAL' ? 'Personal' : 'Industrial'}
+                </Text>
+              </View>
+
+              <View className="mb-3">
+                <Text className="text-xs text-gray-500 mb-1">Tipo de Cobro</Text>
+                <Text className="text-base text-gray-900 font-medium">
+                  {guide.charge_type === 'BY_WEIGHT' ? 'Por Peso' : guide.charge_type === 'BY_UNIT' ? 'Por Unidad' : 'Fijo'}
+                </Text>
+              </View>
+
+              {guide.washing_type && (
+                <View className="mb-3">
+                  <Text className="text-xs text-gray-500 mb-1">Tipo de Lavado</Text>
+                  <Text className="text-base text-gray-900 font-medium">
+                    {guide.washing_type === 'DRY' ? 'En Seco' : guide.washing_type === 'WET' ? 'Húmedo' : 'Mixto'}
+                  </Text>
+                </View>
+              )}
+
+              <View className="mb-3">
+                <Text className="text-xs text-gray-500 mb-1">Condición General</Text>
+                <Text className="text-base text-gray-900 font-medium">
+                  {guide.general_condition === 'GOOD' ? 'Buena' : 
+                   guide.general_condition === 'REGULAR' ? 'Regular' : 
+                   guide.general_condition === 'POOR' ? 'Deficiente' : 
+                   guide.general_condition === 'DAMAGED' ? 'Dañado' : 'N/A'}
+                </Text>
+              </View>
+
+              {guide.notes && (
+                <View>
+                  <Text className="text-xs text-gray-500 mb-1">Notas</Text>
+                  <Text className="text-sm text-gray-700">{guide.notes}</Text>
+                </View>
+              )}
+            </Card>
+
+            {/* Personal Involucrado */}
+            {guide.service_type === 'INDUSTRIAL' && (
+              <Card padding="md" variant="outlined" className="mb-4">
+                <View className="flex-row items-center mb-3">
+                  <IonIcon name="people-outline" size={20} color="#10B981" />
+                  <Text className="text-lg font-semibold text-gray-900 ml-2">Personal Involucrado</Text>
+                </View>
+
+                {guide.driver_name && (
+                  <View className="mb-3">
+                    <Text className="text-xs text-gray-500 mb-1">Conductor</Text>
+                    <Text className="text-base text-gray-900 font-medium">{guide.driver_name}</Text>
+                  </View>
+                )}
+
+                {guide.delivered_by && (
+                  <View className="mb-3">
+                    <Text className="text-xs text-gray-500 mb-1">Entregado Por</Text>
+                    <Text className="text-base text-gray-900 font-medium">{guide.delivered_by}</Text>
+                  </View>
+                )}
+
+                {guide.received_by && (
+                  <View className="mb-3">
+                    <Text className="text-xs text-gray-500 mb-1">Recibido Por</Text>
+                    <Text className="text-base text-gray-900 font-medium">{guide.received_by}</Text>
+                  </View>
+                )}
+
+                {guide.vehicle_plate && (
+                  <View className="mb-3">
+                    <Text className="text-xs text-gray-500 mb-1">Vehículo</Text>
+                    <View className="flex-row items-center">
+                      <IonIcon name="car-outline" size={16} color="#6B7280" />
+                      <Text className="text-base text-gray-900 font-medium ml-2">{guide.vehicle_plate}</Text>
+                    </View>
+                  </View>
+                )}
+
+                {(!guide.driver_name && !guide.delivered_by && !guide.received_by && !guide.vehicle_plate) && (
+                  <Text className="text-sm text-gray-500 italic">No hay información de personal registrada</Text>
+                )}
+              </Card>
+            )}
+
+            {/* Exportar Guía */}
+            <Card padding="md" variant="outlined" className="mb-4">
+              <View className="flex-row items-center mb-3">
+                <IonIcon name="download-outline" size={20} color="#F59E0B" />
+                <Text className="text-lg font-semibold text-gray-900 ml-2">Exportar Guía</Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => downloadGuidePDF(guide.id)}
+                disabled={isPrinting}
+                className={`flex-row items-center justify-center p-4 rounded-lg ${
+                  isPrinting ? 'bg-gray-300' : 'bg-red-500'
+                }`}
+              >
+                <IonIcon 
+                  name={isPrinting ? "hourglass-outline" : "document-text-outline"} 
+                  size={20} 
+                  color="white" 
+                />
+                <Text className="text-white font-semibold ml-2">
+                  {isPrinting ? 'Generando PDF...' : 'Generar PDF'}
+                </Text>
+              </TouchableOpacity>
+
+              <Text className="text-xs text-gray-500 mt-2 text-center">
+                El PDF se descargará y aparecerá en las notificaciones
+              </Text>
             </Card>
           </ScrollView>
 

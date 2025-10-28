@@ -1,109 +1,94 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, Modal, FlatList, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, FlatList, TextInput, Alert } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { Card, Button } from '@/components/common';
-import { useScanQr } from '@/laundry/hooks/guides';
+import { Card } from '@/components/common';
+import { useScanVehicleQr } from '@/laundry/hooks/vehicles';
 import { QrScanner } from './QrScanner';
 
-interface Guide {
+interface Vehicle {
   id: string;
-  guide_number: string;
-  client_name?: string;
+  plate_number: string;
+  brand: string;
+  model: string;
+  year: number;
   status: string;
-  created_at: string;
-  total_garments?: number;
+  capacity?: number;
 }
 
-interface GuideSelectionModalProps {
+interface VehicleSelectionModalProps {
   visible: boolean;
   onClose: () => void;
-  onSelectGuide: (guideId: string) => void;
-  processType: string;
-  guides: Guide[];
-  serviceType?: 'industrial' | 'personal';
-  isLoading?: boolean;
+  onSelectVehicle: (vehicle: Vehicle) => void;
+  vehicles: Vehicle[];
 }
 
-export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
+export const VehicleSelectionModal: React.FC<VehicleSelectionModalProps> = ({
   visible,
   onClose,
-  onSelectGuide,
-  processType,
-  guides,
-  serviceType = 'industrial',
-  isLoading = false,
+  onSelectVehicle,
+  vehicles,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showQrScanner, setShowQrScanner] = useState(false);
-  const [scannedGuide, setScannedGuide] = useState<Guide | null>(null);
-  const { scanQrAsync, isScanning } = useScanQr();
+  const [scannedVehicle, setScannedVehicle] = useState<Vehicle | null>(null);
+  const { scanVehicleQrAsync, isScanning } = useScanVehicleQr();
 
-  const filteredGuides = useMemo(() => {
-    if (!searchQuery.trim()) return guides;
+  const filteredVehicles = useMemo(() => {
+    if (!searchQuery.trim()) return vehicles;
     const query = searchQuery.toLowerCase();
-    return guides.filter(guide => 
-      guide.guide_number.toLowerCase().includes(query)
+    return vehicles.filter(vehicle => 
+      vehicle.plate_number.toLowerCase().includes(query) ||
+      vehicle.brand.toLowerCase().includes(query) ||
+      vehicle.model.toLowerCase().includes(query)
     );
-  }, [guides, searchQuery]);
-
-  const getProcessTypeLabel = (type: string) => {
-    const processLabels: Record<string, string> = {
-      'IN_PROCESS': 'EN PROCESO',
-      'WASHING': 'LAVADO',
-      'DRYING': 'SECADO',
-      'PACKAGING': 'EMPAQUE',
-      'SHIPPING': 'EMBARQUE',
-      'LOADING': 'CARGA',
-      'DELIVERY': 'ENTREGA',
-    };
-    return processLabels[type] || type;
-  };
+  }, [vehicles, searchQuery]);
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      'RECEIVED': '#10B981',
-      'IN_PROCESS': '#3B82F6',
-      'WASHING': '#06B6D4',
-      'DRYING': '#F59E0B',
-      'PACKAGING': '#8B5CF6',
-      'SHIPPING': '#EF4444',
-      'LOADING': '#84CC16',
-      'DELIVERY': '#22C55E',
+      'AVAILABLE': '#10B981',
+      'IN_USE': '#3B82F6',
+      'MAINTENANCE': '#F59E0B',
+      'OUT_OF_SERVICE': '#EF4444',
     };
     return colors[status] || '#6B7280';
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${day}/${month}/${year} ${hours}:${minutes}`;
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      'AVAILABLE': 'Disponible',
+      'IN_USE': 'En Uso',
+      'MAINTENANCE': 'Mantenimiento',
+      'OUT_OF_SERVICE': 'Fuera de Servicio',
+    };
+    return labels[status] || status;
   };
 
-  const renderGuide = ({ item }: { item: Guide }) => (
+  const renderVehicle = ({ item }: { item: Vehicle }) => (
     <TouchableOpacity
-      onPress={() => onSelectGuide(item.id)}
+      onPress={() => {
+        onSelectVehicle(item);
+        onClose();
+      }}
       className="mb-3"
     >
       <Card padding="md" variant="outlined">
         <View className="flex-row items-center">
           <View className="flex-1">
             <View className="flex-row items-center mb-2">
-              <Icon name="document-text-outline" size={20} color="#6B7280" />
+              <Icon name="car-outline" size={20} color="#6B7280" />
               <Text className="text-lg font-bold text-gray-900 ml-2">
-                {item.guide_number}
+                {item.plate_number}
               </Text>
             </View>
             <Text className="text-sm text-gray-600 mb-1">
-              Fecha: {formatDate(item.created_at)}
+              {item.brand} {item.model} ({item.year})
             </Text>
             <View className="flex-row items-center justify-between">
-              <Text className="text-sm text-gray-500">
-                {item.total_garments || 0} prendas
-              </Text>
+              {item.capacity && (
+                <Text className="text-sm text-gray-500">
+                  Capacidad: {item.capacity} kg
+                </Text>
+              )}
               <View 
                 className="px-2 py-1 rounded-full"
                 style={{ backgroundColor: `${getStatusColor(item.status)}20` }}
@@ -112,7 +97,7 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
                   className="text-xs font-medium"
                   style={{ color: getStatusColor(item.status) }}
                 >
-                  {item.status}
+                  {getStatusLabel(item.status)}
                 </Text>
               </View>
             </View>
@@ -136,10 +121,10 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
           <View className="flex-row items-center justify-between p-6 border-b border-gray-200">
             <View>
               <Text className="text-2xl font-bold text-gray-900">
-                Guías - {getProcessTypeLabel(processType)}
+                Seleccionar Vehículo
               </Text>
               <Text className="text-sm text-gray-600 mt-1">
-                Selecciona una guía para continuar
+                Selecciona un vehículo para el transporte
               </Text>
             </View>
             <TouchableOpacity
@@ -156,7 +141,7 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
               <Icon name="search-outline" size={18} color="#6B7280" />
               <TextInput
                 className="flex-1 ml-2 text-gray-900"
-                placeholder="Buscar por número de guía..."
+                placeholder="Buscar por placa, marca o modelo..."
                 placeholderTextColor="#9CA3AF"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -182,29 +167,22 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Guides List */}
+          {/* Vehicles List */}
           <View className="flex-1 px-6">
-            {isLoading ? (
+            {filteredVehicles.length === 0 ? (
               <View className="flex-1 items-center justify-center">
-                <ActivityIndicator size="large" color="#3B82F6" />
-                <Text className="text-sm text-gray-500 mt-4">
-                  Cargando guías...
-                </Text>
-              </View>
-            ) : filteredGuides.length === 0 ? (
-              <View className="flex-1 items-center justify-center">
-                <Icon name="document-outline" size={48} color="#D1D5DB" />
+                <Icon name="car-outline" size={48} color="#D1D5DB" />
                 <Text className="text-lg font-medium text-gray-500 mt-4">
-                  No hay guías disponibles
+                  No hay vehículos disponibles
                 </Text>
                 <Text className="text-sm text-gray-400 mt-2 text-center">
-                  No se encontraron guías para este proceso
+                  No se encontraron vehículos
                 </Text>
               </View>
             ) : (
               <FlatList
-                data={filteredGuides}
-                renderItem={renderGuide}
+                data={filteredVehicles}
+                renderItem={renderVehicle}
                 keyExtractor={item => item.id}
                 showsVerticalScrollIndicator={false}
               />
@@ -221,21 +199,21 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
           onScan={async (qrData: string) => {
             setShowQrScanner(false);
             try {
-              const guide = await scanQrAsync(qrData);
-              setScannedGuide(guide);
+              const vehicle = await scanVehicleQrAsync(qrData);
+              setScannedVehicle(vehicle);
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'No se pudo escanear el código QR');
+              Alert.alert('Error', error.message || 'No se pudo escanear el código QR del vehículo');
             }
           }}
         />
       )}
       
-      {/* Modal de Detalles de Guía Escaneada */}
+      {/* Modal de Detalles de Vehículo Escaneado */}
       <Modal
-        visible={!!scannedGuide}
+        visible={!!scannedVehicle}
         transparent
         animationType="fade"
-        onRequestClose={() => setScannedGuide(null)}
+        onRequestClose={() => setScannedVehicle(null)}
       >
         <View className="flex-1 bg-black/60 justify-center items-center">
           <View className="bg-white rounded-3xl mx-4 w-11/12 max-w-md" style={{ elevation: 10 }}>
@@ -245,11 +223,11 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
                 <View className="flex-row items-center flex-1">
                   <Icon name="qr-code-outline" size={28} color="white" />
                   <Text className="text-white text-2xl font-bold ml-3">
-                    Guía Encontrada
+                    Vehículo Encontrado
                   </Text>
                 </View>
                 <TouchableOpacity
-                  onPress={() => setScannedGuide(null)}
+                  onPress={() => setScannedVehicle(null)}
                   className="w-8 h-8 rounded-full bg-white/20 items-center justify-center"
                 >
                   <Icon name="close" size={20} color="white" />
@@ -261,59 +239,59 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
             </View>
 
             {/* Body */}
-            {scannedGuide && (
+            {scannedVehicle && (
               <View className="p-6">
-                {/* Número de Guía */}
+                {/* Placa del Vehículo */}
                 <View className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <Text className="text-sm text-blue-600 font-medium mb-1">Número de Guía</Text>
+                  <Text className="text-sm text-blue-600 font-medium mb-1">Placa</Text>
                   <Text className="text-2xl font-bold text-blue-900">
-                    {scannedGuide.guide_number}
+                    {scannedVehicle.plate_number}
                   </Text>
                 </View>
 
                 {/* Información Principal */}
                 <View className="space-y-3 mb-6">
                   <View className="flex-row justify-between py-2 border-b border-gray-100">
-                    <Text className="text-sm text-gray-600">Cliente:</Text>
+                    <Text className="text-sm text-gray-600">Vehículo:</Text>
                     <Text className="text-sm font-semibold text-gray-900">
-                      {scannedGuide.client_name || 'Sin cliente'}
+                      {scannedVehicle.brand} {scannedVehicle.model}
                     </Text>
                   </View>
                   
                   <View className="flex-row justify-between py-2 border-b border-gray-100">
-                    <Text className="text-sm text-gray-600">Total Prendas:</Text>
+                    <Text className="text-sm text-gray-600">Año:</Text>
                     <Text className="text-sm font-semibold text-gray-900">
-                      {scannedGuide.total_garments || 0}
+                      {scannedVehicle.year}
                     </Text>
                   </View>
                   
                   <View className="flex-row justify-between py-2 border-b border-gray-100">
-                    <Text className="text-sm text-gray-600">Estado:</Text>
-                    <View 
-                      className="px-3 py-1 rounded-full"
-                      style={{ backgroundColor: `${getStatusColor(scannedGuide.status)}20` }}
-                    >
-                      <Text 
-                        className="text-xs font-bold"
-                        style={{ color: getStatusColor(scannedGuide.status) }}
-                      >
-                        {scannedGuide.status}
-                      </Text>
-                    </View>
+                    <Text className="text-sm text-gray-600">Capacidad:</Text>
+                    <Text className="text-sm font-semibold text-gray-900">
+                      {scannedVehicle.capacity} kg
+                    </Text>
                   </View>
                   
                   <View className="flex-row justify-between py-2">
-                    <Text className="text-sm text-gray-600">Fecha de Creación:</Text>
-                    <Text className="text-sm font-medium text-gray-900">
-                      {new Date(scannedGuide.created_at).toLocaleDateString('es-ES')}
-                    </Text>
+                    <Text className="text-sm text-gray-600">Estado:</Text>
+                    <View 
+                      className="px-3 py-1 rounded-full"
+                      style={{ backgroundColor: `${getStatusColor(scannedVehicle.status)}20` }}
+                    >
+                      <Text 
+                        className="text-xs font-bold"
+                        style={{ color: getStatusColor(scannedVehicle.status) }}
+                      >
+                        {getStatusLabel(scannedVehicle.status)}
+                      </Text>
+                    </View>
                   </View>
                 </View>
 
                 {/* Botones */}
                 <View className="flex-row space-x-2">
                   <TouchableOpacity
-                    onPress={() => setScannedGuide(null)}
+                    onPress={() => setScannedVehicle(null)}
                     className="flex-1 bg-gray-100 p-4 rounded-lg items-center"
                   >
                     <Text className="text-gray-700 font-semibold">Cancelar</Text>
@@ -321,13 +299,14 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
                   
                   <TouchableOpacity
                     onPress={() => {
-                      onSelectGuide(scannedGuide.id);
-                      setScannedGuide(null);
+                      onSelectVehicle(scannedVehicle);
+                      setScannedVehicle(null);
+                      onClose();
                     }}
                     className="flex-1 bg-blue-500 p-4 rounded-lg flex-row items-center justify-center"
                   >
-                    <Icon name="arrow-forward-circle-outline" size={20} color="white" />
-                    <Text className="text-white font-semibold ml-2">Continuar</Text>
+                    <Icon name="checkmark-circle-outline" size={20} color="white" />
+                    <Text className="text-white font-semibold ml-2">Seleccionar</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -338,3 +317,4 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
     </Modal>
   );
 };
+

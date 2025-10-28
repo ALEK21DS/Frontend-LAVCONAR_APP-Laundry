@@ -27,3 +27,6 @@ export * from './branch-offices';
 
 // Dashboard
 export * from './dashboard';
+
+// Vehículos
+export * from './vehicles';

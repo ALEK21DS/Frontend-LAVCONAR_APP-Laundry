@@ -17,7 +17,7 @@ export const useUpdateGuideStatus = () => {
 
   const mutation = useMutation({
     mutationFn: async ({ id, data: statusData }: UpdateGuideStatusParams): Promise<Guide> => {
-      const { data } = await guidesApi.patch<ApiResponse<Guide>>(`/${id}/status`, statusData);
+      const { data } = await guidesApi.patch<ApiResponse<Guide>>(`/update-guide/${id}`, statusData);
       return data.data!;
     },
     onSuccess: (updatedGuide) => {

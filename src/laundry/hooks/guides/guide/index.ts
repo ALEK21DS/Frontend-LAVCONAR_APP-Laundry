@@ -8,4 +8,5 @@ export * from './useCreateGuide';
 export * from './useUpdateGuideStatus';
 export * from './useDeleteGuide';
 export * from './useScanQr';
+export * from './usePrintGuide';
 

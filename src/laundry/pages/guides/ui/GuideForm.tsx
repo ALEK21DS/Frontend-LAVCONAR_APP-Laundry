@@ -12,6 +12,8 @@ import { useBranchOffices } from '@/laundry/hooks/branch-offices';
 import { useCreateGuide, useCreateGuideGarment } from '@/laundry/hooks/guides';
 import { GuideDetailForm } from './GuideDetailForm';
 import { isValidDate, sanitizeNumericInput, sanitizeDecimalInput, isNonNegative, safeParseInt, safeParseFloat } from '@/helpers/validators.helper';
+import { useVehicles } from '@/laundry/hooks/vehicles';
+import { VehicleSelectionModal } from '@/laundry/components';
 
 type Option = { label: string; value: string };
 
@@ -31,6 +33,7 @@ interface GuideFormProps {
   // Valores iniciales opcionales
   initialServiceType?: string;
   initialTotalWeight?: number;
+  unregisteredCount?: number;
 }
 
 export const GuideForm: React.FC<GuideFormProps> = ({
@@ -48,6 +51,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   onNavigate,
   initialServiceType = '',
   initialTotalWeight = 0,
+  unregisteredCount = 0,
 }) => {
   const { user } = useAuthStore();
   const { sucursales } = useBranchOffices();
@@ -105,9 +109,17 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   const [totalBundlesReceived, setTotalBundlesReceived] = useState<string>('');
   const [bundlesDiscrepancy, setBundlesDiscrepancy] = useState<string>('');
   const [vehiclePlate, setVehiclePlate] = useState<string>('');
+  const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
+  const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
   const { createClientAsync, isCreating } = useCreateClient();
   const { createGuideAsync, isCreating: isCreatingGuide } = useCreateGuide();
   const { createGuideGarmentAsync, isCreating: isCreatingGuideGarment } = useCreateGuideGarment();
+  
+  // Obtener lista de vehículos (solo para servicio industrial)
+  const { vehicles, isLoading: isLoadingVehicles } = useVehicles({ 
+    limit: 50,
+    enabled: serviceType === 'INDUSTRIAL'
+  });
 
   // Función para formatear fecha mientras se escribe (dd/mm/yyyy)
   const formatDateInput = (text: string): string => {
@@ -175,6 +187,23 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
       <ScrollView className="flex-1" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 16 }}>
+      {/* Advertencia para servicio industrial con prendas no registradas */}
+      {unregisteredCount > 0 && (
+        <View className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+          <View className="flex-row items-start">
+            <Icon name="warning-outline" size={20} color="#F97316" />
+            <View className="flex-1 ml-2">
+              <Text className="text-sm font-semibold text-orange-900">
+                {unregisteredCount} {unregisteredCount === 1 ? 'código no registrado' : 'códigos no registrados'}
+              </Text>
+              <Text className="text-xs text-orange-700 mt-1">
+                Registre las prendas o coloque el peso manualmente
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Información Básica */}
       <View className="mb-6">
         <Text className="text-base text-gray-700 font-semibold mb-2">Información Básica</Text>
@@ -422,12 +451,33 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               />
             </View>
             <View className="flex-1 px-1">
-              <Input
-                label="Placa del Vehículo"
-                placeholder="ej: ABC-123"
-                value={vehiclePlate}
-                onChangeText={setVehiclePlate}
-              />
+              <Text className="text-sm font-medium text-gray-700 mb-1">Placa del Vehículo</Text>
+              <TouchableOpacity
+                onPress={() => setVehicleModalOpen(true)}
+                className="bg-purple-500 p-4 rounded-lg flex-row items-center justify-between"
+              >
+                {vehiclePlate ? (
+                  <>
+                    <View className="flex-row items-center flex-1">
+                      <Icon name="car-outline" size={20} color="white" />
+                      <Text className="text-white font-semibold ml-2 text-base">
+                        {vehiclePlate}
+                      </Text>
+                    </View>
+                    <Icon name="create-outline" size={20} color="white" />
+                  </>
+                ) : (
+                  <>
+                    <View className="flex-row items-center flex-1">
+                      <Icon name="car-outline" size={20} color="white" />
+                      <Text className="text-white font-medium ml-2">
+                        Seleccionar Vehículo
+                      </Text>
+                    </View>
+                    <Icon name="qr-code-outline" size={20} color="white" />
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -594,7 +644,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
 
             // Guardar en estado y continuar al formulario de detalles
             setSavedGuideData(guideData);
-            setShowDetailForm(true);
+          setShowDetailForm(true);
         }}
         isLoading={isCreatingGuide || !!submitting}
         fullWidth
@@ -663,6 +713,26 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           />
         </View>
       </Modal>
+
+      {/* Modal de Selección de Vehículos */}
+      <VehicleSelectionModal
+        visible={vehicleModalOpen}
+        onClose={() => setVehicleModalOpen(false)}
+        onSelectVehicle={(vehicle) => {
+          setSelectedVehicle(vehicle);
+          setVehiclePlate(vehicle.plate_number);
+          setVehicleModalOpen(false);
+        }}
+        vehicles={vehicles.map(v => ({
+          id: v.id,
+          plate_number: v.plate_number,
+          brand: v.brand,
+          model: v.model,
+          year: v.year,
+          status: v.status,
+          capacity: v.capacity,
+        }))}
+      />
 
       </ScrollView>
     </KeyboardAvoidingView>

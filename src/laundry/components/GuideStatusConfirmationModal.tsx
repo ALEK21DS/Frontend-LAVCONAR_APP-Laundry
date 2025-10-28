@@ -26,7 +26,8 @@ export const GuideStatusConfirmationModal: React.FC<GuideStatusConfirmationModal
 }) => {
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      'RECEIVED': 'Recibida',
+      // Estados de proceso
+      'RECEIVED': 'Recibido',
       'IN_PROCESS': 'En Proceso',
       'WASHING': 'Lavado',
       'DRYING': 'Secado',
@@ -35,8 +36,15 @@ export const GuideStatusConfirmationModal: React.FC<GuideStatusConfirmationModal
       'PACKAGING': 'Empaque',
       'SHIPPING': 'Embarque',
       'LOADING': 'Carga',
-      'DELIVERY': 'Entregado',
+      'DELIVERY': 'Entrega',
       'COMPLETED': 'Completada',
+      // Scan types
+      'COLLECTION': 'Recibido',
+      'WAREHOUSE_RECEPTION': 'En Proceso',
+      'PRE_WASH': 'Lavado',
+      'POST_WASH': 'Secado',
+      'POST_DRY': 'Empaque',
+      'FINAL_COUNT': 'Carga',
     };
     return labels[status] || status;
   };

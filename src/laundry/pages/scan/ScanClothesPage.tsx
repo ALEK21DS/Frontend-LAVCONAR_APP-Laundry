@@ -11,7 +11,7 @@ import { GuideForm } from '@/laundry/pages/guides/ui/GuideForm';
 import { ProcessForm } from '@/laundry/pages/processes/ui/ProcessForm';
 import { GarmentForm } from '@/laundry/pages/garments/ui/GarmentForm';
 import { useClients } from '@/laundry/hooks/clients';
-import { useGarments, useCreateGarment, useUpdateGarment, useGuides } from '@/laundry/hooks/guides';
+import { useGarments, useCreateGarment, useUpdateGarment, useGuides, useGarmentsByRfidCodes } from '@/laundry/hooks/guides';
 import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
 import { GuideSelectionModal } from '@/laundry/components/GuideSelectionModal';
 import { garmentsApi } from '@/laundry/api/garments/garments.api';
@@ -111,6 +111,31 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const isRfidCodeAlreadyRegistered = useCallback((rfidCode: string) => {
     return registeredGarments.some(garment => garment.rfidCode === rfidCode);
   }, [registeredGarments]);
+  
+  // Para servicio industrial: verificar prendas registradas por RFID
+  const rfidCodes = scannedTags.map(tag => tag.epc);
+  const { data: garmentsData } = useGarmentsByRfidCodes(
+    rfidCodes, 
+    serviceType === 'industrial' && rfidCodes.length > 0
+  );
+  
+  // Crear un mapa de RFID -> Prenda para búsqueda rápida
+  const garmentsByRfid = React.useMemo(() => {
+    const map = new Map();
+    if (garmentsData?.data) {
+      garmentsData.data.forEach((garment: any) => {
+        if (garment.rfid_code) {
+          map.set(garment.rfid_code, garment);
+        }
+      });
+    }
+    return map;
+  }, [garmentsData]);
+  
+  // Contar prendas no registradas
+  const unregisteredCount = React.useMemo(() => {
+    return scannedTags.filter(tag => !garmentsByRfid.has(tag.epc)).length;
+  }, [scannedTags, garmentsByRfid]);
 
   // Calcular peso total de las prendas registradas
   const calculateTotalWeight = useCallback(() => {
@@ -635,26 +660,41 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     });
   };
 
-  const renderScannedTag = ({ item, index }: { item: ScannedTag; index: number }) => (
-    <Card variant="outlined" className="mb-2">
-      <View className="flex-row justify-between items-center">
-        <View className="flex-1">
-          <View className="flex-row items-center">
-            <View className="bg-primary-DEFAULT w-8 h-8 rounded-full items-center justify-center mr-3">
-              <Text className="text-white font-bold">{index + 1}</Text>
-            </View>
-            <View>
-              <Text className="text-sm font-mono text-gray-900">{item.epc}</Text>
-              {item.rssi && (
-                <Text className="text-xs text-gray-500 mt-1">Señal: {item.rssi} dBm</Text>
-              )}
+  const renderScannedTag = ({ item, index }: { item: ScannedTag; index: number }) => {
+    const garment = serviceType === 'industrial' ? garmentsByRfid.get(item.epc) : null;
+    const isRegistered = !!garment;
+    
+    return (
+      <Card variant="outlined" className="mb-2">
+        <View className="flex-row justify-between items-center">
+          <View className="flex-1">
+            <View className="flex-row items-center">
+              <View 
+                className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${
+                  serviceType === 'industrial' && !isRegistered 
+                    ? 'bg-orange-500' 
+                    : 'bg-primary-DEFAULT'
+                }`}
+              >
+                <Text className="text-white font-bold">{index + 1}</Text>
+              </View>
+              <View className="flex-1">
+                <Text className="text-sm font-mono text-gray-900">{item.epc}</Text>
+                {serviceType === 'industrial' ? (
+                  <Text className={`text-xs mt-1 ${isRegistered ? 'text-gray-600' : 'text-orange-600 font-medium'}`}>
+                    {isRegistered ? garment.description || garment.garment_type || 'Sin nombre' : 'Prenda no registrada'}
+                  </Text>
+                ) : item.rssi && (
+                  <Text className="text-xs text-gray-500 mt-1">Señal: {item.rssi} dBm</Text>
+                )}
+              </View>
             </View>
           </View>
+          <Icon name="checkmark-circle" size={24} color="#10B981" />
         </View>
-        <Icon name="checkmark-circle" size={24} color="#10B981" />
-      </View>
-    </Card>
-  );
+      </Card>
+    );
+  };
 
   return (
     <Container safe>
@@ -947,6 +987,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             }}
             initialServiceType={serviceType === 'industrial' ? 'INDUSTRIAL' : 'PERSONAL'}
             initialTotalWeight={serviceType === 'personal' ? calculateTotalWeight() : 0}
+            unregisteredCount={serviceType === 'industrial' ? unregisteredCount : 0}
           />
         </View>
       </Modal>

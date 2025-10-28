@@ -56,6 +56,15 @@ export const GUIDE_STATUS_TRANSLATIONS: Dictionary = {
   COMPLETED: "Completada",
   FINISHED: "Terminada",
   DELIVERED: "Entregada",
+
+  // SCAN TYPES (RFID)
+  COLLECTION: "Recibido",
+  WAREHOUSE_RECEPTION: "En Proceso",
+  PRE_WASH: "Lavado",
+  POST_WASH: "Secado",
+  POST_DRY: "Empaque",
+  FINAL_COUNT: "Carga",
+  DELIVERY: "Entrega",
 };
 
 // TIPOS DE PRENDA

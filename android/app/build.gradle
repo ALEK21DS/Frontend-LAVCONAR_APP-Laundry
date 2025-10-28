@@ -126,6 +126,9 @@ dependencies {
     
     // Cámara para escaneo QR
     implementation project(':react-native-camera')
+    
+    // Manejo de archivos y descargas
+    implementation project(':react-native-blob-util')
 }
 
 // Asegura que las fuentes de react-native-vector-icons se incluyan en el APK
