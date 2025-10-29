@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Pressable, Modal, findNodeHandle, Dimensions, ScrollView } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { SelectOption } from '@/interfaces/pagination.response';
@@ -34,6 +34,13 @@ export const Dropdown: React.FC<DropdownProps> = ({
   const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number }>(
     { x: 0, y: 0, width: 0, height: 0 }
   );
+  
+  // Cleanup: cerrar el dropdown cuando el componente se desmonte
+  useEffect(() => {
+    return () => {
+      setIsOpen(false);
+    };
+  }, []);
 
   const selectedOption = options.find(opt => opt.value === value);
 

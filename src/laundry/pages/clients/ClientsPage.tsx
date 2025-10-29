@@ -203,7 +203,7 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
     >
       <View className="px-4 pt-4 flex-1">
         <View className="flex-row items-center mb-4">
-          <Text className="text-2xl font-bold text-gray-900 flex-1">Clientes</Text>
+          <Text className="text-lg font-bold text-gray-900 flex-1">CLIENTES</Text>
           <TouchableOpacity onPress={openCreate} className="w-10 h-10 rounded-lg bg-blue-600 items-center justify-center active:bg-blue-700">
             <IonIcon name="add" size={20} color="#ffffff" />
           </TouchableOpacity>
@@ -252,13 +252,15 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
                         <IonIcon name="person-outline" size={20} color="#2563EB" />
                       </View>
                       <View className="flex-1">
-                        <Text className="text-gray-900 font-semibold mb-1">{client.name}</Text>
-                        <Text className="text-gray-500 text-xs mb-1">{client.identification_number}</Text>
-                        <View className={`px-2 py-0.5 rounded-full self-start ${client.is_active ? 'bg-green-100' : 'bg-gray-100'}`}>
-                          <Text className={`text-xs font-medium ${client.is_active ? 'text-green-700' : 'text-gray-600'}`}>
-                            {client.is_active ? 'Activo' : 'Inactivo'}
-                          </Text>
+                        <View className="flex-row items-center justify-between mb-1">
+                          <Text className="text-gray-900 font-semibold flex-1">{client.name}</Text>
+                          <View className={`px-2 py-1 rounded-full ${client.is_active ? 'bg-green-100' : 'bg-gray-100'}`}>
+                            <Text className={`text-xs font-medium ${client.is_active ? 'text-green-700' : 'text-gray-600'}`}>
+                              {client.is_active ? 'Activo' : 'Inactivo'}
+                            </Text>
+                          </View>
                         </View>
+                        <Text className="text-gray-500 text-xs">{client.identification_number}</Text>
                       </View>
                     </View>
                   </Card>

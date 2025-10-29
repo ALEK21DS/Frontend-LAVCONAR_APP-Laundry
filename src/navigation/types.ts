@@ -5,7 +5,6 @@ export type RootStackParamList = {
 
 export type AuthStackParamList = {
   Login: undefined;
-  ForgotPassword: undefined;
 };
 
 export type MainStackParamList = {

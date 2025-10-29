@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Modal, TextInput, ActivityIndicator, Alert } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Button, Card } from '@/components/common';
 import { GUIDE_STATUS_LABELS, GUIDE_STATUS_COLORS } from '@/constants/processes';
 import { formatDateTime } from '@/helpers/formatters.helper';
 import { usePrintGuide } from '@/laundry/hooks/guides';
+import { useCreateAuthorizationRequest, useGetAuthorizationById, useInvalidateAuthorization } from '@/laundry/hooks/authorizations';
 
 interface GuideDetailsModalProps {
   visible: boolean;
@@ -21,21 +22,55 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
 }) => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [description, setDescription] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isWaitingAuth, setIsWaitingAuth] = useState(false);
-  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(false);
+  const [currentRequestId, setCurrentRequestId] = useState<string>('');
   
   // Hook para exportar PDF
   const { downloadGuidePDF, isPrinting } = usePrintGuide();
+  
+  // Hook para crear solicitud de autorización
+  const { createAuthorizationRequestAsync, isCreating } = useCreateAuthorizationRequest();
+  
+  // Hook para invalidar autorizaciones existentes
+  const { invalidateAuthorizationAsync } = useInvalidateAuthorization();
+  
+  // Hook para verificar el estado de la solicitud específica (solo se activa cuando checkingAuth es true)
+  // El hook hace polling automático cada 3 segundos
+  const { authorization, status: authStatus, isChecking } = useGetAuthorizationById(
+    currentRequestId,
+    checkingAuth && !!currentRequestId
+  );
+
+  // Efecto para monitorear el estado de autorización
+  useEffect(() => {
+    if (checkingAuth && authStatus) {
+      if (authStatus === 'APPROVED') {
+        // Autorización aprobada - abrir formulario directamente
+        setCheckingAuth(false);
+        setDescription('');
+        setCurrentRequestId('');
+        onEdit();
+        onClose();
+      } else if (authStatus === 'REJECTED') {
+        // Autorización rechazada
+        Alert.alert(
+          'Solicitud Rechazada', 
+          'El superadmin ha rechazado tu solicitud de edición.'
+        );
+        setCheckingAuth(false);
+        setDescription('');
+        setCurrentRequestId('');
+      }
+    }
+  }, [checkingAuth, authStatus]);
 
   // Resetear estados cuando el modal se cierra
   useEffect(() => {
     if (!visible) {
       setShowAuthModal(false);
       setDescription('');
-      setIsSubmitting(false);
-      setIsWaitingAuth(false);
-      setIsAuthorized(false);
+      setCheckingAuth(false);
+      setCurrentRequestId('');
     }
   }, [visible]);
 
@@ -47,30 +82,36 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
 
   const handleSubmitRequest = async () => {
     if (!description.trim()) {
+      Alert.alert('Error', 'Por favor ingresa una razón para la solicitud');
       return;
     }
 
-    setIsSubmitting(true);
-    
-    // Simular envío de solicitud
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setIsSubmitting(false);
-    setShowAuthModal(false);
-    setIsWaitingAuth(true);
-    
-    // Simular espera de autorización (3 segundos)
-    setTimeout(() => {
-      setIsWaitingAuth(false);
-      setIsAuthorized(true);
-      // Mostrar aprobación y luego abrir formulario
-      setTimeout(() => {
-        setIsAuthorized(false);
-        setDescription('');
-        onEdit();
-        onClose();
-      }, 2000);
-    }, 3000);
+    try {
+      // Crear la solicitud de autorización y guardar su ID
+      const authRequest = await createAuthorizationRequestAsync({
+        entity_type: 'guides',
+        entity_id: guide.id,
+        action_type: 'UPDATE',
+        reason: description,
+      });
+      
+      // Guardar el ID de la solicitud para verificar específicamente esta autorización
+      setCurrentRequestId(authRequest.id);
+      setShowAuthModal(false);
+      setCheckingAuth(true);
+    } catch (error: any) {
+      const errorMessage = error.message || 'No se pudo enviar la solicitud';
+      
+      // Si el error es porque ya hay una solicitud pendiente, mostrar mensaje apropiado
+      if (errorMessage.includes('pendiente') || errorMessage.includes('pending')) {
+        Alert.alert(
+          'Solicitud Pendiente', 
+          'Ya existe una solicitud de autorización pendiente para esta guía. Espera a que sea procesada o contacta al superadmin.'
+        );
+      } else {
+        Alert.alert('Error', errorMessage);
+      }
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -347,13 +388,13 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
                 title="Cancelar"
                 variant="outline"
                 onPress={() => setShowAuthModal(false)}
-                disabled={isSubmitting}
+                disabled={isCreating}
                 className="flex-1 mr-2"
               />
               <Button
                 title="Enviar Solicitud"
                 onPress={handleSubmitRequest}
-                isLoading={isSubmitting}
+                isLoading={isCreating}
                 disabled={!description.trim()}
                 className="flex-1 ml-2"
               />
@@ -363,7 +404,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
       </Modal>
 
       {/* Modal de Espera de Autorización */}
-      <Modal transparent visible={isWaitingAuth} animationType="fade" onRequestClose={() => {}}>
+      <Modal transparent visible={checkingAuth} animationType="fade" onRequestClose={() => {}}>
         <View className="flex-1 items-center justify-center bg-black/50 p-4">
           <View className="w-full max-w-sm bg-white rounded-xl p-6 shadow-xl">
             <View className="flex-row items-center justify-center mb-4">
@@ -379,30 +420,12 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
             </Text>
 
             <Text className="text-sm text-gray-500 text-center">
-              Procesando autorización...
+              Verificando autorización...
             </Text>
           </View>
         </View>
       </Modal>
 
-      {/* Modal de Autorización Aprobada */}
-      <Modal transparent visible={isAuthorized} animationType="fade" onRequestClose={() => {}}>
-        <View className="flex-1 items-center justify-center bg-black/50 p-4">
-          <View className="w-full max-w-sm bg-white rounded-xl p-6 shadow-xl">
-            <View className="flex-row items-center justify-center mb-4">
-              <IonIcon name="checkmark-circle-outline" size={48} color="#10B981" />
-            </View>
-
-            <Text className="text-xl font-bold text-gray-900 text-center mb-2">
-              ¡Autorización Aprobada!
-            </Text>
-
-            <Text className="text-base text-gray-700 text-center">
-              El SuperAdmin ha aprobado tu solicitud. Redirigiendo al formulario de edición...
-            </Text>
-          </View>
-        </View>
-      </Modal>
     </>
   );
 };

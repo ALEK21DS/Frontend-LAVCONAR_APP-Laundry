@@ -131,7 +131,7 @@ export const ScanProcessesPage: React.FC<ScanProcessesPageProps> = ({ navigation
             navigation.goBack();
           }}
         />
-        <Text className="text-2xl font-bold text-gray-900 ml-2">Asignar Procesos</Text>
+        <Text className="text-lg font-bold text-gray-900 ml-2">ASIGNAR PROCESOS</Text>
       </View>
 
       <View className="mb-6">

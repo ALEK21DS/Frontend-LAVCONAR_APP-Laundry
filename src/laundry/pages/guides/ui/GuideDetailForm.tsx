@@ -317,7 +317,6 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
           </View>
           <ScanForm
             onSubmit={(data) => {
-              console.log('Escaneo RFID creado:', data);
               setShowScanForm(false);
               onCancel(); // Cerrar el modal principal
               // Navegar al Dashboard después de completar todo el proceso

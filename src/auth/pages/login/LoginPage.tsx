@@ -137,14 +137,6 @@ export const LoginPage: React.FC = () => {
             size="lg"
             variant="white"
           />
-
-          {/* Enlace: ¿Olvidaste tu contraseña? */}
-          <TouchableOpacity
-            className="mt-4"
-            onPress={() => navigation.navigate('ForgotPassword')}
-          >
-            <Text className="text-center text-blue-400">¿Olvidaste tu contraseña?</Text>
-          </TouchableOpacity>
         </View>
       </AuthLayout>
     </>

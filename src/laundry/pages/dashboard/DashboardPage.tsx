@@ -32,7 +32,7 @@ import { useDashboardStats, useRecentActivity } from '@/laundry/hooks/dashboard'
       <ScrollView className="flex-1" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}>
         <View className="px-4 pt-4">
           <View className="mb-6">
-            <Text className="text-3xl font-bold text-black">Dashboard</Text>
+            <Text className="text-lg font-bold text-black">DASHBOARD</Text>
             <Text className="text-base text-black mt-1">Monitoreo en tiempo real del sistema de lavandería</Text>
             <View className="h-4" />
             <View className="flex-row flex-wrap -mx-2">

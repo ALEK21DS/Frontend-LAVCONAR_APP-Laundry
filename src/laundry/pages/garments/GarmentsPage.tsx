@@ -92,10 +92,7 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
     >
       <View className="px-4 pt-4 flex-1">
         <View className="flex-row items-center mb-4">
-          <Text className="text-2xl font-bold text-gray-900 flex-1">Prendas</Text>
-          <TouchableOpacity onPress={openCreate} className="w-10 h-10 rounded-lg bg-blue-600 items-center justify-center active:bg-blue-700">
-            <IonIcon name="add" size={20} color="#ffffff" />
-          </TouchableOpacity>
+          <Text className="text-lg font-bold text-gray-900 flex-1">PRENDAS</Text>
         </View>
 
         <View className="mb-4 flex-row items-center bg-white border border-gray-200 rounded-lg px-3">

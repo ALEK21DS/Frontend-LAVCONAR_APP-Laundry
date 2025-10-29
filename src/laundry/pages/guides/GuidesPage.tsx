@@ -4,6 +4,8 @@ import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Card } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useGuides, useCreateGuide, useUpdateGuideStatus, useScanQr } from '@/laundry/hooks/guides';
+import { useClients } from '@/laundry/hooks/clients';
+import { useInvalidateAuthorization } from '@/laundry/hooks/authorizations';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { GuideForm } from './ui/GuideForm';
@@ -25,11 +27,14 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const { guides, isLoading, refetch, total, totalPages, currentPage } = useGuides({ page, limit });
   const { createGuideAsync, isCreating } = useCreateGuide();
   const { updateGuideStatusAsync, isUpdating } = useUpdateGuideStatus();
+  const { clients } = useClients({ limit: 50 });
+  const { invalidateAuthorizationAsync } = useInvalidateAuthorization();
   const [query, setQuery] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedGuide, setSelectedGuide] = useState<any | null>(null);
+  const [isNavigatingToScanner, setIsNavigatingToScanner] = useState(false);
   const prefilledTags = route?.params?.prefilledTags || [];
   const [scannedTags, setScannedTags] = useState<ScannedTag[]>([]);
   const [isScanning, setIsScanning] = useState(false);
@@ -37,12 +42,28 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const isScanningRef = useRef<boolean>(false);
   const MIN_RSSI = -65;
 
-  // Recargar la lista de guías cada vez que la pantalla recibe foco
+  // Recargar la lista de guías y manejar el regreso del escáner
   useFocusEffect(
     useCallback(() => {
       refetch();
-    }, [refetch])
+      
+      // Si regresamos del escáner, reabrir el modal
+      if (isNavigatingToScanner) {
+        setIsNavigatingToScanner(false);
+        if (editingId) {
+          setFormOpen(true);
+        }
+      }
+    }, [refetch, isNavigatingToScanner, editingId])
   );
+  
+  // Mantener el modal abierto cuando se regresa del escáner en modo edición
+  useEffect(() => {
+    if (editingId && !formOpen && !isNavigatingToScanner) {
+      // Si estamos editando y el modal se cerró (y no estamos navegando), reabrirlo
+      setFormOpen(true);
+    }
+  }, [editingId, isNavigatingToScanner]);
   
   // Estados para el flujo de servicio personal
   const [showServiceTypeModal, setShowServiceTypeModal] = useState(false);
@@ -54,6 +75,9 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   // Estados para QR Scanner
   const [showQrScanner, setShowQrScanner] = useState(false);
   const { scanQrAsync, isScanning: isScanningQr } = useScanQr();
+  
+  // Estado para el cliente seleccionado
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
 
   const demoGuides = [
     { 
@@ -83,6 +107,13 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   ];
   const base = guides && guides.length > 0 ? guides : (demoGuides as any[]);
 
+  const clientOptions = useMemo(() => {
+    return clients.map(client => ({
+      label: client.name,
+      value: client.id,
+    }));
+  }, [clients]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return base;
@@ -102,8 +133,13 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const openEdit = () => {
     if (selectedGuide) {
       setEditingId(selectedGuide.id);
+      setSelectedClientId(selectedGuide.client_id || '');
       setFormOpen(true);
     }
+  };
+
+  const onChangeClient = (clientId: string) => {
+    setSelectedClientId(clientId);
   };
 
   const handleServiceTypeSelect = (serviceType: 'industrial' | 'personal') => {
@@ -119,9 +155,23 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
     }
   };
 
-  const closeModal = () => {
+  const closeModal = async () => {
+    // Si estaba editando una guía, invalidar la autorización
+    if (editingId && selectedGuide) {
+      try {
+        await invalidateAuthorizationAsync({
+          entity_type: 'guides',
+          entity_id: selectedGuide.id,
+        });
+      } catch (error) {
+        console.error('Error al invalidar autorización:', error);
+      }
+    }
+    
     setFormOpen(false);
     setScannedTags([]);
+    setSelectedClientId('');
+    setEditingId(null);
     seenSetRef.current.clear();
     stopScanning();
     if (route?.params?.prefilledTags) {
@@ -251,19 +301,14 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
     >
       <View className="px-4 pt-4 flex-1">
         <View className="flex-row items-center mb-4">
-          <Text className="text-2xl font-bold text-gray-900 flex-1">Guías</Text>
+          <Text className="text-lg font-bold text-gray-900 flex-1">GUÍAS</Text>
           
           {/* Botón Escanear QR */}
           <TouchableOpacity 
             onPress={() => setShowQrScanner(true)} 
-            className="w-10 h-10 rounded-lg bg-green-600 items-center justify-center active:bg-green-700 mr-2"
+            className="w-10 h-10 rounded-lg bg-green-600 items-center justify-center active:bg-green-700"
           >
             <IonIcon name="qr-code-outline" size={20} color="#ffffff" />
-          </TouchableOpacity>
-          
-          {/* Botón Crear Guía */}
-          <TouchableOpacity onPress={openCreate} className="w-10 h-10 rounded-lg bg-blue-600 items-center justify-center active:bg-blue-700">
-            <IonIcon name="add" size={20} color="#ffffff" />
           </TouchableOpacity>
         </View>
 
@@ -416,9 +461,9 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
             </TouchableOpacity>
           </View>
           <GuideForm
-            clientOptions={[{ label: 'Cliente Demo', value: 'client-demo-1' }]}
-            selectedClientId={'client-demo-1'}
-            onChangeClient={() => {}}
+            clientOptions={clientOptions}
+            selectedClientId={selectedClientId}
+            onChangeClient={onChangeClient}
             guideItems={(() => {
               const allTags = [...prefilledTags, ...scannedTags];
               const uniqueEPCs = new Set<string>();
@@ -442,7 +487,19 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
                 startScanning();
               }
             }}
-            onSubmit={() => { 
+            onSubmit={async () => {
+              // Si estaba editando, invalidar la autorización
+              if (editingId && selectedGuide) {
+                try {
+                  await invalidateAuthorizationAsync({
+                    entity_type: 'guides',
+                    entity_id: selectedGuide.id,
+                  });
+                } catch (error) {
+                  console.error('Error al invalidar autorización:', error);
+                }
+              }
+              
               setFormOpen(false);
               setScannedTags([]);
               seenSetRef.current.clear();
@@ -453,12 +510,17 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
                 navigation.setParams({ prefilledTags: [] });
               }
             }}
-            showScanButton={prefilledTags.length === 0}
+            showScanButton={editingId ? true : prefilledTags.length === 0}
             isScanning={isScanning}
             onNavigate={(route: string, params?: any) => {
+              // Marcar que estamos navegando al escáner para mantener el estado
+              if (route === 'ScanClothes') {
+                setIsNavigatingToScanner(true);
+              }
               // @ts-ignore
               navigation.navigate(route, params);
             }}
+            guideToEdit={editingId ? selectedGuide : undefined}
           />
         </View>
       </Modal>

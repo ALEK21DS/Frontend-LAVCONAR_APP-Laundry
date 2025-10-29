@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Modal, Alert } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Button, Card, Dropdown, Input } from '@/components/common';
@@ -10,8 +10,11 @@ import { ClientForm } from '@/laundry/pages/clients/ui/ClientForm';
 import { useCreateClient } from '@/laundry/hooks/clients';
 import { useBranchOffices } from '@/laundry/hooks/branch-offices';
 import { useCreateGuide, useCreateGuideGarment } from '@/laundry/hooks/guides';
+import { useGuideGarmentsByGuide } from '@/laundry/hooks/guides/guide-garments';
+import { useGetRfidScanByGuide } from '@/laundry/hooks/guides/rfid-scan';
 import { GuideDetailForm } from './GuideDetailForm';
 import { isValidDate, sanitizeNumericInput, sanitizeDecimalInput, isNonNegative, safeParseInt, safeParseFloat } from '@/helpers/validators.helper';
+import { translateEnum } from '@/helpers';
 import { useVehicles } from '@/laundry/hooks/vehicles';
 import { VehicleSelectionModal } from '@/laundry/components';
 
@@ -34,6 +37,8 @@ interface GuideFormProps {
   initialServiceType?: string;
   initialTotalWeight?: number;
   unregisteredCount?: number;
+  // Datos de la guía para modo edición
+  guideToEdit?: any;
 }
 
 export const GuideForm: React.FC<GuideFormProps> = ({
@@ -52,6 +57,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   initialServiceType = '',
   initialTotalWeight = 0,
   unregisteredCount = 0,
+  guideToEdit,
 }) => {
   const { user } = useAuthStore();
   const { sucursales } = useBranchOffices();
@@ -83,7 +89,6 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   const [collectionDate, setCollectionDate] = useState<string>(formatDateToDisplay(new Date()));
   const [deliveryDate, setDeliveryDate] = useState<string>('');
   const [totalWeight, setTotalWeight] = useState<string>(initialTotalWeight > 0 ? initialTotalWeight.toFixed(2) : '');
-  const totalGarments = guideItems.length;
   // Estado inicial según tipo de servicio
   const getInitialStatus = () => {
     return initialServiceType === 'PERSONAL' ? GUIDE_STATUS.SENT : GUIDE_STATUS.COLLECTED;
@@ -120,6 +125,73 @@ export const GuideForm: React.FC<GuideFormProps> = ({
     limit: 50,
     enabled: serviceType === 'INDUSTRIAL'
   });
+
+  // Obtener detalles de las prendas de la guía en modo edición (para mostrar info)
+  const { data: guideGarmentsData, isLoading: isLoadingGarments } = useGuideGarmentsByGuide(
+    guideToEdit?.id || '',
+    !!guideToEdit?.id
+  );
+  
+  // Obtener los RFIDs escaneados de la guía en modo edición
+  const { rfidScan } = useGetRfidScanByGuide(
+    guideToEdit?.id || '',
+    !!guideToEdit?.id
+  );
+  
+  // El backend puede devolver un objeto único o un array de garments, normalizarlo a array
+  const existingGarments = useMemo(() => {
+    if (!guideGarmentsData?.data) return [];
+    return Array.isArray(guideGarmentsData.data) 
+      ? guideGarmentsData.data 
+      : [guideGarmentsData.data];
+  }, [guideGarmentsData]);
+  
+  // Extraer los RFIDs escaneados del rfid_scan
+  const existingRfids = useMemo(() => {
+    if (!rfidScan) return [];
+    return rfidScan.scanned_rfid_codes || [];
+  }, [rfidScan]);
+  
+  // En modo edición, usar el número de RFIDs existentes; en creación, usar guideItems
+  const totalGarments = useMemo(() => {
+    return guideToEdit ? existingRfids.length : guideItems.length;
+  }, [guideToEdit, existingRfids.length, guideItems.length]);
+
+  // Cargar datos de la guía en modo edición
+  useEffect(() => {
+    if (guideToEdit) {
+      
+      // Convertir fecha ISO a formato dd/mm/yyyy
+      const formatISOToDisplay = (isoDate: string): string => {
+        if (!isoDate) return '';
+        const date = new Date(isoDate);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+      };
+
+      setServiceType(guideToEdit.service_type || '');
+      setChargeType(guideToEdit.charge_type || 'BY_WEIGHT');
+      setCondition(guideToEdit.general_condition || 'REGULAR');
+      setCollectionDate(formatISOToDisplay(guideToEdit.collection_date));
+      setDeliveryDate(formatISOToDisplay(guideToEdit.delivery_date));
+      setTotalWeight(guideToEdit.total_weight ? parseFloat(guideToEdit.total_weight).toFixed(2) : '');
+      setStatus(guideToEdit.status || '');
+      setNotes(guideToEdit.notes || '');
+      setSealNumber(guideToEdit.precinct_number || '');
+      setServicePriority(guideToEdit.service_priority || 'NORMAL');
+      setWashingType(guideToEdit.washing_type || '');
+      setDeliveredBy(guideToEdit.delivered_by || '');
+      setDriverName(guideToEdit.driver_name || '');
+      setVehiclePlate(guideToEdit.vehicle_plate || '');
+      setTotalBundlesExpected(guideToEdit.total_bundles_expected?.toString() || '');
+      setTotalBundlesReceived(guideToEdit.total_bundles_received?.toString() || '');
+      setBundlesDiscrepancy(guideToEdit.bundles_discrepancy?.toString() || '');
+      setDepartureTime(guideToEdit.departure_time || '');
+      setArrivalTime(guideToEdit.arrival_time || '');
+    }
+  }, [guideToEdit]);
 
   // Función para formatear fecha mientras se escribe (dd/mm/yyyy)
   const formatDateInput = (text: string): string => {
@@ -332,17 +404,81 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       {showScanButton && (
         <View className="mb-6">
           <Button
-            title={isScanning ? 'Detener Escaneo' : 'Iniciar Escaneo'}
-            onPress={onScan}
-            icon={<Icon name={isScanning ? 'stop-circle-outline' : 'scan-outline'} size={18} color="white" />}
+            title={guideToEdit ? 'Editar Prendas' : (isScanning ? 'Detener Escaneo' : 'Iniciar Escaneo')}
+            onPress={() => {
+              // Si estamos en modo edición, SIEMPRE navegar a la página de escaneo
+              if (guideToEdit && onNavigate) {
+                onNavigate('ScanClothes', {
+                  mode: 'guide',
+                  serviceType: serviceType === 'PERSONAL' ? 'personal' : 'industrial',
+                  guideId: guideToEdit.id,
+                  initialRfids: existingRfids, // Usar los RFIDs del rfid_scan
+                  isEditMode: true,
+                });
+              } else {
+                // Comportamiento normal de escaneo para creación de guía
+                onScan();
+              }
+            }}
+            icon={<Icon name={guideToEdit ? 'create-outline' : (isScanning ? 'stop-circle-outline' : 'scan-outline')} size={18} color="white" />}
             fullWidth
             size="sm"
             disabled={!selectedClientId}
-            style={isScanning ? { backgroundColor: '#dc2626' } : { backgroundColor: '#1f4eed' }}
+            style={{ backgroundColor: '#1f4eed' }}
           />
-          {!selectedClientId && (
+          {!selectedClientId && !guideToEdit && (
             <Text className="text-sm text-gray-500 mt-2 text-center">Selecciona un cliente para continuar</Text>
           )}
+        </View>
+      )}
+
+      {/* Prendas Registradas en la Guía (Modo Edición) */}
+      {guideToEdit && (
+        <View className="mb-6 bg-amber-50 p-4 rounded-lg border border-amber-200">
+          <View className="flex-row items-center mb-3">
+            <Icon name="shirt-outline" size={20} color="#F59E0B" />
+            <Text className="text-base text-amber-800 font-semibold ml-2">
+              Códigos RFID Escaneados ({existingRfids.length})
+            </Text>
+          </View>
+          
+          {existingRfids.length === 0 ? (
+            <View className="items-center py-3">
+              <Icon name="information-circle-outline" size={40} color="#F59E0B" />
+              <Text className="text-amber-800 font-medium mt-2 text-center text-sm">
+                No hay códigos RFID
+              </Text>
+              <Text className="text-amber-700 text-xs mt-1 text-center px-2">
+                Presiona "Editar Prendas" para escanear
+              </Text>
+            </View>
+          ) : (
+          
+          <ScrollView className="max-h-40">
+            {existingRfids.map((rfid: string, index: number) => (
+              <View 
+                key={rfid} 
+                className="bg-white rounded-lg p-3 mb-2 flex-row items-center justify-between border border-amber-300"
+              >
+                <View className="flex-1">
+                  <Text className="text-sm font-mono text-gray-900">
+                    {rfid}
+                  </Text>
+                  <Text className="text-xs text-gray-500 mt-1">
+                    Código RFID #{index + 1}
+                  </Text>
+                </View>
+                <View className="bg-green-500 w-8 h-8 rounded-full items-center justify-center">
+                  <Icon name="checkmark" size={20} color="#FFFFFF" />
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+          )}
+          
+          <Text className="text-xs text-amber-700 mt-3">
+            💡 Puedes escanear más prendas para agregarlas a esta guía
+          </Text>
         </View>
       )}
 
