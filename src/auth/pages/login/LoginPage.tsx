@@ -7,7 +7,7 @@ import { useBranchOffices } from '@/laundry/hooks/branch-offices';
 import { validateLoginData } from '@/helpers/validators.helper';
 import { LoginCredentials } from '@/auth/interfaces/auth.response';
 import { AuthLayout } from '@/auth/layouts/AuthLayout';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { Image } from 'react-native';
 import { Toast } from '@/components/ui/toast';
 
 export const LoginPage: React.FC = () => {
@@ -79,12 +79,16 @@ export const LoginPage: React.FC = () => {
         <View className="mx-4">
           {/* Logo y Título */}
           <View className="items-center mb-8">
-            {/* Icono de Olas */}
-            <View className="bg-gray-800 w-16 h-16 rounded-2xl items-center justify-center mb-4">
-              <Icon name="waves" size={32} color="#FFFFFF" />
-            </View>
-            <Text className="text-3xl font-bold text-blue-600">LAVCONAR</Text>
-            <Text className="text-sm text-gray-400 mt-1">Lavandería LAVCONAR</Text>
+            <Image
+              source={require('@/assets/logo-laundry-lav.png')}
+              resizeMode="contain"
+              style={{ width: 80, height: 80, marginBottom: 8 }}
+            />
+            <Image
+              source={require('@/assets/logo-laundry-name.png')}
+              resizeMode="contain"
+              style={{ width: 200, height: 60 }}
+            />
           </View>
 
           {/* Formulario */}
@@ -97,7 +101,6 @@ export const LoginPage: React.FC = () => {
               error={errors.username}
               autoCapitalize="none"
               keyboardType="email-address"
-              variant="dark"
             />
 
             <Input
@@ -107,7 +110,6 @@ export const LoginPage: React.FC = () => {
               onChangeText={text => setFormData({ ...formData, password: text })}
               error={errors.password}
               secureTextEntry
-              variant="dark"
             />
 
             {isLoadingSucursales ? (
@@ -123,7 +125,6 @@ export const LoginPage: React.FC = () => {
                 value={formData.sucursalId}
                 onValueChange={value => setFormData({ ...formData, sucursalId: value })}
                 error={errors.sucursalId}
-                variant="dark"
               />
             )}
           </View>
@@ -135,7 +136,7 @@ export const LoginPage: React.FC = () => {
             isLoading={isLoading || isSubmitting}
             fullWidth
             size="lg"
-            variant="white"
+            style={{ backgroundColor: '#143b64' }}
           />
         </View>
       </AuthLayout>

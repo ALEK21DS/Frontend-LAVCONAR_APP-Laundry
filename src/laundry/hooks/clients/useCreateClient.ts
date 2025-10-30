@@ -19,8 +19,8 @@ export const useCreateClient = () => {
       // Invalidar todas las queries de clientes para refrescar la lista
       queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
-    onError: (err) => {
-      console.error('Error al crear cliente:', handleApiError(err));
+    onError: () => {
+      // El manejo del error se realiza en el componente que invoca mutateAsync
     },
   });
 

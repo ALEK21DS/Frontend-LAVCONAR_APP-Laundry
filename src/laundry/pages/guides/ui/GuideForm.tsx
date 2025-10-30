@@ -413,6 +413,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
                   serviceType: serviceType === 'PERSONAL' ? 'personal' : 'industrial',
                   guideId: guideToEdit.id,
                   initialRfids: existingRfids, // Usar los RFIDs del rfid_scan
+                  guideToEdit, // pasar toda la guía para prefills de edición
                   isEditMode: true,
                 });
               } else {

@@ -27,8 +27,8 @@ export const useUpdateClient = () => {
       // Actualizar el cliente específico en el cache
       queryClient.invalidateQueries({ queryKey: ['client', updatedClient.id] });
     },
-    onError: (err) => {
-      console.error('Error al actualizar cliente:', handleApiError(err));
+    onError: () => {
+      // El componente llamador maneja el error
     },
   });
 

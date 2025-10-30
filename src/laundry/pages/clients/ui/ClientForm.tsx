@@ -12,12 +12,15 @@ interface ClientFormProps {
   submitting?: boolean;
   onSubmit: (data: CreateClientDto) => Promise<void> | void;
   onCancel?: () => void;
+  isEditing?: boolean;
 }
 
 export const ClientForm: React.FC<ClientFormProps> = ({
   initialValues,
   submitting,
   onSubmit,
+  onCancel,
+  isEditing = false,
 }) => {
   const { user } = useAuthStore();
   const { sucursales } = useBranchOffices();
@@ -38,7 +41,10 @@ export const ClientForm: React.FC<ClientFormProps> = ({
     branch_office_id: initialValues?.branch_office_id || branchOfficeId,
   });
   
-  const [isActive, setIsActive] = useState<boolean>((initialValues as any)?.is_active ?? true);
+  const initialActive = typeof (initialValues as any)?.status === 'string'
+    ? ((initialValues as any).status === 'ACTIVE')
+    : (initialValues as any)?.is_active ?? true;
+  const [isActive, setIsActive] = useState<boolean>(initialActive);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validateField = (field: string, value: string) => {
@@ -48,8 +54,6 @@ export const ClientForm: React.FC<ClientFormProps> = ({
       case 'name':
         if (!value.trim()) {
           newErrors.name = 'El nombre es requerido';
-        } else if (value.trim().length < 3) {
-          newErrors.name = 'El nombre debe tener al menos 3 caracteres';
         } else {
           delete newErrors.name;
         }
@@ -66,8 +70,8 @@ export const ClientForm: React.FC<ClientFormProps> = ({
       case 'identification_number':
         if (!value.trim()) {
           newErrors.identification_number = 'La cédula/RUC es requerida';
-        } else if (value.trim().length < 10) {
-          newErrors.identification_number = 'La cédula/RUC debe tener al menos 10 caracteres';
+        } else if (!/^\d+$/.test(value)) {
+          newErrors.identification_number = 'Solo números';
         } else {
           delete newErrors.identification_number;
         }
@@ -75,8 +79,8 @@ export const ClientForm: React.FC<ClientFormProps> = ({
       case 'phone':
         if (!value.trim()) {
           newErrors.phone = 'El teléfono es requerido';
-        } else if (value.trim().length < 7) {
-          newErrors.phone = 'El teléfono debe tener al menos 7 dígitos';
+        } else if (!/^\d+$/.test(value)) {
+          newErrors.phone = 'Solo números';
         } else {
           delete newErrors.phone;
         }
@@ -84,8 +88,6 @@ export const ClientForm: React.FC<ClientFormProps> = ({
       case 'address':
         if (!value.trim()) {
           newErrors.address = 'La dirección es requerida';
-        } else if (value.trim().length < 5) {
-          newErrors.address = 'La dirección debe tener al menos 5 caracteres';
         } else {
           delete newErrors.address;
         }
@@ -93,8 +95,6 @@ export const ClientForm: React.FC<ClientFormProps> = ({
       case 'acronym':
         if (!value.trim()) {
           newErrors.acronym = 'El acrónimo es requerido';
-        } else if (value.trim().length < 2) {
-          newErrors.acronym = 'El acrónimo debe tener al menos 2 caracteres';
         } else {
           delete newErrors.acronym;
         }
@@ -111,8 +111,6 @@ export const ClientForm: React.FC<ClientFormProps> = ({
     // Validar cada campo
     if (!formData.name.trim()) {
       tempErrors.name = 'El nombre es requerido';
-    } else if (formData.name.trim().length < 3) {
-      tempErrors.name = 'El nombre debe tener al menos 3 caracteres';
     }
 
     if (!formData.email.trim()) {
@@ -123,26 +121,22 @@ export const ClientForm: React.FC<ClientFormProps> = ({
 
     if (!formData.identification_number.trim()) {
       tempErrors.identification_number = 'La cédula/RUC es requerida';
-    } else if (formData.identification_number.trim().length < 10) {
-      tempErrors.identification_number = 'La cédula/RUC debe tener al menos 10 caracteres';
+    } else if (!/^\d+$/.test(formData.identification_number)) {
+      tempErrors.identification_number = 'Solo números';
     }
 
     if (!formData.phone.trim()) {
       tempErrors.phone = 'El teléfono es requerido';
-    } else if (formData.phone.trim().length < 7) {
-      tempErrors.phone = 'El teléfono debe tener al menos 7 dígitos';
+    } else if (!/^\d+$/.test(formData.phone)) {
+      tempErrors.phone = 'Solo números';
     }
 
     if (!formData.address.trim()) {
       tempErrors.address = 'La dirección es requerida';
-    } else if (formData.address.trim().length < 5) {
-      tempErrors.address = 'La dirección debe tener al menos 5 caracteres';
     }
 
     if (!formData.acronym.trim()) {
       tempErrors.acronym = 'El acrónimo es requerido';
-    } else if (formData.acronym.trim().length < 2) {
-      tempErrors.acronym = 'El acrónimo debe tener al menos 2 caracteres';
     }
 
     // Actualizar los errores
@@ -153,8 +147,20 @@ export const ClientForm: React.FC<ClientFormProps> = ({
       return;
     }
 
-    // Enviar solo los datos requeridos por el backend (sin is_active)
-    const dataToSubmit = { ...formData };
+    // Asegurar sucursal obligatoria
+    if (!formData.branch_office_id) {
+      Alert.alert('Sucursal requerida', 'No se encontró la sucursal del usuario. Vuelve a iniciar sesión.');
+      return;
+    }
+
+    // Normalización básica
+    const cleanDigits = (v: string) => v.replace(/\D/g, '');
+    const dataToSubmit = {
+      ...formData,
+      phone: cleanDigits(formData.phone),
+      identification_number: cleanDigits(formData.identification_number),
+      status: (isActive ? 'ACTIVE' : 'INACTIVE') as any,
+    };
     await Promise.resolve(onSubmit(dataToSubmit as CreateClientDto));
   };
 
@@ -205,7 +211,8 @@ export const ClientForm: React.FC<ClientFormProps> = ({
               placeholder="Número de identificación"
               value={formData.identification_number}
               onChangeText={text => {
-                setFormData({ ...formData, identification_number: text });
+                const onlyDigits = text.replace(/[^0-9]/g, '');
+                setFormData({ ...formData, identification_number: onlyDigits });
                 validateField('identification_number', text);
               }}
               keyboardType="numeric"
@@ -217,7 +224,8 @@ export const ClientForm: React.FC<ClientFormProps> = ({
               placeholder="Número de teléfono"
               value={formData.phone}
               onChangeText={text => {
-                setFormData({ ...formData, phone: text });
+                const onlyDigits = text.replace(/[^0-9]/g, '');
+                setFormData({ ...formData, phone: onlyDigits });
                 validateField('phone', text);
               }}
               keyboardType="phone-pad"
@@ -247,47 +255,54 @@ export const ClientForm: React.FC<ClientFormProps> = ({
               error={errors.acronym}
             />
 
-            {/* Campo de Estado - Interactivo */}
+            {/* Campo de Estado - Visible en crear y editar (por defecto ACTIVO) */}
             <View className="mb-4">
-              <Text className="text-base font-semibold text-gray-700 mb-2">Estado</Text>
-              <TouchableOpacity
-                onPress={() => setIsActive(!isActive)}
-                activeOpacity={0.7}
-              >
-                <Card 
-                  padding="md" 
-                  variant="outlined"
-                  className={isActive ? 'border-green-500 bg-green-50' : 'border-gray-300 bg-gray-50'}
+                <Text className="text-base font-semibold text-gray-700 mb-2">Estado</Text>
+                <TouchableOpacity
+                  onPress={() => setIsActive(!isActive)}
+                  activeOpacity={0.7}
                 >
-                  <View className="flex-row items-center justify-between">
-                    <View className="flex-row items-center flex-1">
-                      <View 
-                        className="w-10 h-10 rounded-full items-center justify-center"
-                        style={{ backgroundColor: isActive ? '#10b981' : '#6B7280' }}
-                      >
-                        <Icon 
-                          name={isActive ? 'checkmark-circle' : 'close-circle'} 
-                          size={24} 
-                          color="white" 
-                        />
-                      </View>
-                      <View className="ml-3">
-                        <Text className={`text-base font-semibold ${isActive ? 'text-green-700' : 'text-gray-700'}`}>
-                          {isActive ? 'Activo' : 'Inactivo'}
-                        </Text>
-                        <Text className="text-sm text-gray-500">
-                          {isActive ? 'El cliente puede realizar operaciones' : 'El cliente no puede realizar operaciones'}
-                        </Text>
+                  <Card 
+                    padding="md" 
+                    variant="outlined"
+                    className={isActive ? 'border-green-500 bg-green-50' : 'border-gray-300 bg-gray-50'}
+                  >
+                    <View className="flex-row items-center justify-between">
+                      <View className="flex-row items-center flex-1">
+                        <View 
+                          className="w-10 h-10 rounded-full items-center justify-center"
+                          style={{ backgroundColor: isActive ? '#10b981' : '#6B7280' }}
+                        >
+                          <Icon 
+                            name={isActive ? 'checkmark-circle' : 'close-circle'} 
+                            size={24} 
+                            color="white" 
+                          />
+                        </View>
+                        <View className="ml-3">
+                          <Text className={`text-base font-semibold ${isActive ? 'text-green-700' : 'text-gray-700'}`}>
+                            {isActive ? 'Activo' : 'Inactivo'}
+                          </Text>
+                          <Text className="text-sm text-gray-500">
+                            {isActive ? 'El cliente puede realizar operaciones' : 'El cliente no puede realizar operaciones'}
+                          </Text>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                </Card>
-              </TouchableOpacity>
-            </View>
+                  </Card>
+                </TouchableOpacity>
+              </View>
           </View>
 
           <View className="h-3" />
-          <Button title="Guardar" onPress={handleSubmit} isLoading={!!submitting} fullWidth size="md" />
+          <Button 
+            title="Guardar" 
+            onPress={handleSubmit} 
+            isLoading={!!submitting} 
+            fullWidth 
+            size="md" 
+            disabled={!!submitting || Object.keys(errors).length > 0}
+          />
         </ScrollView>
       </View>
     </KeyboardAvoidingView>

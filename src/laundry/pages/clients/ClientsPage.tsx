@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, ActivityIndicator, Alert } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Card } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -43,6 +43,11 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
       refetch();
     }, [refetch])
   );
+
+  // Resetear a página 1 cuando cambien búsqueda o filtro
+  React.useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter]);
 
   const demoClients = [
     { 
@@ -95,10 +100,11 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
     let result = base;
     
     // Filtrar por estado
+    const isActiveFlag = (c: any) => (typeof c.status === 'string' ? c.status === 'ACTIVE' : c.is_active === true);
     if (statusFilter === 'active') {
-      result = result.filter((c: any) => c.is_active === true);
+      result = result.filter((c: any) => isActiveFlag(c));
     } else if (statusFilter === 'inactive') {
-      result = result.filter((c: any) => c.is_active === false);
+      result = result.filter((c: any) => !isActiveFlag(c));
     }
     
     // Filtrar por búsqueda
@@ -169,26 +175,38 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
         acronym: selectedClient.acronym,
         branch_office_id: selectedClient.branch_office_id,
         is_active: selectedClient.is_active,
+        status: selectedClient.status,
       });
       setFormOpen(true);
     }
   };
 
+  const handleCloseFormModal = () => {
+    Alert.alert(
+      'Descartar cambios',
+      'Tienes cambios sin guardar. ¿Deseas salir y descartar?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Descartar', style: 'destructive', onPress: () => {
+            setFormOpen(false);
+            setEditingId(null);
+            setInitialValues(undefined);
+          } }
+      ]
+    );
+  };
+
   const handleDelete = () => {
-    if (!selectedClient?.id) {
-      console.error('No hay cliente seleccionado para eliminar');
-      return;
-    }
-    
-    console.log('Eliminar cliente:', selectedClient.id);
+    if (!selectedClient?.id) return;
     deleteClient(selectedClient.id, {
       onSuccess: () => {
-        console.log('✅ Cliente eliminado exitosamente');
+        Alert.alert('Cliente eliminado', 'El cliente fue eliminado correctamente');
         setSelectedClient(null);
         setDetailsOpen(false);
+        refetch();
       },
       onError: (error: any) => {
-        console.error('❌ Error al eliminar cliente:', error.message || error);
+        Alert.alert('Error', error?.message || 'No se pudo eliminar el cliente');
       }
     });
   };
@@ -254,11 +272,13 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
                       <View className="flex-1">
                         <View className="flex-row items-center justify-between mb-1">
                           <Text className="text-gray-900 font-semibold flex-1">{client.name}</Text>
-                          <View className={`px-2 py-1 rounded-full ${client.is_active ? 'bg-green-100' : 'bg-gray-100'}`}>
-                            <Text className={`text-xs font-medium ${client.is_active ? 'text-green-700' : 'text-gray-600'}`}>
-                              {client.is_active ? 'Activo' : 'Inactivo'}
+                          {(() => { const active = (typeof client.status === 'string' ? client.status === 'ACTIVE' : client.is_active); return (
+                          <View className={`px-2 py-1 rounded-full ${active ? 'bg-green-100' : 'bg-gray-100'}`}>
+                            <Text className={`text-xs font-medium ${active ? 'text-green-700' : 'text-gray-600'}`}>
+                              {active ? 'Activo' : 'Inactivo'}
                             </Text>
                           </View>
+                          );})()}
                         </View>
                         <Text className="text-gray-500 text-xs">{client.identification_number}</Text>
                       </View>
@@ -326,34 +346,56 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
       />
 
       {/* Modal de Formulario */}
-      <Modal visible={formOpen} transparent animationType="slide" onRequestClose={() => setFormOpen(false)}>
+      <Modal visible={formOpen} transparent animationType="slide" onRequestClose={handleCloseFormModal}>
         <View className="flex-1 bg-black/40" />
         <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl p-4" style={{ elevation: 8 }}>
           <View className="flex-row items-center mb-4">
             <Text className="text-xl font-bold text-gray-900 flex-1">{editingId ? 'Editar Cliente' : 'Nuevo Cliente'}</Text>
-            <TouchableOpacity onPress={() => setFormOpen(false)}>
+            <TouchableOpacity onPress={handleCloseFormModal}>
               <IonIcon name="close" size={22} color="#111827" />
             </TouchableOpacity>
           </View>
           <ClientForm 
             initialValues={initialValues} 
             submitting={isCreating || isUpdating} 
+            isEditing={!!editingId}
             onSubmit={async (data) => {
               try {
                 if (editingId) {
                   await updateClientAsync({ id: editingId, data });
-                  console.log('✅ Cliente actualizado exitosamente');
+                  Alert.alert('Cliente actualizado', 'Los datos del cliente fueron actualizados');
+                  // Ajustar el filtro para reflejar el nuevo estado si cambió
+                  if ((data as any).status === 'INACTIVE') setStatusFilter('inactive');
+                  if ((data as any).status === 'ACTIVE') setStatusFilter('active');
                 } else {
                   await createClientAsync(data);
-                  console.log('✅ Cliente creado exitosamente');
+                  Alert.alert('Cliente creado', 'El cliente fue creado correctamente');
                 }
                 setFormOpen(false);
                 setEditingId(null);
                 setInitialValues(undefined);
-              } catch (error) {
-                console.error('❌ Error al guardar cliente:', error);
+                refetch();
+              } catch (error: any) {
+                const message = error?.response?.data?.message || error?.message || 'No se pudo guardar el cliente';
+                if (typeof message === 'string') {
+                  const msg = message.toLowerCase();
+                  if (msg.includes('email') && (msg.includes('existe') || msg.includes('ya existe') || msg.includes('unique'))) {
+                    Alert.alert('Duplicado', 'Ya existe un cliente con este email.');
+                    return;
+                  }
+                  if ((msg.includes('identificacion') || msg.includes('identificación') || msg.includes('cedula') || msg.includes('cédula') || msg.includes('ruc')) && (msg.includes('existe') || msg.includes('ya existe') || msg.includes('unique'))) {
+                    Alert.alert('Duplicado', 'Ya existe un cliente con esta cédula/RUC.');
+                    return;
+                  }
+                  if (/unique|duplicad/i.test(message)) {
+                    Alert.alert('Duplicado', 'El email o la cédula/RUC ya existen.');
+                    return;
+                  }
+                }
+                Alert.alert('Error', String(message));
               }
             }} 
+            onCancel={() => setFormOpen(false)}
           />
         </View>
       </Modal>

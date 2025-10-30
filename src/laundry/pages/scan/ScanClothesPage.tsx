@@ -27,6 +27,7 @@ type ScanClothesPageProps = {
       serviceType?: 'industrial' | 'personal';
       initialRfids?: string[];
       isEditMode?: boolean;
+      guideToEdit?: any;
     };
   };
 };
@@ -36,6 +37,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const serviceType = route?.params?.serviceType || 'industrial';
   const initialRfids = route?.params?.initialRfids || [];
   const isEditMode = route?.params?.isEditMode || false;
+  const passedGuide = route?.params?.guideToEdit || null;
   const { scannedTags, addScannedTag, clearScannedTags, isScanning, setIsScanning } = useTagStore();
   
   // Hooks modulares
@@ -263,31 +265,19 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       
       // Usar setTimeout para asegurar que clearScannedTags terminó
       setTimeout(() => {
-        // Agregar los RFIDs iniciales como tags escaneados
-        initialRfids.forEach((rfid) => {
-          addScannedTag({
-            epc: rfid,
-            rssi: -50, // Valor ficticio para tags precargados
-            timestamp: Date.now(),
-          });
-          seenSetRef.current.add(rfid);
-        });
-        
-        scannedTagsCountRef.current = initialRfids.length;
-        
-        // En modo edición con servicio personal, convertir scannedTags en registeredGarments
+        // En modo edición NO poblar scannedTags; solo lista de registradas
+        scannedTagsCountRef.current = 0;
         if (serviceType === 'personal') {
           const garments = initialRfids.map((rfid, index) => ({
             id: `edit-${rfid}`,
             rfidCode: rfid,
-            description: `Prenda ${index + 1}`, // Nombre temporal, se puede mejorar con datos del backend
+            description: `Prenda ${index + 1}`,
             category: undefined,
             color: undefined,
             weight: undefined,
           }));
           setRegisteredGarments(garments);
         }
-        
         setInitialRfidsLoaded(true); // Marcar como cargados
       }, 100);
     }
@@ -850,7 +840,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         {mode === 'guide' && serviceType === 'personal' ? (
           <>
             {/* Sección de Código Escaneado (temporal) - Solo en modo creación */}
-            {scannedTags.length > 0 && (
+            {!isEditMode && scannedTags.length > 0 && (
               <View className="mb-4">
                 <View className="flex-row items-center justify-between mb-3">
                   <Text className="text-lg font-bold text-gray-900">
@@ -1057,8 +1047,8 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             initialServiceType={serviceType === 'industrial' ? 'INDUSTRIAL' : 'PERSONAL'}
             initialTotalWeight={serviceType === 'personal' ? calculateTotalWeight() : 0}
             unregisteredCount={serviceType === 'industrial' ? unregisteredCount : 0}
-            // Indicar al formulario que estamos editando cuando corresponda
-            guideToEdit={isEditMode ? { id: route?.params?.guideId } : undefined}
+            // Indicar al formulario que estamos editando cuando corresponda y pasar guía completa si viene
+            guideToEdit={isEditMode ? (passedGuide || { id: route?.params?.guideId }) : undefined}
           />
         </View>
       </Modal>

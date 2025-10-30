@@ -8,7 +8,7 @@ interface AuthLayoutProps {
 
 export const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
   return (
-    <Container safe className="bg-[#0f1115]">
+    <Container safe className="bg-[#0b1f36]">
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1">
@@ -20,8 +20,8 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
             className="px-4 rounded-lg border w-full self-center"
             style={{
               maxWidth: 620,
-              backgroundColor: '#111216',
-              borderColor: '#2b2f36',
+              backgroundColor: '#ffffff',
+              borderColor: '#e5e7eb',
               padding: 24,
             }}>
             {children}

@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import WavesIcon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 
 type HeaderBarProps = {
@@ -20,16 +19,14 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 }) => {
   return (
     <View
-      className={`flex-row items-center justify-between rounded-none px-4 py-3 ${className}`}
+      className={`flex-row items-center justify-between rounded-none px-2 py-2 ${className}`}
       style={{ backgroundColor: bgColor }}>
       <View className="flex-row items-center">
-        <View className="bg-primary-DEFAULT/20 rounded-lg p-2 mr-3">
-          <WavesIcon name="waves" size={20} color="#ffffff" />
-        </View>
-        <View>
-          <Text className="text-white font-bold text-lg">LAVCONAR</Text>
-          <Text className="text-gray-200 text-xs">Sistema de Lavandería</Text>
-        </View>
+        <Image
+          source={require('@/assets/logo-laundry.png')}
+          resizeMode="contain"
+          style={{ width: 200, height: 70, marginLeft: 0 }}
+        />
       </View>
 
       <View className="flex-row items-center">
