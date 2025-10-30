@@ -53,6 +53,10 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
       Alert.alert('Error', 'El peso debe ser un número válido');
       return;
     }
+    if (typeof weightValue === 'number' && weightValue < 0) {
+      Alert.alert('Error', 'El peso debe ser mayor o igual a 0');
+      return;
+    }
 
     setIsSubmitting(true);
     try {

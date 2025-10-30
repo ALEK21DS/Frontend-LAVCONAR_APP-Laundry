@@ -13,6 +13,12 @@ type GuideDetailFormProps = {
   initialValues?: any;
   scannedTags?: string[];
   onNavigate?: (route: string, params?: any) => void;
+  initialRfidScan?: { scan_type?: string; location?: string; differences_detected?: string } | undefined;
+  // Contexto de edición
+  editContext?: { guideId: string; guideGarmentId?: string; rfidScanId?: string } | undefined;
+  initialGuide?: any;
+  initialGuideGarment?: any;
+  initialRfidScanFull?: any;
 };
 
 export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
@@ -22,7 +28,12 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
   guideData,
   initialValues,
   scannedTags = [],
-  onNavigate
+  onNavigate,
+  initialRfidScan,
+  editContext,
+  initialGuide,
+  initialGuideGarment,
+  initialRfidScanFull
 }) => {
   const [formData, setFormData] = useState({
     garment_type: initialValues?.garment_type || '',
@@ -128,6 +139,7 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
               value={formData.garment_type}
               onValueChange={(value: string) => setFormData(prev => ({ ...prev, garment_type: value }))}
               placeholder="Seleccionar tipo de prenda"
+            disabled={!!editContext?.guideGarmentId}
             />
           </View>
 
@@ -324,12 +336,21 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
                 onNavigate('Dashboard');
               }
             }}
-            onCancel={() => setShowScanForm(false)}
+            onCancel={() => {
+              // Al cancelar con la X, cerrar también el modal de Detalle
+              setShowScanForm(false);
+              onCancel();
+            }}
             submitting={false}
             guideData={guideData}
             guideGarmentData={formData}
             scannedTags={scannedTags}
             onNavigate={onNavigate}
+            initialRfidScan={initialRfidScan}
+            editContext={editContext}
+            initialGuide={initialGuide}
+            initialGuideGarment={initialGuideGarment}
+            initialRfidScanFull={initialRfidScanFull}
           />
         </View>
       </Modal>

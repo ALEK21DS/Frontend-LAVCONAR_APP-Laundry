@@ -52,6 +52,11 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   }, [scannedTags]);
   const [guideModalOpen, setGuideModalOpen] = useState(false);
   const [garmentModalOpen, setGarmentModalOpen] = useState(false);
+  // Al entrar a esta pantalla o cuando cambien los params, asegurarnos de que no haya modales abiertos
+  useEffect(() => {
+    setGuideModalOpen(false);
+    setGarmentModalOpen(false);
+  }, [route?.params?.guideId, route?.params?.isEditMode]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [processModalOpen, setProcessModalOpen] = useState(false);
   const [selectedGuideId, setSelectedGuideId] = useState<string>('');
@@ -787,15 +792,17 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   return (
     <Container safe>
       <View className="flex-row items-center mb-6">
-        <Button
-          icon={<Icon name="arrow-back-outline" size={24} color="#3B82F6" />}
-          variant="ghost"
-          size="icon"
-          onPress={() => {
-            stopScanning();
-            navigation.goBack();
-          }}
-        />
+        {!isEditMode && (
+          <Button
+            icon={<Icon name="arrow-back-outline" size={24} color="#3B82F6" />}
+            variant="ghost"
+            size="icon"
+            onPress={() => {
+              stopScanning();
+              navigation.goBack();
+            }}
+          />
+        )}
         <Text className="text-lg font-bold text-gray-900 ml-2">
           {isEditMode 
             ? 'EDITAR PRENDAS DE GUÍA'
@@ -983,37 +990,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         </View>
       )}
       
-      {/* Botones para modo edición (servicio personal) */}
-      {mode === 'guide' && serviceType === 'personal' && isEditMode && registeredGarments.length > 0 && (
-        <View className="flex-row space-x-2">
-          <View className="flex-1">
-            <Button
-              title="Limpiar Todo"
-              onPress={() => {
-                clearScannedTags();
-                setRegisteredGarments([]);
-                seenSetRef.current.clear();
-                scannedTagsCountRef.current = 0;
-              }}
-              variant="outline"
-              fullWidth
-              size="sm"
-              icon={<Icon name="trash-outline" size={16} color="#EF4444" />}
-              style={{ borderColor: '#EF4444' }}
-            />
-          </View>
-          <View className="flex-1">
-            <Button
-              title="Continuar"
-              onPress={handleContinueToGuideForm}
-              variant="outline"
-              fullWidth
-              size="sm"
-              icon={<Icon name="arrow-forward-circle-outline" size={16} color="#3B82F6" />}
-            />
-          </View>
-        </View>
-      )}
+      {/* En modo edición ya no mostramos botones secundarios; se usa solo el botón inferior "Continuar a Guía" */}
 
       {/* Botones para otros modos */}
       {!(mode === 'guide' && serviceType === 'personal') && scannedTags.length > 0 && (
@@ -1051,7 +1028,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         <View className="flex-1 bg-black/40" />
         <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl p-4" style={{ elevation: 8 }}>
           <View className="flex-row items-center mb-4">
-            <Text className="text-xl font-bold text-gray-900 flex-1">Nueva Guía</Text>
+            <Text className="text-xl font-bold text-gray-900 flex-1">{isEditMode ? 'Editar Guía' : 'Nueva Guía'}</Text>
             <TouchableOpacity onPress={handleCloseGuideModal}>
               <Icon name="close" size={22} color="#111827" />
             </TouchableOpacity>
@@ -1080,6 +1057,8 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             initialServiceType={serviceType === 'industrial' ? 'INDUSTRIAL' : 'PERSONAL'}
             initialTotalWeight={serviceType === 'personal' ? calculateTotalWeight() : 0}
             unregisteredCount={serviceType === 'industrial' ? unregisteredCount : 0}
+            // Indicar al formulario que estamos editando cuando corresponda
+            guideToEdit={isEditMode ? { id: route?.params?.guideId } : undefined}
           />
         </View>
       </Modal>

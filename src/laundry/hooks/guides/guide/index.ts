@@ -6,6 +6,7 @@ export * from './useGuide';
 export * from './useTodayGuides';
 export * from './useCreateGuide';
 export * from './useUpdateGuideStatus';
+export * from './useUpdateGuide';
 export * from './useDeleteGuide';
 export * from './useScanQr';
 export * from './usePrintGuide';

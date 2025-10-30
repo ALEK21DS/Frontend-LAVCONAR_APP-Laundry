@@ -5,6 +5,9 @@ import { Button, Input, Dropdown } from '@/components/common';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { useBranchOffices } from '@/laundry/hooks/branch-offices';
 import { useCreateRfidScan, useCreateGuide, useCreateGuideGarment } from '@/laundry/hooks/guides';
+import { useUpdateGuide } from '@/laundry/hooks/guides/guide';
+import { useUpdateGuideGarment } from '@/laundry/hooks/guides/guide-garments';
+import { useUpdateRfidScan } from '@/laundry/hooks/guides/rfid-scan';
 import { safeParseFloat, safeParseInt } from '@/helpers/validators.helper';
 
 type ScanFormProps = {
@@ -15,6 +18,11 @@ type ScanFormProps = {
   guideGarmentData: any; // Datos del detalle guardados en memoria
   scannedTags?: string[];
   onNavigate?: (route: string, params?: any) => void;
+  initialRfidScan?: { scan_type?: string; location?: string; differences_detected?: string } | undefined;
+  editContext?: { guideId: string; guideGarmentId?: string; rfidScanId?: string } | undefined;
+  initialGuide?: any;
+  initialGuideGarment?: any;
+  initialRfidScanFull?: any;
 };
 
 export const ScanForm: React.FC<ScanFormProps> = ({
@@ -24,13 +32,21 @@ export const ScanForm: React.FC<ScanFormProps> = ({
   guideData,
   guideGarmentData,
   scannedTags = [],
-  onNavigate
+  onNavigate,
+  initialRfidScan,
+  editContext,
+  initialGuide,
+  initialGuideGarment,
+  initialRfidScanFull
 }) => {
   const { user } = useAuthStore();
   const { sucursales } = useBranchOffices();
   const { createGuideAsync, isCreating: isCreatingGuide } = useCreateGuide();
   const { createGuideGarmentAsync, isCreating: isCreatingGuideGarment } = useCreateGuideGarment();
   const { createRfidScanAsync, isCreating: isCreatingRfidScan } = useCreateRfidScan();
+  const { updateGuideAsync } = useUpdateGuide();
+  const { updateGuideGarmentAsync } = useUpdateGuideGarment();
+  const { updateRfidScanAsync } = useUpdateRfidScan();
   
   // Obtener la sucursal del usuario logueado
   const branchOfficeId = user?.branch_office_id || user?.sucursalId || '';
@@ -40,11 +56,11 @@ export const ScanForm: React.FC<ScanFormProps> = ({
   const [formData, setFormData] = useState({
     branch_offices_id: branchOfficeId,
     branch_office_name: branchOfficeName,
-    scan_type: '',
+    scan_type: initialRfidScan?.scan_type || '',
     scanned_quantity: scannedTags.length || 0,
     scanned_rfid_codes: scannedTags,
-    location: '',
-    differences_detected: '',
+    location: initialRfidScan?.location || '',
+    differences_detected: initialRfidScan?.differences_detected || '',
   });
 
   const scanTypes = [
@@ -56,6 +72,24 @@ export const ScanForm: React.FC<ScanFormProps> = ({
     { label: 'Conteo Final', value: 'FINAL_COUNT' },
     { label: 'Entrega', value: 'DELIVERY' },
   ];
+
+  const buildDiff = (prev: any, curr: any) => {
+    const diff: any = {};
+    if (!prev) return curr; // si no hay previo, retornar todo (para crear)
+    for (const key of Object.keys(curr)) {
+      const prevVal = prev[key];
+      const currVal = curr[key];
+      const isArray = Array.isArray(prevVal) || Array.isArray(currVal);
+      if (isArray) {
+        const a = Array.isArray(prevVal) ? prevVal : [];
+        const b = Array.isArray(currVal) ? currVal : [];
+        if (JSON.stringify(a) !== JSON.stringify(b)) diff[key] = currVal;
+        continue;
+      }
+      if (currVal !== prevVal) diff[key] = currVal;
+    }
+    return diff;
+  };
 
   const handleSubmit = async () => {
     // Validar campos obligatorios
@@ -71,11 +105,19 @@ export const ScanForm: React.FC<ScanFormProps> = ({
     let createdGuide: any = null;
 
     try {
-      // ========== PASO 1: CREAR GUÍA ==========
-      createdGuide = await createGuideAsync(guideData);
+      // ========== PASO 1: CREAR/ACTUALIZAR GUÍA ==========
+      if (editContext?.guideId) {
+        const guideDiff = buildDiff(initialGuide, guideData);
+        if (Object.keys(guideDiff).length > 0) {
+          await updateGuideAsync({ id: editContext.guideId, data: guideDiff });
+        }
+        createdGuide = { id: editContext.guideId };
+      } else {
+        createdGuide = await createGuideAsync(guideData);
+      }
 
       try {
-        // ========== PASO 2: CREAR DETALLE ==========
+        // ========== PASO 2: CREAR/ACTUALIZAR DETALLE ==========
         const guideGarmentPayload = {
           guide_id: createdGuide.id,
           branch_offices_id: guideGarmentData.branch_office_id,
@@ -89,11 +131,19 @@ export const ScanForm: React.FC<ScanFormProps> = ({
           quantity: safeParseInt(guideGarmentData.quantity) || 1,
           novelties: guideGarmentData.incidents ? guideGarmentData.incidents.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
           label_printed: guideGarmentData.label_printed || false,
-        };
-        await createGuideGarmentAsync(guideGarmentPayload);
+        } as any;
+
+        if (editContext?.guideGarmentId) {
+          const ggDiff = buildDiff(initialGuideGarment, guideGarmentPayload);
+          if (Object.keys(ggDiff).length > 0) {
+            await updateGuideGarmentAsync({ id: editContext.guideGarmentId, data: ggDiff });
+          }
+        } else {
+          await createGuideGarmentAsync(guideGarmentPayload);
+        }
 
         try {
-          // ========== PASO 3: CREAR ESCANEO RFID ==========
+          // ========== PASO 3: CREAR/ACTUALIZAR ESCANEO RFID ==========
           // NOTA: user_id NO se envía, el backend lo obtiene del token JWT
           
           const rfidScanData = {
@@ -105,9 +155,16 @@ export const ScanForm: React.FC<ScanFormProps> = ({
             unexpected_codes: [],
             location: formData.location || undefined,
             differences_detected: formData.differences_detected || undefined,
-          };
-          
-          await createRfidScanAsync(rfidScanData);
+          } as any;
+
+          if (editContext?.rfidScanId) {
+            const rsDiff = buildDiff(initialRfidScanFull, rfidScanData);
+            if (Object.keys(rsDiff).length > 0) {
+              await updateRfidScanAsync({ id: editContext.rfidScanId, data: rsDiff });
+            }
+          } else {
+            await createRfidScanAsync(rfidScanData);
+          }
 
           // ✅ TODO EXITOSO
           onSubmit(formData);
@@ -161,6 +218,7 @@ export const ScanForm: React.FC<ScanFormProps> = ({
               onValueChange={(value) => setFormData(prev => ({ ...prev, scan_type: value }))}
               placeholder="Seleccionar tipo de escaneo"
               icon="scan-outline"
+              disabled={!!editContext?.rfidScanId}
             />
           </View>
 

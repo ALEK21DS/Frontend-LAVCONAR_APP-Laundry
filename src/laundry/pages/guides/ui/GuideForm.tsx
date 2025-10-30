@@ -344,7 +344,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           value={serviceType}
           onValueChange={setServiceType}
           icon="cog-outline"
-          disabled={!!initialServiceType}
+          disabled={!!initialServiceType || !!guideToEdit}
         />
 
         {/* Campos base que siempre aparecen */}
@@ -688,12 +688,14 @@ export const GuideForm: React.FC<GuideFormProps> = ({
 
       <View className="h-3" />
       <Button
-        title="Crear Guía"
+        title={guideToEdit ? 'Editar Guía' : 'Crear Guía'}
         onPress={async () => {
           // Validar campos obligatorios según el esquema de Prisma
-          if (!selectedClientId) {
-            Alert.alert('Error', 'Debe seleccionar un cliente');
-            return;
+          if (!guideToEdit) {
+            if (!selectedClientId) {
+              Alert.alert('Error', 'Debe seleccionar un cliente');
+              return;
+            }
           }
           if (!branchOfficeId) {
             Alert.alert('Error', 'No se ha asignado una sucursal al usuario');
@@ -734,11 +736,21 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             }
           }
           
-          if (guideItems.length === 0) {
-            Alert.alert('Error', 'Debe escanear al menos una prenda');
-            return;
+          if (!guideToEdit) {
+            if (guideItems.length === 0) {
+              Alert.alert('Error', 'Debe escanear al menos una prenda');
+              return;
+            }
           }
           
+          // Normalizar campos numéricos antes de validar
+          const totalBundlesExpectedClean = sanitizeNumericInput(totalBundlesExpected);
+          const totalBundlesReceivedClean = sanitizeNumericInput(totalBundlesReceived);
+          const bundlesDiscrepancyClean = sanitizeNumericInput(bundlesDiscrepancy);
+          if (totalBundlesExpected !== totalBundlesExpectedClean) setTotalBundlesExpected(totalBundlesExpectedClean);
+          if (totalBundlesReceived !== totalBundlesReceivedClean) setTotalBundlesReceived(totalBundlesReceivedClean);
+          if (bundlesDiscrepancy !== bundlesDiscrepancyClean) setBundlesDiscrepancy(bundlesDiscrepancyClean);
+
           // Validar peso si existe
           if (totalWeight && !isNonNegative(totalWeight)) {
             Alert.alert('Error', 'El peso total debe ser un número válido mayor o igual a 0');
@@ -746,15 +758,15 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           }
           
           // Validar campos numéricos opcionales
-          if (totalBundlesExpected && !isNonNegative(totalBundlesExpected)) {
+          if (totalBundlesExpectedClean && !isNonNegative(totalBundlesExpectedClean)) {
             Alert.alert('Error', 'Los bultos esperados deben ser un número válido mayor o igual a 0');
             return;
           }
-          if (totalBundlesReceived && !isNonNegative(totalBundlesReceived)) {
+          if (totalBundlesReceivedClean && !isNonNegative(totalBundlesReceivedClean)) {
             Alert.alert('Error', 'Los bultos recibidos deben ser un número válido mayor o igual a 0');
             return;
           }
-          if (bundlesDiscrepancy && !isNonNegative(bundlesDiscrepancy)) {
+          if (bundlesDiscrepancyClean && !isNonNegative(bundlesDiscrepancyClean)) {
             Alert.alert('Error', 'La discrepancia debe ser un número válido mayor o igual a 0');
             return;
           }
@@ -773,9 +785,9 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               total_garments: totalGarments,
               notes: notes || undefined,
               // Campos opcionales numéricos
-              total_bundles_expected: safeParseInt(totalBundlesExpected),
-              total_bundles_received: safeParseInt(totalBundlesReceived),
-              bundles_discrepancy: safeParseInt(bundlesDiscrepancy),
+              total_bundles_expected: safeParseInt(totalBundlesExpectedClean),
+              total_bundles_received: safeParseInt(totalBundlesReceivedClean),
+              bundles_discrepancy: safeParseInt(bundlesDiscrepancyClean),
             };
 
             // Guardar en estado y continuar al formulario de detalles
@@ -785,7 +797,11 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         isLoading={isCreatingGuide || !!submitting}
         fullWidth
         size="md"
-        disabled={!selectedClientId || !collectionDate || guideItems.length === 0 || !serviceType || !chargeType || !branchOfficeId}
+        disabled={
+          guideToEdit
+            ? (!collectionDate || !serviceType || !chargeType || !branchOfficeId)
+            : (!selectedClientId || !collectionDate || guideItems.length === 0 || !serviceType || !chargeType || !branchOfficeId)
+        }
         icon={<Icon name="checkmark-circle-outline" size={18} color="white" />}
       />
 
@@ -843,8 +859,32 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               // Pasar la sucursal del usuario logueado
               branch_office_id: branchOfficeId,
               branch_office_name: branchOfficeName,
+              // Prefill desde el primer detalle existente en modo edición
+              ...(guideToEdit && existingGarments.length > 0 ? {
+                garment_type: existingGarments[0].garment_type,
+                predominant_color: existingGarments[0].predominant_color,
+                requested_services: existingGarments[0].requested_services,
+                initial_state_description: existingGarments[0].initial_state_desc,
+                additional_cost: existingGarments[0].additional_cost ? String(existingGarments[0].additional_cost) : '0',
+                observations: existingGarments[0].observations || '',
+                label_printed: !!existingGarments[0].label_printed,
+                incidents: Array.isArray(existingGarments[0].novelties) ? existingGarments[0].novelties.join(', ') : '',
+              } : {})
             }}
-            scannedTags={guideItems.map(item => item.tagEPC)}
+            scannedTags={guideToEdit ? existingRfids : guideItems.map(item => item.tagEPC)}
+            initialRfidScan={guideToEdit && rfidScan ? {
+              scan_type: rfidScan.scan_type,
+              location: rfidScan.location,
+              differences_detected: rfidScan.differences_detected,
+            } : undefined}
+            editContext={guideToEdit ? {
+              guideId: guideToEdit.id,
+              guideGarmentId: existingGarments[0]?.id,
+              rfidScanId: rfidScan?.id,
+            } : undefined}
+            initialGuide={guideToEdit || undefined}
+            initialGuideGarment={existingGarments[0] || undefined}
+            initialRfidScanFull={rfidScan || undefined}
             onNavigate={onNavigate}
           />
         </View>
