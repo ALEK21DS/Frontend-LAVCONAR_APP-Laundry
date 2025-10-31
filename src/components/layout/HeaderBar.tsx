@@ -42,8 +42,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
         {onLogoutPress && (
           <TouchableOpacity
             onPress={onLogoutPress}
-            className="w-9 h-9 rounded-lg bg-white/20 items-center justify-center">
-            <IonIcon name="log-out-outline" size={18} color="#ffffff" />
+            className="w-12 h-12 rounded-lg bg-white/20 items-center justify-center mr-2">
+            <IonIcon name="log-out-outline" size={24} color="#ffffff" />
           </TouchableOpacity>
         )}
       </View>

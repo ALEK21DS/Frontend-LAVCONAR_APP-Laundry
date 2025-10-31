@@ -15,5 +15,6 @@ export type MainStackParamList = {
   ScanClothes: { mode?: 'garment' | 'guide' | 'process'; guideId?: string; processType?: string } | undefined;
   ScanProcesses: undefined;
   Processes: undefined;
+  Incidents: undefined;
   GarmentValidation: { guideId: string; processType: string; scannedTags: string[] };
 };

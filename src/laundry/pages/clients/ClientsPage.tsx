@@ -222,7 +222,7 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
       <View className="px-4 pt-4 flex-1">
         <View className="flex-row items-center mb-4">
           <Text className="text-lg font-bold text-gray-900 flex-1">CLIENTES</Text>
-          <TouchableOpacity onPress={openCreate} className="w-10 h-10 rounded-lg items-center justify-center" style={{ backgroundColor: '#0b1f36' }}>
+          <TouchableOpacity onPress={openCreate} className="w-10 h-8 rounded-lg items-center justify-center" style={{ backgroundColor: '#0b1f36' }}>
             <IonIcon name="add" size={20} color="#ffffff" />
           </TouchableOpacity>
         </View>
@@ -230,7 +230,7 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
         <View className="mb-4 flex-row items-center">
           <View className="flex-1 flex-row items-center bg-white border border-gray-200 rounded-lg px-3">
             <IonIcon name="search-outline" size={18} color="#6B7280" />
-            <TextInput className="flex-1 h-10 ml-2 text-gray-900" placeholder="Buscar por nombre, cédula, email o acrónimo" placeholderTextColor="#9CA3AF" value={query} onChangeText={setQuery} autoCorrect={false} />
+            <TextInput className="flex-1 h-10 ml-2 text-gray-900" placeholder="Nombre, cédula o email" placeholderTextColor="#9CA3AF" value={query} onChangeText={setQuery} autoCorrect={false} />
             {query.length > 0 && (
               <TouchableOpacity onPress={() => setQuery('')}>
                 <IonIcon name="close-circle" size={18} color="#9CA3AF" />
@@ -240,7 +240,7 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
           
           <TouchableOpacity 
             onPress={toggleStatusFilter}
-            className="ml-2 px-3 h-10 rounded-lg items-center justify-center"
+            className="ml-2 px-3 h-8 rounded-lg items-center justify-center"
             style={{ backgroundColor: getStatusFilterColor() }}
           >
             <Text className="text-white text-xs font-semibold">

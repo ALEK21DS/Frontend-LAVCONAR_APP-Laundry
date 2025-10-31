@@ -136,7 +136,7 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
           <View className="flex-row items-center justify-between p-6 border-b border-gray-200">
             <View>
               <Text className="text-2xl font-bold text-gray-900">
-                Guías - {getProcessTypeLabel(processType)}
+                Guías
               </Text>
               <Text className="text-sm text-gray-600 mt-1">
                 Selecciona una guía para continuar
@@ -152,7 +152,7 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
 
           {/* Search */}
           <View className="px-6 py-4">
-            <View className="flex-row items-center bg-gray-100 rounded-lg px-3 py-2 mb-3">
+            <View className="flex-row items-center bg-gray-100 rounded-lg px-3 py-1.5 mb-3">
               <Icon name="search-outline" size={18} color="#6B7280" />
               <TextInput
                 className="flex-1 ml-2 text-gray-900"

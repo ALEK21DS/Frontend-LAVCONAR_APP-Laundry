@@ -4,7 +4,7 @@ import IonIcon from 'react-native-vector-icons/Ionicons';
 import { ServiceTypeModal } from '@/laundry/components/ServiceTypeModal';
 
 type TabItem = {
-  key: 'Dashboard' | 'Clients' | 'ScanClothes' | 'Guides' | 'Processes';
+  key: 'Dashboard' | 'Clients' | 'ScanClothes' | 'Guides' | 'Processes' | 'Incidents';
   label: string;
   icon: string;
 };
@@ -34,6 +34,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpen
   const [guidesRadialOpen, setGuidesRadialOpen] = useState(false);
   const guidesAnimUp = useRef(new Animated.Value(0)).current;
   const guidesAnimDiag = useRef(new Animated.Value(0)).current;
+  
+  const [processesRadialOpen, setProcessesRadialOpen] = useState(false);
+  const processesAnimUp = useRef(new Animated.Value(0)).current;
+  const processesAnimDiag = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const to1 = Animated.timing(animLeft, { toValue: radialOpen ? 1 : 0, duration: 160, useNativeDriver: true });
@@ -59,6 +63,18 @@ export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpen
       Animated.stagger(40, [diag, up]).start();
     }
   }, [guidesRadialOpen, guidesAnimUp, guidesAnimDiag]);
+
+  useEffect(() => {
+    const up = Animated.timing(processesAnimUp, { toValue: processesRadialOpen ? 1 : 0, duration: 150, useNativeDriver: true });
+    const diag = Animated.timing(processesAnimDiag, { toValue: processesRadialOpen ? 1 : 0, duration: 150, useNativeDriver: true });
+    if (processesRadialOpen) {
+      // Abrir de abajo hacia arriba (primero Procesos, luego Incidentes)
+      Animated.stagger(60, [up, diag]).start();
+    } else {
+      // Cerrar de arriba hacia abajo (primero Incidentes, luego Procesos)
+      Animated.stagger(40, [diag, up]).start();
+    }
+  }, [processesRadialOpen, processesAnimUp, processesAnimDiag]);
 
   const handleServiceTypeSelect = (serviceType: 'industrial' | 'personal') => {
     setShowServiceTypeModal(false);
@@ -138,6 +154,59 @@ export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpen
             </View>
           );
         }
+        const isProcesses = tab.key === 'Processes';
+        if (isProcesses) {
+          return (
+            <View key={tab.key} className="flex-1 items-center" style={{ position: 'relative' }}>
+              {/* Overlay para cerrar */}
+              {processesRadialOpen && (
+                <View
+                  style={{ position: 'absolute', left: -400, right: -400, bottom: 40, top: -600, zIndex: 30 }}
+                  // @ts-ignore responder props
+                  onStartShouldSetResponder={() => true}
+                  onResponderRelease={() => setProcessesRadialOpen(false)}
+                />
+              )}
+
+              {/* Botón Processes principal */}
+              <TouchableOpacity
+                className="items-center"
+                activeOpacity={0.8}
+                onPress={() => setProcessesRadialOpen(prev => !prev)}
+                style={{ zIndex: 40 }}
+              >
+                <IonIcon name={tab.icon} size={22} color={active === 'Processes' || active === 'Incidents' ? '#0b1f36' : '#6B7280'} />
+                <Text className={`text-xs mt-1 ${active === 'Processes' || active === 'Incidents' ? 'text-[#0b1f36]' : 'text-gray-500'}`}>{tab.label}</Text>
+              </TouchableOpacity>
+
+              {/* Submenú vertical: arriba = Procesos, arriba de esa = Incidentes */}
+              <>
+                <Animated.View style={{ position: 'absolute', bottom: 10, transform: [{ translateY: processesAnimUp.interpolate({ inputRange: [0,1], outputRange: [0,-48] }) }, { scale: processesAnimUp }], opacity: processesAnimUp, zIndex: 50 }} pointerEvents={processesRadialOpen ? 'auto' : 'none'}>
+                  <TouchableOpacity
+                    className="w-12 h-12 rounded-full items-center justify-center"
+                    style={{ backgroundColor: '#143b64', elevation: 10 }}
+                    onPress={() => { setProcessesRadialOpen(false); onNavigate('Processes'); }}
+                    activeOpacity={0.9}
+                  >
+                    <IonIcon name="sync-outline" size={18} color="#ffffff" />
+                  </TouchableOpacity>
+                </Animated.View>
+
+                <Animated.View style={{ position: 'absolute', bottom: 15, transform: [{ translateY: processesAnimDiag.interpolate({ inputRange: [0,1], outputRange: [0,-96] }) }, { scale: processesAnimDiag }], opacity: processesAnimDiag, zIndex: 50 }} pointerEvents={processesRadialOpen ? 'auto' : 'none'}>
+                  <TouchableOpacity
+                    className="w-12 h-12 rounded-full items-center justify-center"
+                    style={{ backgroundColor: '#143b64', elevation: 10 }}
+                    onPress={() => { setProcessesRadialOpen(false); onNavigate('Incidents' as any); }}
+                    activeOpacity={0.9}
+                  >
+                    <IonIcon name="warning-outline" size={18} color="#ffffff" />
+                  </TouchableOpacity>
+                </Animated.View>
+              </>
+            </View>
+          );
+        }
+        
         const isGuides = tab.key === 'Guides';
         if (isGuides) {
           return (
@@ -195,7 +264,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpen
           <TouchableOpacity
             key={tab.key}
             className="flex-1 items-center"
-            onPress={() => { if (!radialOpen && !guidesRadialOpen) onNavigate(tab.key); }}
+            onPress={() => { if (!radialOpen && !guidesRadialOpen && !processesRadialOpen) onNavigate(tab.key); }}
             activeOpacity={0.8}
           >
             <IonIcon name={tab.icon} size={22} color={isActive ? '#0b1f36' : '#6B7280'} />

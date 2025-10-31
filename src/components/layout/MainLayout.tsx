@@ -11,7 +11,7 @@ import { ServiceTypeModal } from '@/laundry/components/ServiceTypeModal';
 import { useUpdateRfidScan, useGetAllRfidScans } from '@/laundry/hooks/guides/rfid-scan';
 
 interface MainLayoutProps {
-  activeTab: 'Dashboard' | 'Clients' | 'ScanClothes' | 'Guides' | 'Processes';
+  activeTab: 'Dashboard' | 'Clients' | 'ScanClothes' | 'Guides' | 'Processes' | 'Incidents';
   onNavigate: (route: MainLayoutProps['activeTab'], params?: any) => void;
   children: React.ReactNode;
 }

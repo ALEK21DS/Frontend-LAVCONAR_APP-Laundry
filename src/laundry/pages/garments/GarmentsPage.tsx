@@ -9,9 +9,10 @@ import { GarmentForm } from './ui/GarmentForm';
 import { GarmentDetailsModal } from './ui/GarmentDetailsModal';
 import { rfidModule } from '@/lib/rfid/rfid.module';
 import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
-import { useGarments, useCreateGarment, useUpdateGarment } from '@/laundry/hooks/guides';
+import { useGarments, useCreateGarment, useUpdateGarment, useScanGarmentQr } from '@/laundry/hooks/guides';
 import { garmentsApi } from '@/laundry/api/garments/garments.api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { QrScanner } from '@/laundry/components';
 
 type GarmentsPageProps = { navigation: NativeStackNavigationProp<any> };
 
@@ -33,6 +34,9 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
   const [isScanning, setIsScanning] = useState(false);
   const isScanningRef = useRef(false);
   const seenSetRef = useRef<Set<string>>(new Set());
+  // QR
+  const [showQrScanner, setShowQrScanner] = useState(false);
+  const { scanGarmentQrAsync, isScanning: isScanningQr } = useScanGarmentQr();
 
   // Recargar la lista de prendas cada vez que la pantalla recibe foco
   useFocusEffect(
@@ -73,8 +77,12 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
         rfidCode: selectedGarment.rfid_code,
         description: selectedGarment.description,
         color: selectedGarment.color,
+        garmentType: selectedGarment.garment_type,
+        brand: selectedGarment.brand,
+        status: selectedGarment.is_active ? 'ACTIVE' : 'INACTIVE',
+        physicalState: selectedGarment.physical_state,
         observations: selectedGarment.observations,
-        weight: selectedGarment.weight,
+        weight: selectedGarment.weight?.toString(),
       });
       setRfidCode(selectedGarment.rfid_code || '');
       setFormOpen(true);
@@ -93,6 +101,14 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
       <View className="px-4 pt-4 flex-1">
         <View className="flex-row items-center mb-4">
           <Text className="text-lg font-bold text-gray-900 flex-1">PRENDAS</Text>
+          {/* Botón Escanear QR */}
+          <TouchableOpacity 
+            onPress={() => setShowQrScanner(true)} 
+            disabled={isScanningQr}
+            className="w-10 h-10 rounded-lg bg-green-600 items-center justify-center active:bg-green-700"
+          >
+            <IonIcon name="qr-code-outline" size={20} color="#ffffff" />
+          </TouchableOpacity>
         </View>
 
         <View className="mb-4 flex-row items-center bg-white border border-gray-200 rounded-lg px-3">
@@ -348,6 +364,10 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
                     data: {
                       description: data.description,
                       color: data.color,
+                      garment_type: data.garmentType,
+                      brand: data.brand,
+                      status: data.status,
+                      physical_state: data.physicalState,
                       observations: data.observations,
                       weight: data.weight,
                     }
@@ -383,6 +403,9 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
                   rfid_code: finalRfidCode,
                   description: data.description,
                   color: data.color,
+                  garment_type: data.garmentType,
+                  brand: data.brand,
+                  physical_state: data.physicalState,
                   observations: data.observations,
                   weight: data.weight,
                 });
@@ -399,6 +422,9 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
                       rfid_code: data.rfidCode || rfidCode,
                       description: data.description,
                       color: data.color,
+                      garment_type: data.garmentType,
+                      brand: data.brand,
+                      physical_state: data.physicalState,
                       observations: data.observations,
                       weight: data.weight,
                     });
@@ -430,6 +456,28 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
           />
         </View>
       </Modal>
+      {/* Escáner QR */}
+      {showQrScanner && (
+        <QrScanner
+          visible={showQrScanner}
+          onClose={() => setShowQrScanner(false)}
+          onScan={async (qrData: string) => {
+            setShowQrScanner(false);
+            try {
+              const garment = await scanGarmentQrAsync(qrData);
+              if (garment) {
+                setSelectedGarment(garment);
+                setDetailsOpen(true);
+              } else {
+                Alert.alert('No encontrado', 'No se encontró la prenda para este QR');
+              }
+            } catch (error: any) {
+              const message = error?.message || 'No se pudo escanear el código QR de la prenda';
+              Alert.alert('Error', message);
+            }
+          }}
+        />
+      )}
     </MainLayout>
   );
 };

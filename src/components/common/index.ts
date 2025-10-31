@@ -4,4 +4,5 @@ export * from './Dropdown';
 export * from './Card';
 export * from './Container';
 export * from './Badge';
+export * from './AutocompleteInput';
 export * from '../ui/loading-spinner';

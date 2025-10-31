@@ -7,4 +7,5 @@ export * from './useCreateGarment';
 export * from './useUpdateGarment';
 export * from './useDeleteGarment';
 export * from './useGarmentsByRfidCodes';
+export * from './useScanGarmentQr';
 

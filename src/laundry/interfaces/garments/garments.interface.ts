@@ -4,6 +4,9 @@ export interface Garment {
   branch_offices_id?: string;
   description?: string;
   color?: string;
+  garment_type?: string;
+  brand?: string;
+  physical_state?: string;
   weight?: number; // Peso de la prenda en kg
   observations?: string;
   is_active: boolean;
@@ -18,6 +21,9 @@ export interface CreateGarmentDto {
   branch_offices_id?: string;
   description?: string;
   color?: string;
+  garment_type?: string;
+  brand?: string;
+  physical_state?: string;
   weight?: number;
   observations?: string;
 }
@@ -25,6 +31,9 @@ export interface CreateGarmentDto {
 export interface UpdateGarmentDto {
   description?: string;
   color?: string;
+  garment_type?: string;
+  brand?: string;
+  physical_state?: string;
   observations?: string;
   weight?: number;
   status?: string;

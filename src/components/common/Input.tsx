@@ -44,7 +44,7 @@ export const Input: React.FC<InputProps> = ({
       <View
         className={`
           flex-row items-center
-          border rounded-lg px-4
+          border rounded-lg px-4 py-2
           ${variant === 'dark' ? 'bg-[#1b1f25]' : 'bg-white'}
         `.trim()}
         style={{
@@ -55,25 +55,27 @@ export const Input: React.FC<InputProps> = ({
             : variant === 'dark' 
             ? '#4B5563' 
             : '#D1D5DB',
-          backgroundColor: error ? '#FEF2F2' : variant === 'dark' ? '#1b1f25' : '#FFFFFF'
+          backgroundColor: error ? '#FEF2F2' : variant === 'dark' ? '#1b1f25' : '#FFFFFF',
+          minHeight: 44,
         }}>
         {icon && (
           <Icon
             name={icon}
-            size={20}
+            size={18}
             color={isFocused ? '#3B82F6' : error ? '#EF4444' : '#6B7280'}
             style={{ marginRight: 8 }}
           />
         )}
 
         <TextInput
-          className={`flex-1 py-3 ${
+          className={`flex-1 ${
             variant === 'dark' ? 'text-gray-100' : 'text-gray-900'
-          } text-base ${className}`.trim()}
+          } text-sm ${className}`.trim()}
           placeholderTextColor="#9CA3AF"
           secureTextEntry={shouldShowPassword}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
+          style={{ paddingVertical: 8, fontSize: 14 }}
           {...props}
         />
 
