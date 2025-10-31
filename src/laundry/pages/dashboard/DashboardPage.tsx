@@ -39,7 +39,7 @@ import { useDashboardStats, useRecentActivity } from '@/laundry/hooks/dashboard'
               <View className="w-1/2 px-2 mb-4">
                 <Card variant="elevated" padding="md">
                   <View className="items-center">
-                    <Icon name="people-outline" size={32} color="#3B82F6" />
+                    <Icon name="people-outline" size={28} color="#8EB021" />
                     <Text className="text-2xl font-bold text-gray-900 mt-2">{stats.clients || 0}</Text>
                     <Text className="text-sm text-gray-500">Clientes</Text>
                   </View>
@@ -48,7 +48,7 @@ import { useDashboardStats, useRecentActivity } from '@/laundry/hooks/dashboard'
               <View className="w-1/2 px-2 mb-4">
                 <Card variant="elevated" padding="md">
                   <View className="items-center">
-                    <Icon name="document-text-outline" size={32} color="#F59E0B" />
+                    <Icon name="document-text-outline" size={28} color="#8EB021" />
                     <Text className="text-2xl font-bold text-gray-900 mt-2">{stats.guides || 0}</Text>
                     <Text className="text-sm text-gray-500">Guías</Text>
                   </View>
@@ -57,7 +57,7 @@ import { useDashboardStats, useRecentActivity } from '@/laundry/hooks/dashboard'
               <View className="w-1/2 px-2 mb-4">
                 <Card variant="elevated" padding="md">
                   <View className="items-center">
-                    <Icon name="shirt-outline" size={32} color="#10B981" />
+                    <Icon name="shirt-outline" size={28} color="#8EB021" />
                     <Text className="text-2xl font-bold text-gray-900 mt-2">{stats.garments || 0}</Text>
                     <Text className="text-sm text-gray-500">Prendas</Text>
                   </View>
@@ -66,7 +66,7 @@ import { useDashboardStats, useRecentActivity } from '@/laundry/hooks/dashboard'
               <View className="w-1/2 px-2 mb-4">
                 <Card variant="elevated" padding="md">
                   <View className="items-center">
-                    <Icon name="construct-outline" size={32} color="#6366F1" />
+                    <Icon name="construct-outline" size={28} color="#8EB021" />
                     <Text className="text-2xl font-bold text-gray-900 mt-2">{stats.processes || 0}</Text>
                     <Text className="text-sm text-gray-500">Procesos</Text>
                   </View>
@@ -80,7 +80,7 @@ import { useDashboardStats, useRecentActivity } from '@/laundry/hooks/dashboard'
             <Text className="text-xl font-bold text-gray-900 mb-3">Actividad Reciente</Text>
             {activitiesLoading ? (
               <View className="flex-1 items-center justify-center py-8">
-                <ActivityIndicator size="large" color="#0b1f36" />
+                <ActivityIndicator size="large" color="#8EB021" />
               </View>
             ) : activities.length === 0 ? (
               <Card variant="outlined" padding="lg">

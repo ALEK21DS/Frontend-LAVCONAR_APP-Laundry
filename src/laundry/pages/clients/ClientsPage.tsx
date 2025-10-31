@@ -144,7 +144,7 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
   const getStatusFilterColor = () => {
     switch (statusFilter) {
       case 'active':
-        return '#10B981'; // Verde
+        return '#8EB021'; // Verde
       case 'inactive':
         return '#6B7280'; // Gris
       default:
@@ -252,7 +252,7 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
         <ScrollView className="flex-1">
           {isLoading && clients.length === 0 ? (
             <View className="flex-1 items-center justify-center py-20">
-              <ActivityIndicator size="large" color="#2563EB" />
+              <ActivityIndicator size="large" color="#8EB021" />
             </View>
           ) : !isLoading && filtered.length === 0 ? (
             <Text className="text-gray-500">No se encontraron clientes.</Text>
@@ -266,12 +266,12 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
                 >
                   <Card padding="md" variant="default">
                     <View className="flex-row items-center">
-                      <View className="bg-blue-50 rounded-lg p-2 mr-3">
-                        <IonIcon name="person-outline" size={20} color="#2563EB" />
+                      <View className="rounded-lg p-2 mr-3" style={{ backgroundColor: '#8EB02120' }}>
+                        <IonIcon name="person-outline" size={20} color="#8EB021" />
                       </View>
                       <View className="flex-1">
                         <View className="flex-row items-center justify-between mb-1">
-                          <Text className="text-gray-900 font-semibold flex-1">{client.name}</Text>
+                          <Text className="text-gray-900 flex-1">{client.name}</Text>
                           {(() => { const active = (typeof client.status === 'string' ? client.status === 'ACTIVE' : client.is_active); return (
                           <View className={`px-2 py-1 rounded-full ${active ? 'bg-green-100' : 'bg-gray-100'}`}>
                             <Text className={`text-xs font-medium ${active ? 'text-green-700' : 'text-gray-600'}`}>

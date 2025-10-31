@@ -50,8 +50,8 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
         {/* Header */}
         <View className="flex-row items-center p-4 border-b border-gray-200">
           <View className="flex-row items-center flex-1">
-            <View className="bg-blue-50 rounded-lg p-2 mr-3">
-              <IonIcon name="person-outline" size={24} color="#2563EB" />
+            <View className="rounded-lg p-2 mr-3" style={{ backgroundColor: '#8EB02120' }}>
+              <IonIcon name="person-outline" size={24} color="#8EB021" />
             </View>
             <Text className="text-xl font-bold text-gray-900">Detalles del Cliente</Text>
           </View>
@@ -65,7 +65,7 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
           {/* Información Básica */}
           <Card padding="md" variant="outlined" className="mb-4">
             <View className="flex-row items-center mb-3">
-              <IonIcon name="information-circle-outline" size={20} color="#2563EB" />
+              <IonIcon name="information-circle-outline" size={20} color="#8EB021" />
               <Text className="text-lg font-semibold text-gray-900 ml-2">Información Básica</Text>
             </View>
 
@@ -97,7 +97,7 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
           {/* Información de Contacto */}
           <Card padding="md" variant="outlined" className="mb-4">
             <View className="flex-row items-center mb-3">
-              <IonIcon name="call-outline" size={20} color="#2563EB" />
+              <IonIcon name="call-outline" size={20} color="#8EB021" />
               <Text className="text-lg font-semibold text-gray-900 ml-2">Información de Contacto</Text>
             </View>
 
@@ -136,7 +136,7 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
           {/* Sucursal Asignada */}
           <Card padding="md" variant="outlined" className="mb-4">
             <View className="flex-row items-center mb-3">
-              <IonIcon name="business-outline" size={20} color="#2563EB" />
+              <IonIcon name="business-outline" size={20} color="#8EB021" />
               <Text className="text-lg font-semibold text-gray-900 ml-2">Sucursal Asignada</Text>
             </View>
             <Card padding="md" className="bg-blue-50 border-blue-200">
@@ -148,7 +148,7 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
           {/* Información de Registro */}
           <Card padding="md" variant="outlined" className="mb-4">
             <View className="flex-row items-center mb-3">
-              <IonIcon name="calendar-outline" size={20} color="#2563EB" />
+              <IonIcon name="calendar-outline" size={20} color="#8EB021" />
               <Text className="text-lg font-semibold text-gray-900 ml-2">Información de Registro</Text>
             </View>
             <View className="flex-row flex-wrap -mx-2">

@@ -96,7 +96,7 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
 
         {isLoading ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color="#0b1f36" />
+            <ActivityIndicator size="large" color="#8EB021" />
           </View>
         ) : (
           <>
@@ -116,8 +116,8 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
                     >
                       <Card padding="md" variant="default">
                         <View className="flex-row items-center">
-                          <View className="bg-purple-50 rounded-lg p-2 mr-3">
-                            <IonIcon name="construct-outline" size={20} color="#8B5CF6" />
+                          <View className="rounded-lg p-2 mr-3" style={{ backgroundColor: '#8EB02120' }}>
+                            <IonIcon name="construct-outline" size={20} color="#8EB021" />
                           </View>
                           <View className="flex-1">
                             <Text className="text-gray-900 font-semibold">

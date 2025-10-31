@@ -114,7 +114,7 @@ export const LoginPage: React.FC = () => {
 
             {isLoadingSucursales ? (
               <View className="py-4">
-                <ActivityIndicator size="small" color="#3B82F6" />
+                <ActivityIndicator size="small" color="#8EB021" />
                 <Text className="text-center text-gray-400 mt-2">Cargando sucursales...</Text>
               </View>
             ) : (

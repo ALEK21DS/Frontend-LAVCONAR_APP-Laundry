@@ -101,7 +101,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpen
                 {/* Arriba (Prenda)  */}
                 <Animated.View style={{ position: 'absolute', top: -115, transform: [{ scale: animTop }], opacity: animTop, zIndex: 50 }} pointerEvents={radialOpen ? 'auto' : 'none'}>
                   <TouchableOpacity activeOpacity={0.85} onPress={() => { setRadialOpen(false); /* @ts-ignore */ onNavigate('ScanClothes' as any, { mode: 'garment' }); }}>
-                    <View style={{ width: 78, height: 78, borderRadius: 39, backgroundColor: '#10B981', elevation: 10 }} className="items-center justify-center">
+                    <View style={{ width: 78, height: 78, borderRadius: 39, backgroundColor: '#143b64', elevation: 10 }} className="items-center justify-center">
                       <IonIcon name="shirt-outline" size={22} color="#ffffff" />
                     </View>
                   </TouchableOpacity>
@@ -110,16 +110,16 @@ export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpen
                 {/* Izquierda (Guía)  */}
                 <Animated.View style={{ position: 'absolute', top: -70, left: -75, transform: [{ scale: animLeft }], opacity: animLeft, zIndex: 50 }} pointerEvents={radialOpen ? 'auto' : 'none'}>
                   <TouchableOpacity activeOpacity={0.85} onPress={() => { setRadialOpen(false); setShowServiceTypeModal(true); }}>
-                    <View style={{ width: 78, height: 78, borderRadius: 39, backgroundColor: '#F59E0B', elevation: 10 }} className="items-center justify-center">
+                    <View style={{ width: 78, height: 78, borderRadius: 39, backgroundColor: '#143b64', elevation: 10 }} className="items-center justify-center">
                       <IonIcon name="document-text-outline" size={20} color="#ffffff" />
                     </View>
                   </TouchableOpacity>
                 </Animated.View>
 
-                {/* Derecha (Proceso - morado) */}
+                {/* Derecha (Proceso - azul oscuro) */}
                 <Animated.View style={{ position: 'absolute', top: -70, right: -75, transform: [{ scale: animRight }], opacity: animRight, zIndex: 50 }} pointerEvents={radialOpen ? 'auto' : 'none'}>
                   <TouchableOpacity activeOpacity={0.85} onPress={() => { setRadialOpen(false); onOpenProcessTypeModal?.(); }}>
-                    <View style={{ width: 78, height: 78, borderRadius: 39, backgroundColor: '#7c3aed', elevation: 10 }} className="items-center justify-center">
+                    <View style={{ width: 78, height: 78, borderRadius: 39, backgroundColor: '#143b64', elevation: 10 }} className="items-center justify-center">
                       <IonIcon name="construct-outline" size={20} color="#ffffff" />
                     </View>
                   </TouchableOpacity>
@@ -168,7 +168,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpen
                 <Animated.View style={{ position: 'absolute', bottom: 10, transform: [{ translateY: guidesAnimUp.interpolate({ inputRange: [0,1], outputRange: [0,-48] }) }, { scale: guidesAnimUp }], opacity: guidesAnimUp, zIndex: 50 }} pointerEvents={guidesRadialOpen ? 'auto' : 'none'}>
                   <TouchableOpacity
                     className="w-12 h-12 rounded-full items-center justify-center"
-                    style={{ backgroundColor: '#F59E0B', elevation: 10 }}
+                    style={{ backgroundColor: '#143b64', elevation: 10 }}
                     onPress={() => { setGuidesRadialOpen(false); onNavigate('Guides'); }}
                     activeOpacity={0.9}
                   >
@@ -179,7 +179,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpen
                 <Animated.View style={{ position: 'absolute', bottom: 15, transform: [{ translateY: guidesAnimDiag.interpolate({ inputRange: [0,1], outputRange: [0,-96] }) }, { scale: guidesAnimDiag }], opacity: guidesAnimDiag, zIndex: 50 }} pointerEvents={guidesRadialOpen ? 'auto' : 'none'}>
                   <TouchableOpacity
                     className="w-12 h-12 rounded-full items-center justify-center"
-                    style={{ backgroundColor: '#10B981', elevation: 10 }}
+                    style={{ backgroundColor: '#143b64', elevation: 10 }}
                     onPress={() => { setGuidesRadialOpen(false); onNavigate('Garments' as any); }}
                     activeOpacity={0.9}
                   >

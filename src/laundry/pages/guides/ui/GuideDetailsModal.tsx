@@ -128,10 +128,10 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
         <View className="flex-1 bg-black/40" />
         <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl" style={{ elevation: 8 }}>
           {/* Header */}
-          <View className="flex-row items-center p-4 border-b border-gray-200">
+            <View className="flex-row items-center p-4 border-b border-gray-200">
             <View className="flex-row items-center flex-1">
-              <View className="bg-yellow-50 rounded-lg p-2 mr-3">
-                <IonIcon name="document-text-outline" size={24} color="#F59E0B" />
+              <View className="rounded-lg p-2 mr-3" style={{ backgroundColor: '#8EB02120' }}>
+                <IonIcon name="document-text-outline" size={24} color="#8EB021" />
               </View>
               <Text className="text-xl font-bold text-gray-900">Detalles de la Guía</Text>
             </View>
@@ -145,7 +145,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
             {/* Información Básica */}
             <Card padding="md" variant="outlined" className="mb-4">
               <View className="flex-row items-center mb-3">
-                <IonIcon name="information-circle-outline" size={20} color="#3B82F6" />
+                <IonIcon name="information-circle-outline" size={20} color="#8EB021" />
                 <Text className="text-lg font-semibold text-gray-900 ml-2">Información Básica</Text>
               </View>
 
@@ -202,7 +202,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
             {/* Información Adicional */}
             <Card padding="md" variant="outlined" className="mb-4">
               <View className="flex-row items-center mb-3">
-                <IonIcon name="shirt-outline" size={20} color="#3B82F6" />
+                <IonIcon name="shirt-outline" size={20} color="#8EB021" />
                 <Text className="text-lg font-semibold text-gray-900 ml-2">Prendas</Text>
               </View>
 
@@ -224,7 +224,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
             {/* Información de Servicio */}
             <Card padding="md" variant="outlined" className="mb-4">
               <View className="flex-row items-center mb-3">
-                <IonIcon name="settings-outline" size={20} color="#8B5CF6" />
+                <IonIcon name="settings-outline" size={20} color="#8EB021" />
                 <Text className="text-lg font-semibold text-gray-900 ml-2">Información de Servicio</Text>
               </View>
 
@@ -302,7 +302,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
                   <View className="mb-3">
                     <Text className="text-xs text-gray-500 mb-1">Vehículo</Text>
                     <View className="flex-row items-center">
-                      <IonIcon name="car-outline" size={16} color="#6B7280" />
+                <IonIcon name="car-outline" size={16} color="#8EB021" />
                       <Text className="text-base text-gray-900 font-medium ml-2">{guide.vehicle_plate}</Text>
                     </View>
                   </View>
@@ -408,7 +408,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
         <View className="flex-1 items-center justify-center bg-black/50 p-4">
           <View className="w-full max-w-sm bg-white rounded-xl p-6 shadow-xl">
             <View className="flex-row items-center justify-center mb-4">
-              <ActivityIndicator size="large" color="#3B82F6" />
+              <ActivityIndicator size="large" color="#8EB021" />
             </View>
 
             <Text className="text-xl font-bold text-gray-900 text-center mb-2">

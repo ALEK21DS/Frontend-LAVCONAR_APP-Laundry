@@ -323,9 +323,9 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
         </View>
 
         <ScrollView className="flex-1">
-          {isLoading && guides.length === 0 ? (
+            {isLoading && guides.length === 0 ? (
             <View className="flex-1 items-center justify-center py-20">
-              <ActivityIndicator size="large" color="#F59E0B" />
+              <ActivityIndicator size="large" color="#8EB021" />
             </View>
           ) : !isLoading && filtered.length === 0 ? (
             <Text className="text-gray-500">No se encontraron guías.</Text>
@@ -339,8 +339,8 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
                 >
                   <Card padding="md" variant="default">
                     <View className="flex-row items-center">
-                      <View className="bg-yellow-50 rounded-lg p-2 mr-3">
-                        <IonIcon name="document-text-outline" size={20} color="#F59E0B" />
+                      <View className="rounded-lg p-2 mr-3" style={{ backgroundColor: '#8EB02120' }}>
+                        <IonIcon name="document-text-outline" size={20} color="#8EB021" />
                       </View>
                       <View className="flex-1">
                         <Text className="text-gray-900 font-semibold">{g.guide_number}</Text>

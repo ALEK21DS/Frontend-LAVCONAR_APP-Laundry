@@ -115,7 +115,7 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
         <ScrollView className="flex-1">
           {isLoading && garments.length === 0 ? (
             <View className="flex-1 items-center justify-center py-20">
-              <ActivityIndicator size="large" color="#0b1f36" />
+              <ActivityIndicator size="large" color="#8EB021" />
             </View>
           ) : !isLoading && filtered.length === 0 ? (
             <Text className="text-gray-500">No se encontraron prendas.</Text>
@@ -129,17 +129,15 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
                   >
                     <Card padding="md" variant="default">
                       <View className="flex-row items-center">
-                        <View className="bg-blue-50 rounded-lg p-2 mr-3">
-                        <IonIcon name="shirt-outline" size={20} color="#0b1f36" />
+                      <View className="rounded-lg p-2 mr-3" style={{ backgroundColor: '#8EB02120' }}>
+                        <IonIcon name="shirt-outline" size={20} color="#8EB021" />
                         </View>
                         <View className="flex-1">
                           <Text className="text-gray-900 font-semibold">
                             {item.rfid_code || 'Sin código'}
                           </Text>
                           <Text className="text-gray-500 text-xs">{item.description || 'Sin descripción'}</Text>
-                          {item.weight && (
-                            <Text className="text-gray-400 text-xs mt-1">Peso: {item.weight} kg</Text>
-                          )}
+                          {/* Peso ocultado por solicitud */}
                         </View>
                       </View>
                     </Card>
