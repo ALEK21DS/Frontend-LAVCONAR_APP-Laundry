@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Pressable } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 
 interface AutocompleteInputProps {
@@ -24,6 +24,8 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
   const inputRef = useRef<TextInput>(null);
+  const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const suggestionContainerRef = useRef<View>(null);
 
   useEffect(() => {
     if (value.trim().length > 0) {
@@ -39,6 +41,12 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
   }, [value, suggestions]);
 
   const handleSelect = (suggestion: string) => {
+    // Cancelar cualquier timeout pendiente
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+    
     onChangeText(suggestion);
     setShowSuggestions(false);
     inputRef.current?.blur();
@@ -50,6 +58,38 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
   const handleChangeText = (text: string) => {
     onChangeText(text);
   };
+
+  const handleInputBlur = () => {
+    // Delay para permitir que el onPress de las sugerencias funcione
+    blurTimeoutRef.current = setTimeout(() => {
+      setShowSuggestions(false);
+    }, 300);
+  };
+
+  const handleInputFocus = () => {
+    // Cancelar cualquier timeout pendiente
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+    
+    if (value.trim().length > 0) {
+      const filtered = suggestions.filter(suggestion =>
+        suggestion.toLowerCase().startsWith(value.toLowerCase())
+      );
+      setFilteredSuggestions(filtered);
+      setShowSuggestions(filtered.length > 0);
+    }
+  };
+
+  // Limpiar timeout al desmontar
+  useEffect(() => {
+    return () => {
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <View className="mb-4 relative">
@@ -69,45 +109,51 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
             placeholderTextColor="#9CA3AF"
             className="flex-1 text-gray-900 text-sm"
             style={{ fontSize: 14, paddingVertical: 4 }}
-            onFocus={() => {
-              if (value.trim().length > 0) {
-                const filtered = suggestions.filter(suggestion =>
-                  suggestion.toLowerCase().startsWith(value.toLowerCase())
-                );
-                setFilteredSuggestions(filtered);
-                setShowSuggestions(filtered.length > 0);
-              }
-            }}
-            onBlur={() => {
-              // Delay para permitir que el onPress de las sugerencias funcione
-              setTimeout(() => setShowSuggestions(false), 200);
-            }}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
           />
         </View>
 
         {showSuggestions && filteredSuggestions.length > 0 && (
           <View 
+            ref={suggestionContainerRef}
             className="absolute top-full mt-1 left-0 right-0 bg-white rounded-lg border border-gray-300 shadow-lg"
             style={{ 
               maxHeight: 192,
               elevation: 5,
               zIndex: 1000,
             }}
+            onStartShouldSetResponder={() => true}
           >
             <ScrollView 
               nestedScrollEnabled
-              keyboardShouldPersistTaps="handled"
+              keyboardShouldPersistTaps="always"
+              keyboardDismissMode="none"
               style={{ maxHeight: 192 }}
+              showsVerticalScrollIndicator={false}
             >
               {filteredSuggestions.map((item, index) => (
-                <TouchableOpacity
+                <Pressable
                   key={`${item}-${index}`}
                   onPress={() => handleSelect(item)}
                   className="px-4 py-2 border-b border-gray-200"
-                  style={{ borderBottomWidth: index < filteredSuggestions.length - 1 ? 1 : 0, borderBottomColor: '#E5E7EB' }}
+                  style={({ pressed }) => [
+                    { 
+                      borderBottomWidth: index < filteredSuggestions.length - 1 ? 1 : 0, 
+                      borderBottomColor: '#E5E7EB',
+                      backgroundColor: pressed ? '#F3F4F6' : 'transparent'
+                    }
+                  ]}
+                  onPressIn={() => {
+                    // Cancelar el blur timeout cuando se presiona una sugerencia
+                    if (blurTimeoutRef.current) {
+                      clearTimeout(blurTimeoutRef.current);
+                      blurTimeoutRef.current = null;
+                    }
+                  }}
                 >
                   <Text className="text-gray-900">{item}</Text>
-                </TouchableOpacity>
+                </Pressable>
               ))}
             </ScrollView>
           </View>
