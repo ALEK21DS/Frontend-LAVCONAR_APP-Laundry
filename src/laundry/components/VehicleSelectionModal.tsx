@@ -243,7 +243,7 @@ export const VehicleSelectionModal: React.FC<VehicleSelectionModalProps> = ({
               <View className="p-6">
                 {/* Placa del Vehículo */}
                 <View className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <Text className="text-sm text-blue-600 font-medium mb-1">Placa</Text>
+                  <Text className="text-sm font-medium mb-1" style={{ color: '#0b1f36' }}>Placa</Text>
                   <Text className="text-2xl font-bold text-blue-900">
                     {scannedVehicle.plate_number}
                   </Text>

@@ -315,7 +315,7 @@ export const GuideDetailForm: React.FC<GuideDetailFormProps> = ({
         <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl" style={{ elevation: 8 }}>
           <View className="flex-row items-center p-4 border-b border-gray-200">
             <View className="flex-row items-center">
-              <IonIcon name="scan-outline" size={20} color="#1f4eed" />
+              <IonIcon name="scan-outline" size={20} color="#0b1f36" />
               <Text className="text-xl font-bold text-gray-900 ml-2">Nuevo Escaneo RFID</Text>
             </View>
             <TouchableOpacity onPress={() => setShowScanForm(false)} className="ml-auto">

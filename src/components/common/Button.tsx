@@ -24,11 +24,11 @@ export const Button: React.FC<ButtonProps> = ({
   const getVariantStyles = (): string => {
     switch (variant) {
       case 'primary':
-        return 'bg-[#1f4eed] active:bg-[#1c3fd1]';
+        return 'bg-[#0b1f36] active:bg-[#0a1a2c]';
       case 'secondary':
         return 'bg-[#10b981] active:bg-[#0ea371]';
       case 'outline':
-        return 'bg-transparent border-2 border-[#1f4eed] active:bg-[#1f4eed]/10';
+        return 'bg-transparent border-2 border-[#0b1f36] active:bg-[#0b1f36]/10';
       case 'danger':
         return 'bg-[#dc2626] active:bg-[#b91c1c]';
       case 'ghost':
@@ -36,7 +36,7 @@ export const Button: React.FC<ButtonProps> = ({
       case 'white':
         return 'bg-white active:bg-gray-100 border border-gray-300';
       default:
-        return 'bg-[#1f4eed] active:bg-[#1c3fd1]';
+        return 'bg-[#0b1f36] active:bg-[#0a1a2c]';
     }
   };
 
@@ -48,7 +48,7 @@ export const Button: React.FC<ButtonProps> = ({
         return 'text-white';
       case 'outline':
       case 'ghost':
-        return 'text-[#1f4eed]';
+        return 'text-[#0b1f36]';
       case 'white':
         return 'text-gray-900';
       default:
@@ -109,7 +109,7 @@ export const Button: React.FC<ButtonProps> = ({
       {...props}>
       {isLoading ? (
         <ActivityIndicator
-          color={variant === 'outline' || variant === 'ghost' ? '#1f4eed' : '#FFFFFF'}
+          color={variant === 'outline' || variant === 'ghost' ? '#0b1f36' : '#FFFFFF'}
           size="small"
         />
       ) : (

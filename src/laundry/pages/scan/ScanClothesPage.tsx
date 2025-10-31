@@ -810,7 +810,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             icon={<Icon name="play-outline" size={18} color="white" />}
             fullWidth
             size="sm"
-            style={{ backgroundColor: '#1f4eed' }}
+            style={{ backgroundColor: '#0b1f36' }}
           />
         ) : (
           <Button

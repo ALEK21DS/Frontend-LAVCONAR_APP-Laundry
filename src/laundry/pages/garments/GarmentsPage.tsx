@@ -115,7 +115,7 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
         <ScrollView className="flex-1">
           {isLoading && garments.length === 0 ? (
             <View className="flex-1 items-center justify-center py-20">
-              <ActivityIndicator size="large" color="#1f4eed" />
+              <ActivityIndicator size="large" color="#0b1f36" />
             </View>
           ) : !isLoading && filtered.length === 0 ? (
             <Text className="text-gray-500">No se encontraron prendas.</Text>
@@ -130,7 +130,7 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
                     <Card padding="md" variant="default">
                       <View className="flex-row items-center">
                         <View className="bg-blue-50 rounded-lg p-2 mr-3">
-                          <IonIcon name="shirt-outline" size={20} color="#1f4eed" />
+                        <IonIcon name="shirt-outline" size={20} color="#0b1f36" />
                         </View>
                         <View className="flex-1">
                           <Text className="text-gray-900 font-semibold">
@@ -157,9 +157,8 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
               <TouchableOpacity
                 onPress={() => setPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                className={`flex-row items-center px-4 py-2 rounded-lg ${
-                  currentPage === 1 ? 'bg-gray-100' : 'bg-blue-600'
-                }`}
+                className={`flex-row items-center px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray-100' : ''}`}
+                style={{ backgroundColor: currentPage === 1 ? undefined : '#0b1f36' }}
               >
                 <IonIcon 
                   name="chevron-back" 
@@ -180,9 +179,8 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
               <TouchableOpacity
                 onPress={() => setPage(prev => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
-                className={`flex-row items-center px-4 py-2 rounded-lg ${
-                  currentPage === totalPages ? 'bg-gray-100' : 'bg-blue-600'
-                }`}
+                className={`flex-row items-center px-4 py-2 rounded-lg ${currentPage === totalPages ? 'bg-gray-100' : ''}`}
+                style={{ backgroundColor: currentPage === totalPages ? undefined : '#0b1f36' }}
               >
                 
                 <IonIcon 

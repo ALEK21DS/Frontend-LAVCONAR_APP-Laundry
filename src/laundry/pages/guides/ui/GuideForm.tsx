@@ -425,7 +425,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             fullWidth
             size="sm"
             disabled={!selectedClientId}
-            style={{ backgroundColor: '#1f4eed' }}
+            style={{ backgroundColor: '#0b1f36' }}
           />
           {!selectedClientId && !guideToEdit && (
             <Text className="text-sm text-gray-500 mt-2 text-center">Selecciona un cliente para continuar</Text>
@@ -832,9 +832,9 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       <Modal transparent visible={showDetailForm} animationType="slide" onRequestClose={() => setShowDetailForm(false)}>
         <View className="flex-1 bg-black/40" />
         <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl" style={{ elevation: 8 }}>
-          <View className="flex-row items-center p-4 border-b border-gray-200">
+            <View className="flex-row items-center p-4 border-b border-gray-200">
             <View className="flex-row items-center">
-              <Icon name="document-text-outline" size={20} color="#1f4eed" />
+              <Icon name="document-text-outline" size={20} color="#0b1f36" />
               <Text className="text-xl font-bold text-gray-900 ml-2">Detalle de Guía</Text>
             </View>
             <TouchableOpacity onPress={() => setShowDetailForm(false)} className="ml-auto">

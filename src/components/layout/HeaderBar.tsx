@@ -13,7 +13,7 @@ type HeaderBarProps = {
 export const HeaderBar: React.FC<HeaderBarProps> = ({
   onToggleTheme,
   className = '',
-  bgColor = '#1f4eed',
+  bgColor = '#0b1f36',
   showThemeToggle = false,
   onLogoutPress,
 }) => {
@@ -22,11 +22,13 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       className={`flex-row items-center justify-between rounded-none px-2 py-2 ${className}`}
       style={{ backgroundColor: bgColor }}>
       <View className="flex-row items-center">
-        <Image
-          source={require('@/assets/logo-laundry.png')}
-          resizeMode="contain"
-          style={{ width: 200, height: 70, marginLeft: 0 }}
-        />
+        <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 6 }}>
+          <Image
+            source={require('@/assets/logo-laundry.png')}
+            resizeMode="contain"
+            style={{ width: 200, height: 70, marginLeft: 0 }}
+          />
+        </View>
       </View>
 
       <View className="flex-row items-center">

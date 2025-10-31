@@ -80,7 +80,7 @@ import { useDashboardStats, useRecentActivity } from '@/laundry/hooks/dashboard'
             <Text className="text-xl font-bold text-gray-900 mb-3">Actividad Reciente</Text>
             {activitiesLoading ? (
               <View className="flex-1 items-center justify-center py-8">
-                <ActivityIndicator size="large" color="#1f4eed" />
+                <ActivityIndicator size="large" color="#0b1f36" />
               </View>
             ) : activities.length === 0 ? (
               <Card variant="outlined" padding="lg">

@@ -96,7 +96,7 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
 
         {isLoading ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color="#1f4eed" />
+            <ActivityIndicator size="large" color="#0b1f36" />
           </View>
         ) : (
           <>
@@ -182,9 +182,8 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
                   <TouchableOpacity
                     onPress={() => setPage(prev => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
-                    className={`flex-row items-center px-4 py-2 rounded-lg ${
-                      currentPage === 1 ? 'bg-gray-100' : 'bg-blue-600'
-                    }`}
+                      className={`flex-row items-center px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray-100' : ''}`}
+                      style={{ backgroundColor: currentPage === 1 ? undefined : '#0b1f36' }}
                   >
                     <IonIcon 
                       name="chevron-back" 
@@ -205,9 +204,8 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
                   <TouchableOpacity
                     onPress={() => setPage(prev => Math.min(totalPages, prev + 1))}
                     disabled={currentPage === totalPages}
-                    className={`flex-row items-center px-4 py-2 rounded-lg ${
-                      currentPage === totalPages ? 'bg-gray-100' : 'bg-blue-600'
-                    }`}
+                      className={`flex-row items-center px-4 py-2 rounded-lg ${currentPage === totalPages ? 'bg-gray-100' : ''}`}
+                      style={{ backgroundColor: currentPage === totalPages ? undefined : '#0b1f36' }}
                   >
                     <IonIcon 
                       name="chevron-forward" 

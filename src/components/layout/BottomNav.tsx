@@ -129,7 +129,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpen
               {/* Botón central */}
               <TouchableOpacity
                 className="-mt-8 w-16 h-16 rounded-full items-center justify-center"
-                style={{ backgroundColor: '#1f4eed', elevation: 12, zIndex: 60 }}
+        style={{ backgroundColor: '#0b1f36', elevation: 12, zIndex: 60 }}
                 onPress={() => setRadialOpen(prev => !prev)}
                 activeOpacity={0.85}
               >
@@ -159,8 +159,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpen
                 onPress={() => setGuidesRadialOpen(prev => !prev)}
                 style={{ zIndex: 40 }}
               >
-                <IonIcon name={tab.icon} size={22} color={active === 'Guides' ? '#1f4eed' : '#6B7280'} />
-                <Text className={`text-xs mt-1 ${active === 'Guides' ? 'text-[#1f4eed]' : 'text-gray-500'}`}>{tab.label}</Text>
+                <IonIcon name={tab.icon} size={22} color={active === 'Guides' ? '#0b1f36' : '#6B7280'} />
+                <Text className={`text-xs mt-1 ${active === 'Guides' ? 'text-[#0b1f36]' : 'text-gray-500'}`}>{tab.label}</Text>
               </TouchableOpacity>
 
               {/* Submenú vertical: arriba = Guías, arriba de esa = Prendas */}
@@ -198,8 +198,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpen
             onPress={() => { if (!radialOpen && !guidesRadialOpen) onNavigate(tab.key); }}
             activeOpacity={0.8}
           >
-            <IonIcon name={tab.icon} size={22} color={isActive ? '#1f4eed' : '#6B7280'} />
-            <Text className={`text-xs mt-1 ${isActive ? 'text-[#1f4eed]' : 'text-gray-500'}`}>{tab.label}</Text>
+            <IonIcon name={tab.icon} size={22} color={isActive ? '#0b1f36' : '#6B7280'} />
+            <Text className={`text-xs mt-1 ${isActive ? 'text-[#0b1f36]' : 'text-gray-500'}`}>{tab.label}</Text>
           </TouchableOpacity>
         );
       })}

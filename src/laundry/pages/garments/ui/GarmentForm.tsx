@@ -92,7 +92,7 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
                 onPress={onScan}
                 size="sm"
                 fullWidth
-                style={isScanning ? { backgroundColor: '#dc2626' } : { backgroundColor: '#1f4eed' }}
+                style={isScanning ? { backgroundColor: '#dc2626' } : { backgroundColor: '#0b1f36' }}
               />
             </View>
           )}
@@ -139,7 +139,7 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
           onPress={handleSubmit}
           isLoading={isSubmitting || submitting}
           fullWidth
-          style={{ backgroundColor: initialValues ? '#F59E0B' : '#1f4eed' }}
+          style={{ backgroundColor: initialValues ? '#F59E0B' : '#0b1f36' }}
         />
       </ScrollView>
     </KeyboardAvoidingView>

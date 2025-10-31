@@ -148,7 +148,7 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
       case 'inactive':
         return '#6B7280'; // Gris
       default:
-        return '#2563EB'; // Azul
+        return '#0b1f36'; // Azul corporativo oscuro
     }
   };
 
@@ -222,7 +222,7 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
       <View className="px-4 pt-4 flex-1">
         <View className="flex-row items-center mb-4">
           <Text className="text-lg font-bold text-gray-900 flex-1">CLIENTES</Text>
-          <TouchableOpacity onPress={openCreate} className="w-10 h-10 rounded-lg bg-blue-600 items-center justify-center active:bg-blue-700">
+          <TouchableOpacity onPress={openCreate} className="w-10 h-10 rounded-lg items-center justify-center" style={{ backgroundColor: '#0b1f36' }}>
             <IonIcon name="add" size={20} color="#ffffff" />
           </TouchableOpacity>
         </View>
@@ -298,9 +298,8 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
               <TouchableOpacity
                 onPress={() => setPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                className={`flex-row items-center px-4 py-2 rounded-lg ${
-                  currentPage === 1 ? 'bg-gray-100' : 'bg-blue-600'
-                }`}
+                className={`flex-row items-center px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray-100' : ''}`}
+                style={{ backgroundColor: currentPage === 1 ? undefined : '#0b1f36' }}
               >
                 <IonIcon 
                   name="chevron-back" 
@@ -321,9 +320,8 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
               <TouchableOpacity
                 onPress={() => setPage(prev => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
-                className={`flex-row items-center px-4 py-2 rounded-lg ${
-                  currentPage === totalPages ? 'bg-gray-100' : 'bg-blue-600'
-                }`}
+                className={`flex-row items-center px-4 py-2 rounded-lg ${currentPage === totalPages ? 'bg-gray-100' : ''}`}
+                style={{ backgroundColor: currentPage === totalPages ? undefined : '#0b1f36' }}
               >
                 <IonIcon 
                   name="chevron-forward" 
