@@ -8,9 +8,18 @@ interface ScanGarmentQrDto {
 export const useScanGarmentQr = () => {
   const mutation = useMutation({
     mutationFn: async (qrData: string): Promise<any> => {
-      const payload: ScanGarmentQrDto = { qr_data: qrData };
-      const { data } = await garmentsApi.post('/scan-garment-qr', payload);
-      return data.data ?? data; // soporta ambos envoltorios
+      try {
+        const payload: ScanGarmentQrDto = { qr_data: qrData };
+        const { data } = await garmentsApi.post('/scan-garment-qr', payload);
+        return data.data ?? data; // soporta ambos envoltorios
+      } catch (err: any) {
+        const status = err?.response?.status;
+        const backendMsg = err?.response?.data?.message;
+        if (status === 400 || status === 403) {
+          throw new Error('Esta prenda no pertenece a tu sucursal');
+        }
+        throw new Error(backendMsg || 'No se pudo escanear el código QR de la prenda');
+      }
     },
     onError: (err: any) => {
       console.error('Error al escanear QR de prenda:', err);

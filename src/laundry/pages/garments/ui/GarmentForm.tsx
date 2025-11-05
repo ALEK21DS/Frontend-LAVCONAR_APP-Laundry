@@ -1,27 +1,41 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, Alert, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
-import { Button, Input, Card, AutocompleteInput, Dropdown } from '@/components/common';
+import { Button, Input, Card, Dropdown } from '@/components/common';
+import { useBranchOffices } from '@/laundry/hooks/branch-offices';
+import { useAuthStore } from '@/auth/store/auth.store';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 
-// Listas de sugerencias
+// Paleta de colores (como en la web)
 const COLOR_SUGGESTIONS = [
-  'Azul', 'Amarillo', 'Amarillo limón', 'Anaranjado', 'Amarillo verdoso',
-  'Blanco', 'Beige', 'Bermellón', 'Bordó',
-  'Celeste', 'Coral', 'Coral claro', 'Carmesí', 'Cereza', 'Cian', 'Caoba',
-  'Dorado',
-  'Fucsia',
-  'Gris', 'Gris claro', 'Gris oscuro', 'Granate', 'Granate oscuro',
-  'Índigo',
-  'Lavanda', 'Lila',
-  'Magenta', 'Marrón', 'Marrón claro', 'Marrón oscuro', 'Morado',
-  'Negro', 'Naranja', 'Naranja claro', 'Naranja oscuro',
-  'Oro', 'Oliva',
-  'Púrpura', 'Plateado', 'Púrpura claro', 'Púrpura oscuro', 'Perla', 'Piel',
-  'Rojo', 'Rosa', 'Rosa claro', 'Rosa oscuro', 'Rojo claro', 'Rojo oscuro',
-  'Turquesa', 'Turquesa claro', 'Turquesa oscuro', 'Terracota',
-  'Verde', 'Verde claro', 'Verde oscuro', 'Verde lima', 'Verde menta', 'Verde oliva',
-  'Violeta',
+  'Blanco', 'Negro', 'Rojo', 'Azul', 'Verde', 'Amarillo', 'Naranja', 'Morado',
+  'Rosa', 'Marrón', 'Gris', 'Azul Marino', 'Beige', 'Azul Claro', 'Azul Oscuro', 'Verde Claro',
+  'Verde Oscuro', 'Rojo Claro', 'Rojo Oscuro', 'Morado Claro', 'Morado Oscuro',
 ];
+
+// Mapa de nombres -> color visual (hex aproximado)
+const COLOR_HEX: Record<string, string> = {
+  'blanco': '#ffffff',
+  'negro': '#000000',
+  'rojo': '#ef4444',
+  'azul': '#2563eb',
+  'verde': '#22c55e',
+  'amarillo': '#fde047',
+  'naranja': '#fb923c',
+  'morado': '#8b5cf6',
+  'rosa': '#f472b6',
+  'marrón': '#92400e',
+  'gris': '#9ca3af',
+  'azul marino': '#1e3a8a',
+  'beige': '#f5f5dc',
+  'azul claro': '#93c5fd',
+  'azul oscuro': '#1d4ed8',
+  'verde claro': '#86efac',
+  'verde oscuro': '#166534',
+  'rojo claro': '#fca5a5',
+  'rojo oscuro': '#991b1b',
+  'morado claro': '#c4b5fd',
+  'morado oscuro': '#5b21b6',
+};
 
 const GARMENT_TYPE_SUGGESTIONS = [
   'Pantalón', 'Pantalones', 'Pantalón largo', 'Pantalón corto',
@@ -64,11 +78,12 @@ interface GarmentFormProps {
   onSubmit: (data: {
     rfidCode: string;
     description: string;
-    color: string;
+    colors: string[];
     garmentType?: string;
     brand?: string;
-    status?: string;
-    physicalState?: string;
+    branchOfficeId?: string;
+    garmentCondition?: string;
+    physicalCondition?: string;
     observations: string;
     weight?: number;
   }) => void;
@@ -76,11 +91,12 @@ interface GarmentFormProps {
   initialValues?: {
     rfidCode?: string;
     description?: string;
-    color?: string;
+    colors?: string[];
     garmentType?: string;
     brand?: string;
-    status?: string;
-    physicalState?: string;
+    branchOfficeId?: string;
+    garmentCondition?: string;
+    physicalCondition?: string;
     weight?: string;
     observations?: string;
   };
@@ -97,58 +113,73 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
   onScan, 
   isScanning = false 
 }) => {
-  const [color, setColor] = useState(initialValues?.color || '');
+  const { sucursales } = useBranchOffices();
+  const { user } = useAuthStore();
+  const userBranchId = user?.branch_office_id || (user as any)?.sucursalId || '';
+  const branchOptions = sucursales.map(s => ({ label: s.name, value: s.id }));
+  const [colorInput, setColorInput] = useState('');
+  const [colors, setColors] = useState<string[]>(Array.isArray(initialValues?.colors) ? initialValues!.colors! : []);
   const [garmentType, setGarmentType] = useState(initialValues?.garmentType || '');
   const [brand, setBrand] = useState(initialValues?.brand || '');
   const [description, setDescription] = useState(initialValues?.description || '');
-  const [status, setStatus] = useState(initialValues?.status || 'ACTIVE');
-  const [physicalState, setPhysicalState] = useState(initialValues?.physicalState || '');
+  const [branchOfficeId, setBranchOfficeId] = useState(initialValues?.branchOfficeId || userBranchId);
+  const [garmentCondition, setGarmentCondition] = useState(initialValues?.garmentCondition || '');
+  const [physicalCondition, setPhysicalCondition] = useState(initialValues?.physicalCondition || '');
   const [weight, setWeight] = useState(initialValues?.weight || '');
   const [observations, setObservations] = useState(initialValues?.observations || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
-  const [showPhysicalStateDropdown, setShowPhysicalStateDropdown] = useState(false);
+  const filteredColorSuggestions = useMemo(() => {
+    const q = colorInput.trim().toLowerCase();
+    if (!q) return [] as string[];
+    return COLOR_SUGGESTIONS.filter(c => c.toLowerCase().includes(q)).slice(0, 10);
+  }, [colorInput]);
+
+  // Errores del formulario (inline)
+  const [errors, setErrors] = useState<{ 
+    description?: string;
+    branchOfficeId?: string;
+    weight?: string;
+  }>({});
 
   // Actualizar campos si cambian los valores iniciales
   useEffect(() => {
     if (initialValues) {
-      setColor(initialValues.color || '');
+      setColors(Array.isArray(initialValues.colors) ? initialValues.colors! : []);
       setGarmentType(initialValues.garmentType || '');
       setBrand(initialValues.brand || '');
       setDescription(initialValues.description || '');
-      setStatus(initialValues.status || 'ACTIVE');
-      setPhysicalState(initialValues.physicalState || '');
+      setBranchOfficeId(initialValues.branchOfficeId || userBranchId);
+      setGarmentCondition(initialValues.garmentCondition || '');
+      setPhysicalCondition(initialValues.physicalCondition || '');
       setWeight(initialValues.weight || '');
       setObservations(initialValues.observations || '');
     }
   }, [initialValues]);
 
-  const handleSubmit = async () => {
-    if (!description.trim()) {
-      Alert.alert('Error', 'La descripción es requerida');
-      return;
-    }
+  const currentBranch = sucursales.find(s => s.id === branchOfficeId);
+  const branchOfficeName = currentBranch?.name || 'Sucursal no asignada';
 
+  const handleSubmit = async () => {
+    const newErrors: typeof errors = {};
+    if (!branchOfficeId) newErrors.branchOfficeId = 'La sucursal es obligatoria';
+    if (!description.trim()) newErrors.description = 'La descripción es obligatoria';
     const weightValue = weight ? parseFloat(weight) : undefined;
-    if (weight && isNaN(weightValue!)) {
-      Alert.alert('Error', 'El peso debe ser un número válido');
-      return;
-    }
-    if (typeof weightValue === 'number' && weightValue < 0) {
-      Alert.alert('Error', 'El peso debe ser mayor o igual a 0');
-      return;
-    }
+    if (weight && isNaN(weightValue!)) newErrors.weight = 'El peso debe ser un número válido';
+    if (typeof weightValue === 'number' && weightValue < 0) newErrors.weight = 'El peso debe ser ≥ 0';
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
 
     setIsSubmitting(true);
     try {
       onSubmit({ 
         rfidCode, 
         description, 
-        color,
+        colors,
         garmentType: garmentType || undefined,
         brand: brand || undefined,
-        status: status || undefined,
-        physicalState: physicalState || undefined,
+        branchOfficeId: branchOfficeId || undefined,
+        garmentCondition: garmentCondition || undefined,
+        physicalCondition: physicalCondition || undefined,
         observations,
         weight: weightValue
       });
@@ -164,7 +195,7 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1"
     >
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+      <ScrollView className="flex-1" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View className="mb-6">
           <Text className="text-base font-semibold text-gray-700 mb-2">Código RFID</Text>
           <Card padding="md" variant="outlined">
@@ -183,23 +214,84 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
           )}
         </View>
 
-        <AutocompleteInput
-          label="Color"
-          placeholder="Ej: Azul, Amarillo, etc."
-          value={color}
-          onChangeText={setColor}
-          suggestions={COLOR_SUGGESTIONS}
-          icon="color-palette-outline"
-        />
+        <View className="mb-4">
+          <Input
+            label="Sucursal"
+            value={branchOfficeName}
+            editable={false}
+            className="bg-gray-50"
+            icon="business-outline"
+          />
+        </View>
 
-        <AutocompleteInput
-          label="Tipo de Prenda"
-          placeholder="Ej: Pantalón, Camisa, Polo, etc."
-          value={garmentType}
-          onChangeText={setGarmentType}
-          suggestions={GARMENT_TYPE_SUGGESTIONS}
-          icon="shirt-outline"
-        />
+        <View className="mb-4">
+          <Input
+            label="Color"
+            placeholder="Escribe el color (ej: rojo)"
+            value={colorInput}
+            onChangeText={setColorInput}
+            icon="color-palette-outline"
+          />
+          {/* Autocompletado simple */}
+          {filteredColorSuggestions.length > 0 && (
+            <View className="bg-white border border-gray-300 rounded-lg">
+              {filteredColorSuggestions.map((sug, idx) => (
+                <TouchableOpacity
+                  key={sug}
+                  onPress={() => {
+                    if (!colors.includes(sug)) setColors(prev => [...prev, sug]);
+                    setColorInput('');
+                  }}
+                  className={`px-3 py-2 ${idx < filteredColorSuggestions.length - 1 ? 'border-b border-gray-200' : ''}`}
+                >
+                  <Text className="text-gray-800">{sug}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          {/* Botones Agregar/Limpiar removidos: ahora se agrega desde el dropdown */}
+
+          {colors.length > 0 && (
+            <Card padding="sm" variant="outlined" className="mt-3">
+              <Text className="text-sm font-medium text-gray-700 mb-2">Colores seleccionados</Text>
+              <View className="flex-row flex-wrap -m-1">
+                {colors.map((c) => {
+                  const key = c.toLowerCase();
+                  const dot = COLOR_HEX[key] || '#6b7280';
+                  return (
+                  <View key={c} className="m-1 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 flex-row items-center">
+                    <View className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: dot }} />
+                    <Text className="text-xs text-blue-800 mr-2">{c}</Text>
+                    <TouchableOpacity onPress={() => setColors(prev => prev.filter(v => v !== c))}>
+                      <IonIcon name="close" size={14} color="#6B7280" />
+                    </TouchableOpacity>
+                  </View>
+                );})}
+              </View>
+            </Card>
+          )}
+
+          {/* Paleta removida para simplificar en móvil; usar autocompletado y chips */}
+        </View>
+
+        <View className="mb-4">
+          <Dropdown
+            label="Tipo de Prenda"
+            placeholder="Seleccionar tipo de prenda"
+            options={[
+              { label: 'Uniformes', value: 'UNIFORMS' },
+              { label: 'Sábanas', value: 'SHEETS' },
+              { label: 'Toallas', value: 'TOWELS' },
+              { label: 'Manteles', value: 'TABLECLOTHS' },
+              { label: 'Cortinas', value: 'CURTAINS' },
+              { label: 'Tapetes', value: 'MATS' },
+              { label: 'Otros', value: 'OTHER' },
+            ]}
+            value={garmentType}
+            onValueChange={setGarmentType}
+            icon="shirt-outline"
+          />
+        </View>
 
         <Input
           label="Marca de Prenda"
@@ -213,104 +305,37 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
           label="Descripción *"
           placeholder="Ej: Camisa de vestir"
           value={description}
-          onChangeText={setDescription}
+          onChangeText={(t) => { setDescription(t); if (errors.description) setErrors(prev => ({ ...prev, description: undefined })); }}
           icon="document-text-outline"
+          error={errors.description}
         />
 
-        <View className="mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-2">Estado de Prenda</Text>
-          <TouchableOpacity
-            onPress={() => setShowStatusDropdown(!showStatusDropdown)}
-            className="bg-white rounded-lg px-4 py-3 border border-gray-300 flex-row items-center justify-between"
-          >
-            <Text className="text-gray-900">
-              {GARMENT_STATUS_OPTIONS.find(s => s.value === status)?.label || 'Activo'}
-            </Text>
-            <IonIcon name="chevron-down" size={20} color="#6B7280" />
-          </TouchableOpacity>
-          {showStatusDropdown && (
-            <View className="bg-white rounded-lg border border-gray-300 mt-1">
-              <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
-                {GARMENT_STATUS_OPTIONS.map((option) => (
-                  <TouchableOpacity
-                    key={option.value}
-                    onPress={() => {
-                      setStatus(option.value);
-                      setShowStatusDropdown(false);
-                    }}
-                    className={`px-4 py-3 border-b border-gray-200 last:border-b-0 flex-row items-center justify-between ${
-                      status === option.value ? 'bg-blue-50' : ''
-                    }`}
-                  >
-                    <Text className={status === option.value ? 'text-blue-600 font-semibold' : 'text-gray-900'}>
-                      {option.label}
-                    </Text>
-                    {status === option.value && (
-                      <IonIcon name="checkmark-circle" size={20} color="#3B82F6" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-        </View>
+        <Input
+          label="Condición de la Prenda"
+          placeholder="Ej: Buen estado general..."
+          value={garmentCondition}
+          onChangeText={setGarmentCondition}
+          multiline
+          icon="create-outline"
+        />
 
-        <View className="mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-2">Estado Físico</Text>
-          <TouchableOpacity
-            onPress={() => setShowPhysicalStateDropdown(!showPhysicalStateDropdown)}
-            className="bg-white rounded-lg px-4 py-3 border border-gray-300 flex-row items-center justify-between"
-          >
-            <Text className={physicalState ? 'text-gray-900' : 'text-gray-400'}>
-              {physicalState
-                ? PHYSICAL_STATE_OPTIONS.find(s => s.value === physicalState)?.label || 'Selecciona el estado'
-                : 'Selecciona el estado'}
-            </Text>
-            <IonIcon name="chevron-down" size={20} color="#6B7280" />
-          </TouchableOpacity>
-          {showPhysicalStateDropdown && (
-            <View className="bg-white rounded-lg border border-gray-300 mt-1">
-              <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
-                <TouchableOpacity
-                  onPress={() => {
-                    setPhysicalState('');
-                    setShowPhysicalStateDropdown(false);
-                  }}
-                  className="px-4 py-3 border-b border-gray-200"
-                >
-                  <Text className="text-gray-900">Ninguno</Text>
-                </TouchableOpacity>
-                {PHYSICAL_STATE_OPTIONS.map((option) => (
-                  <TouchableOpacity
-                    key={option.value}
-                    onPress={() => {
-                      setPhysicalState(option.value);
-                      setShowPhysicalStateDropdown(false);
-                    }}
-                    className={`px-4 py-3 border-b border-gray-200 last:border-b-0 flex-row items-center justify-between ${
-                      physicalState === option.value ? 'bg-blue-50' : ''
-                    }`}
-                  >
-                    <Text className={physicalState === option.value ? 'text-blue-600 font-semibold' : 'text-gray-900'}>
-                      {option.label}
-                    </Text>
-                    {physicalState === option.value && (
-                      <IonIcon name="checkmark-circle" size={20} color="#3B82F6" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-        </View>
+        <Input
+          label="Condición Física"
+          placeholder="Ej: Sin manchas, sin roturas..."
+          value={physicalCondition}
+          onChangeText={setPhysicalCondition}
+          multiline
+          icon="pulse-outline"
+        />
 
         <Input
           label="Peso (kg)"
           placeholder="Ej: 0.5"
           value={weight}
-          onChangeText={setWeight}
+          onChangeText={(t) => { setWeight(t); if (errors.weight) setErrors(prev => ({ ...prev, weight: undefined })); }}
           keyboardType="decimal-pad"
           icon="scale-outline"
+          error={errors.weight}
         />
 
         <Input
