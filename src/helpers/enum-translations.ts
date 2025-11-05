@@ -26,6 +26,7 @@ export const GENERAL_CONDITION_TRANSLATIONS: Dictionary = {
   REGULAR: "Regular",
   POOR: "Deficiente",
   DAMAGED: "Dañado",
+  WITHOUT_NEW_FEATURE: "Sin Novedad",
 };
 
 // ESTADOS DE GUÍA

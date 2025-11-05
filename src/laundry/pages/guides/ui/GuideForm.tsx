@@ -9,10 +9,10 @@ import { GUIDE_STATUS, GUIDE_STATUS_LABELS, SERVICE_PRIORITIES, WASHING_TYPES } 
 import { ClientForm } from '@/laundry/pages/clients/ui/ClientForm';
 import { useCreateClient } from '@/laundry/hooks/clients';
 import { useBranchOffices } from '@/laundry/hooks/branch-offices';
-import { useCreateGuide, useCreateGuideGarment } from '@/laundry/hooks/guides';
+import { useCreateGuide } from '@/laundry/hooks/guides';
 import { useGuideGarmentsByGuide } from '@/laundry/hooks/guides/guide-garments';
 import { useGetRfidScanByGuide } from '@/laundry/hooks/guides/rfid-scan';
-import { GuideDetailForm } from './GuideDetailForm';
+// Detalle de guía eliminado del flujo
 import { isValidDate, sanitizeNumericInput, sanitizeDecimalInput, isNonNegative, safeParseInt, safeParseFloat } from '@/helpers/validators.helper';
 import { translateEnum } from '@/helpers';
 import { useVehicles } from '@/laundry/hooks/vehicles';
@@ -71,7 +71,6 @@ export const GuideForm: React.FC<GuideFormProps> = ({
 
   // Estado local para campos del servicio y fechas
   const [serviceType, setServiceType] = useState<string>(initialServiceType);
-  const [chargeType, setChargeType] = useState<string>('BY_WEIGHT'); // Valor por defecto según Prisma
   const [condition, setCondition] = useState<string>('REGULAR'); // Valor por defecto según Prisma
   const [personalEmployee, setPersonalEmployee] = useState<string>('');
   const [transportEmployee, setTransportEmployee] = useState<string>('');
@@ -87,7 +86,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
     return `${day}/${month}/${year}`;
   };
   const [collectionDate, setCollectionDate] = useState<string>(formatDateToDisplay(new Date()));
-  const [deliveryDate, setDeliveryDate] = useState<string>('');
+  const [deliveryDate, setDeliveryDate] = useState<string>(formatDateToDisplay(new Date()));
   const [totalWeight, setTotalWeight] = useState<string>(initialTotalWeight > 0 ? initialTotalWeight.toFixed(2) : '');
   // Estado inicial según tipo de servicio
   const getInitialStatus = () => {
@@ -95,9 +94,11 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   };
   const [status, setStatus] = useState<string>(getInitialStatus());
   const [notes, setNotes] = useState<string>('');
+  const [supplierGuideNumber, setSupplierGuideNumber] = useState<string>('');
+  const [requestedServices, setRequestedServices] = useState<string[]>([]);
+  const [showRequestedServices, setShowRequestedServices] = useState<boolean>(false);
   const [clientModalOpen, setClientModalOpen] = useState(false);
-  const [showDetailForm, setShowDetailForm] = useState(false);
-  const [savedGuideData, setSavedGuideData] = useState<any>(null);
+  // Detalle de guía eliminado del flujo
 
   // Nuevos campos basados en las imágenes y schema
   const [servicePriority, setServicePriority] = useState<string>('NORMAL');
@@ -105,20 +106,16 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   
   // Personal involucrado
   const [deliveredBy, setDeliveredBy] = useState<string>('');
-  const [receivedBy, setReceivedBy] = useState<string>('');
-  const [driverName, setDriverName] = useState<string>('');
-  const [driverId, setDriverId] = useState<string>('');
+  // Campos adicionales de transporte removidos del UI actual
   
   // Gestión de paquetes
-  const [totalBundlesExpected, setTotalBundlesExpected] = useState<string>('');
   const [totalBundlesReceived, setTotalBundlesReceived] = useState<string>('');
-  const [bundlesDiscrepancy, setBundlesDiscrepancy] = useState<string>('');
+  // Discrepancia/esperados removidos del UI actual
   const [vehiclePlate, setVehiclePlate] = useState<string>('');
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
   const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
   const { createClientAsync, isCreating } = useCreateClient();
   const { createGuideAsync, isCreating: isCreatingGuide } = useCreateGuide();
-  const { createGuideGarmentAsync, isCreating: isCreatingGuideGarment } = useCreateGuideGarment();
   
   // Obtener lista de vehículos (solo para servicio industrial)
   const { vehicles, isLoading: isLoadingVehicles } = useVehicles({ 
@@ -172,7 +169,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       };
 
       setServiceType(guideToEdit.service_type || '');
-      setChargeType(guideToEdit.charge_type || 'BY_WEIGHT');
+      // charge_type no aplica a guides
       setCondition(guideToEdit.general_condition || 'REGULAR');
       setCollectionDate(formatISOToDisplay(guideToEdit.collection_date));
       setDeliveryDate(formatISOToDisplay(guideToEdit.delivery_date));
@@ -183,11 +180,8 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       setServicePriority(guideToEdit.service_priority || 'NORMAL');
       setWashingType(guideToEdit.washing_type || '');
       setDeliveredBy(guideToEdit.delivered_by || '');
-      setDriverName(guideToEdit.driver_name || '');
       setVehiclePlate(guideToEdit.vehicle_plate || '');
-      setTotalBundlesExpected(guideToEdit.total_bundles_expected?.toString() || '');
       setTotalBundlesReceived(guideToEdit.total_bundles_received?.toString() || '');
-      setBundlesDiscrepancy(guideToEdit.bundles_discrepancy?.toString() || '');
       setDepartureTime(guideToEdit.departure_time || '');
       setArrivalTime(guideToEdit.arrival_time || '');
     }
@@ -276,41 +270,8 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         </View>
       )}
 
-      {/* Información Básica */}
-      <View className="mb-6">
-        <Text className="text-base text-gray-700 font-semibold mb-2">Información Básica</Text>
-        <Input 
-          label="Número de Precinto" 
-          placeholder="Ej: SEAL-2024-001"
-          value={sealNumber} 
-          onChangeText={setSealNumber}
-        />
-        <Input label="Sucursal" value={branchOfficeName} editable={false} className="mt-3" />
-        <View className="flex-row mt-3 -mx-1">
-          <View className="flex-1 px-1">
-            <Input 
-              label="Fecha de Recolección *" 
-              placeholder="dd/mm/aaaa" 
-              value={collectionDate} 
-              onChangeText={(text) => setCollectionDate(formatDateInput(text))}
-              keyboardType="numeric"
-              maxLength={10}
-            />
-          </View>
-          <View className="flex-1 px-1">
-            <Input 
-              label="Fecha de Entrega" 
-              placeholder="dd/mm/aaaa" 
-              value={deliveryDate} 
-              onChangeText={(text) => setDeliveryDate(formatDateInput(text))}
-              keyboardType="numeric"
-              maxLength={10}
-            />
-          </View>
-        </View>
-      </View>
-
-      <View className="mb-6">
+      {/* Cliente primero */}
+      <View className="mb-4">
         <Dropdown
           label="Cliente *"
           placeholder="Selecciona un cliente"
@@ -330,7 +291,45 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         </View>
       </View>
 
-      <View className="mb-6">
+      {/* Información Básica */}
+      <View className="mb-4">
+        <Text className="text-base text-gray-700 font-semibold mb-2">Información Básica</Text>
+        <Input 
+          label="Número de Guía del Proveedor" 
+          placeholder="Ej: 123-0001-0002"
+          value={supplierGuideNumber} 
+          onChangeText={setSupplierGuideNumber}
+        />
+        <Input label="Sucursal" value={branchOfficeName} editable={false} className="mt-3" />
+        <View className="flex-row mt-3 -mx-1">
+          <View className="flex-1 px-1">
+            <Input 
+              label="Fecha de Recolección *" 
+              placeholder="dd/mm/aaaa" 
+              value={collectionDate} 
+              onChangeText={(text) => setCollectionDate(formatDateInput(text))}
+              keyboardType="numeric"
+              maxLength={10}
+              editable={false}
+              className="bg-gray-50"
+            />
+          </View>
+          <View className="flex-1 px-1">
+            <Input 
+              label="Fecha de Entrega" 
+              placeholder="dd/mm/aaaa" 
+              value={deliveryDate} 
+              onChangeText={(text) => setDeliveryDate(formatDateInput(text))}
+              keyboardType="numeric"
+              maxLength={10}
+            />
+          </View>
+        </View>
+      </View>
+
+      
+
+      <View className="mb-4">
         <Text className="text-base text-gray-700 font-semibold mb-2">Información del Servicio</Text>
         
         {/* Dropdown para seleccionar tipo de servicio - Deshabilitado porque ya se seleccionó antes */}
@@ -344,40 +343,61 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           value={serviceType}
           onValueChange={setServiceType}
           icon="cog-outline"
-          disabled={!!initialServiceType || !!guideToEdit}
+          disabled={true}
         />
 
-        {/* Campos base que siempre aparecen */}
-        <View className="flex-row -mx-1 mt-4">
-          <View className="flex-1 px-1">
-            <Dropdown
-              label="Tipo de Carga *"
-              placeholder="Selecciona un tipo"
-              options={[
-                { label: 'Por prenda', value: 'BY_UNIT' },
-                { label: 'Por peso', value: 'BY_WEIGHT' },
-              ]}
-              value={chargeType}
-              onValueChange={setChargeType}
-              icon="cube-outline"
-            />
+        {/* Servicios Solicitados */}
+        <View className="mt-2">
+          <Text className="text-sm font-medium text-gray-700 mb-2">Servicios Solicitados</Text>
+          <TouchableOpacity
+            className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-3"
+            onPress={() => setShowRequestedServices(prev => !prev)}
+          >
+            <Text className="text-gray-800">
+              {requestedServices.length > 0 ? requestedServices.join(', ') : 'Seleccionar servicios'}
+            </Text>
+          </TouchableOpacity>
+          {showRequestedServices && (
+            <View className="mt-2 bg-white border border-gray-200 rounded-lg p-3">
+              {[
+                { label: 'Lavado', value: 'WASH' },
+                { label: 'Secado', value: 'DRY' },
+                { label: 'Planchado', value: 'IRON' },
+                { label: 'Limpieza en Seco', value: 'DRY_CLEAN' },
+              ].map(opt => (
+                <TouchableOpacity
+                  key={opt.value}
+                  className="flex-row items-center py-2"
+                  onPress={() => {
+                    setRequestedServices(prev => prev.includes(opt.value)
+                      ? prev.filter(v => v !== opt.value)
+                      : [...prev, opt.value]);
+                  }}
+                >
+                  <View className={`w-5 h-5 mr-3 rounded border ${requestedServices.includes(opt.value) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`} />
+                  <Text className="text-gray-800">{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
           </View>
+          )}
         </View>
         
-        <Dropdown
-          label="Condición General"
-          placeholder="Selecciona la condición"
-          options={[
-            { label: 'Excelente', value: 'EXCELLENT' },
-            { label: 'Buena', value: 'GOOD' },
-            { label: 'Regular', value: 'REGULAR' },
-            { label: 'Deficiente', value: 'POOR' },
-            { label: 'Dañado', value: 'DAMAGED' },
-          ]}
-          value={condition}
-          onValueChange={setCondition}
-          icon="checkmark-circle-outline"
-        />
+        <View className="mt-2">
+          <Dropdown
+            label="Condición General"
+            placeholder="Selecciona la condición"
+            options={[
+              { label: 'Excelente', value: 'EXCELLENT' },
+              { label: 'Buena', value: 'GOOD' },
+              { label: 'Regular', value: 'REGULAR' },
+              { label: 'Deficiente', value: 'POOR' },
+              { label: 'Dañado', value: 'DAMAGED' },
+            ]}
+            value={condition}
+            onValueChange={setCondition}
+            icon="checkmark-circle-outline"
+          />
+        </View>
 
         <View className="flex-row -mx-1 mt-2">
           <View className="flex-1 px-1">
@@ -402,7 +422,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       </View>
 
       {showScanButton && (
-        <View className="mb-6">
+        <View className="mb-4">
           <Button
             title={guideToEdit ? 'Editar Prendas' : (isScanning ? 'Detener Escaneo' : 'Iniciar Escaneo')}
             onPress={() => {
@@ -435,7 +455,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
 
       {/* Prendas Registradas en la Guía (Modo Edición) */}
       {guideToEdit && (
-        <View className="mb-6 bg-amber-50 p-4 rounded-lg border border-amber-200">
+        <View className="mb-4 bg-amber-50 p-4 rounded-lg border border-amber-200">
           <View className="flex-row items-center mb-3">
             <Icon name="shirt-outline" size={20} color="#F59E0B" />
             <Text className="text-base text-amber-800 font-semibold ml-2">
@@ -483,7 +503,8 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         </View>
       )}
 
-      {/* Detalles de Servicio */}
+      {/* Detalles de Servicio (solo servicio personal) */}
+      {serviceType === 'PERSONAL' && (
       <View className="mb-6 bg-blue-50 p-4 rounded-lg">
         <Text className="text-base text-blue-800 font-semibold mb-3">Detalles de Servicio</Text>
         <View className="flex-row -mx-1">
@@ -509,64 +530,26 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           </View>
         </View>
       </View>
+      )}
 
       {/* Campos para Servicio Industrial - Personal de Transporte */}
       {serviceType === 'INDUSTRIAL' && (
-        <View className="mb-6 bg-green-50 p-4 rounded-lg">
+        <View className="mb-4 bg-green-50 p-4 rounded-lg">
           <Text className="text-base text-green-800 font-semibold mb-3">Personal de Transporte (Servicio Industrial)</Text>
-          <View className="flex-row -mx-1 mb-3">
-            <View className="flex-1 px-1">
               <Input
                 label="Entregado por"
                 placeholder="Nombre del transportista"
                 value={deliveredBy}
                 onChangeText={setDeliveredBy}
               />
-            </View>
-            <View className="flex-1 px-1">
-              <Input
-                label="Recibido por"
-                placeholder="Nombre de quien recibe"
-                value={receivedBy}
-                onChangeText={setReceivedBy}
-              />
-            </View>
-          </View>
-          <View className="flex-row -mx-1">
-            <View className="flex-1 px-1">
-              <Input
-                label="Nombre del Conductor"
-                placeholder="Nombre del conductor"
-                value={driverName}
-                onChangeText={setDriverName}
-              />
-            </View>
-            <View className="flex-1 px-1">
-              <Input
-                label="ID del Conductor"
-                placeholder="Cédula o ID del conductor"
-                value={driverId}
-                onChangeText={setDriverId}
-              />
-            </View>
-          </View>
         </View>
       )}
 
       {/* Campos para Servicio Industrial - Gestión de Paquetes */}
       {serviceType === 'INDUSTRIAL' && (
-        <View className="mb-6 bg-purple-50 p-4 rounded-lg">
+        <View className="mb-4 bg-purple-50 p-4 rounded-lg">
           <Text className="text-base text-purple-800 font-semibold mb-3">Gestión de Paquetes (Servicio Industrial)</Text>
           <View className="flex-row -mx-1 mb-3">
-            <View className="flex-1 px-1">
-              <Input
-                label="Paquetes Esperados"
-                placeholder="0"
-                value={totalBundlesExpected}
-                onChangeText={(text) => setTotalBundlesExpected(sanitizeNumericInput(text))}
-                keyboardType="numeric"
-              />
-            </View>
             <View className="flex-1 px-1">
               <Input
                 label="Paquetes Recibidos"
@@ -578,15 +561,6 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             </View>
           </View>
           <View className="flex-row -mx-1 mb-3">
-            <View className="flex-1 px-1">
-              <Input
-                label="Discrepancia"
-                placeholder="0"
-                value={bundlesDiscrepancy}
-                onChangeText={(text) => setBundlesDiscrepancy(sanitizeNumericInput(text))}
-                keyboardType="numeric"
-              />
-            </View>
             <View className="flex-1 px-1">
               <Text className="text-sm font-medium text-gray-700 mb-1">Placa del Vehículo</Text>
               <TouchableOpacity
@@ -620,36 +594,11 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         </View>
       )}
 
-      {/* Campos para Servicio Industrial - Horarios */}
-      {serviceType === 'INDUSTRIAL' && (
-        <View className="mb-6 bg-yellow-50 p-4 rounded-lg">
-          <Text className="text-base text-yellow-800 font-semibold mb-3">Tiempos de Transporte</Text>
-          <View className="flex-row -mx-1">
-            <View className="flex-1 px-1">
-              <Input
-                label="Hora de Salida"
-                placeholder="dd/mm/aaaa --:--"
-                value={departureTime}
-                onChangeText={setDepartureTime}
-                icon="calendar-outline"
-              />
-            </View>
-            <View className="flex-1 px-1">
-              <Input
-                label="Hora de Llegada"
-                placeholder="dd/mm/aaaa --:--"
-                value={arrivalTime}
-                onChangeText={setArrivalTime}
-                icon="calendar-outline"
-              />
-            </View>
-          </View>
-        </View>
-      )}
+      {/* Contenedor de tiempos de transporte removido por requerimiento */}
 
-      {/* Campos para Servicio Personal - FUERA del contenedor de Detalles de Servicio */}
+      {/* Campos para Servicio Personal - Personal de Atención */}
       {serviceType === 'PERSONAL' && (
-        <View className="mb-6">
+        <View className="mb-4">
           <Card padding="md" className="bg-green-50 border-green-200">
             <Text className="text-base text-green-800 font-semibold mb-3">Personal de Atención (Servicio Personal)</Text>
             <Input
@@ -658,17 +607,6 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               value={personalEmployee}
               onChangeText={setPersonalEmployee}
               icon="person-outline"
-            />
-          </Card>
-          
-          <Card padding="md" className="bg-yellow-50 border-yellow-200 mt-4">
-            <Text className="text-base text-yellow-800 font-semibold mb-3">Entrega en Local (Servicio Personal)</Text>
-            <Input
-              label="Entregado al Cliente en"
-              placeholder="dd/mm/aaaa --:--"
-              value={deliveryDate}
-              onChangeText={setDeliveryDate}
-              icon="calendar-outline"
             />
           </Card>
         </View>
@@ -686,6 +624,16 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         onChangeText={setNotes}
         multiline
       />
+
+      {/* Número de Precinto al final */}
+      <View className="mt-4">
+        <Input 
+          label="Número de Precinto" 
+          placeholder="Ej: SEAL-2024-001"
+          value={sealNumber} 
+          onChangeText={setSealNumber}
+        />
+      </View>
 
       <View className="h-3" />
       <Button
@@ -706,10 +654,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             Alert.alert('Error', 'Debe seleccionar un tipo de servicio');
             return;
           }
-          if (!chargeType) {
-            Alert.alert('Error', 'Debe seleccionar un tipo de carga');
-            return;
-          }
+          // charge_type no aplica a guides en Prisma
           if (!collectionDate) {
             Alert.alert('Error', 'Debe ingresar la fecha de recolección');
             return;
@@ -736,7 +681,6 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               return;
             }
           }
-          
           if (!guideToEdit) {
             if (guideItems.length === 0) {
               Alert.alert('Error', 'Debe escanear al menos una prenda');
@@ -745,12 +689,8 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           }
           
           // Normalizar campos numéricos antes de validar
-          const totalBundlesExpectedClean = sanitizeNumericInput(totalBundlesExpected);
           const totalBundlesReceivedClean = sanitizeNumericInput(totalBundlesReceived);
-          const bundlesDiscrepancyClean = sanitizeNumericInput(bundlesDiscrepancy);
-          if (totalBundlesExpected !== totalBundlesExpectedClean) setTotalBundlesExpected(totalBundlesExpectedClean);
           if (totalBundlesReceived !== totalBundlesReceivedClean) setTotalBundlesReceived(totalBundlesReceivedClean);
-          if (bundlesDiscrepancy !== bundlesDiscrepancyClean) setBundlesDiscrepancy(bundlesDiscrepancyClean);
 
           // Validar peso si existe
           if (totalWeight && !isNonNegative(totalWeight)) {
@@ -759,49 +699,58 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           }
           
           // Validar campos numéricos opcionales
-          if (totalBundlesExpectedClean && !isNonNegative(totalBundlesExpectedClean)) {
-            Alert.alert('Error', 'Los bultos esperados deben ser un número válido mayor o igual a 0');
-            return;
-          }
           if (totalBundlesReceivedClean && !isNonNegative(totalBundlesReceivedClean)) {
             Alert.alert('Error', 'Los bultos recibidos deben ser un número válido mayor o igual a 0');
             return;
           }
-          if (bundlesDiscrepancyClean && !isNonNegative(bundlesDiscrepancyClean)) {
-            Alert.alert('Error', 'La discrepancia debe ser un número válido mayor o igual a 0');
-            return;
-          }
           
-            // Guardar datos de la guía en memoria (no crear en BD aún)
+          // Construir payload y crear guía directamente
             const guideData = {
               client_id: selectedClientId,
               branch_office_id: branchOfficeId,
               service_type: serviceType as any,
-              charge_type: chargeType as any,
-              collection_date: formatDateToISO(collectionDate, true), // Con hora actual
-              delivery_date: deliveryDate ? formatDateToISO(deliveryDate, false) : undefined, // Sin hora (00:00)
+            supplier_guide_number: supplierGuideNumber || undefined,
+            collection_date: formatDateToISO(collectionDate, true),
+            delivery_date: deliveryDate ? formatDateToISO(deliveryDate, true) : undefined,
               general_condition: condition as any,
-              status: status as any, // Estado según tipo de servicio (SENT para personal, COLLECTED para industrial)
+            status: status as any,
               total_weight: safeParseFloat(totalWeight),
               total_garments: totalGarments,
               notes: notes || undefined,
-              // Campos opcionales numéricos
-              total_bundles_expected: safeParseInt(totalBundlesExpectedClean),
+            requested_services: requestedServices.length > 0 ? requestedServices : undefined,
               total_bundles_received: safeParseInt(totalBundlesReceivedClean),
-              bundles_discrepancy: safeParseInt(bundlesDiscrepancyClean),
-            };
+            delivered_by: serviceType === 'INDUSTRIAL' ? (deliveredBy || undefined) : (personalEmployee || undefined),
+            vehicle_plate: vehiclePlate || undefined,
+          } as any;
 
-            // Guardar en estado y continuar al formulario de detalles
-            setSavedGuideData(guideData);
-          setShowDetailForm(true);
+          try {
+            const created = await createGuideAsync(guideData);
+            // Cerrar modal superior y navegar a escaneo RFID de la guía creada
+            onSubmit();
+            if (onNavigate && created?.id) {
+              const rfids = guideToEdit
+                ? existingRfids
+                : guideItems.map(item => item.tagEPC);
+              onNavigate('ScanClothes', {
+                mode: 'guide',
+                serviceType: (serviceType === 'PERSONAL' ? 'personal' : 'industrial'),
+                guideId: created.id,
+                initialRfids: rfids,
+                guideToEdit: created,
+                isEditMode: true,
+              });
+            }
+          } catch (e: any) {
+            Alert.alert('Error', e?.message || 'No se pudo crear la guía');
+          }
         }}
         isLoading={isCreatingGuide || !!submitting}
         fullWidth
         size="md"
         disabled={
           guideToEdit
-            ? (!collectionDate || !serviceType || !chargeType || !branchOfficeId)
-            : (!selectedClientId || !collectionDate || guideItems.length === 0 || !serviceType || !chargeType || !branchOfficeId)
+            ? (!collectionDate || !serviceType || !branchOfficeId)
+            : (!selectedClientId || !collectionDate || guideItems.length === 0 || !serviceType || !branchOfficeId)
         }
         icon={<Icon name="checkmark-circle-outline" size={18} color="white" />}
       />
@@ -829,67 +778,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         </View>
       </Modal>
 
-      <Modal transparent visible={showDetailForm} animationType="slide" onRequestClose={() => setShowDetailForm(false)}>
-        <View className="flex-1 bg-black/40" />
-        <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl" style={{ elevation: 8 }}>
-            <View className="flex-row items-center p-4 border-b border-gray-200">
-            <View className="flex-row items-center">
-              <Icon name="document-text-outline" size={20} color="#0b1f36" />
-              <Text className="text-xl font-bold text-gray-900 ml-2">Detalle de Guía</Text>
-            </View>
-            <TouchableOpacity onPress={() => setShowDetailForm(false)} className="ml-auto">
-              <Icon name="close" size={22} color="#111827" />
-            </TouchableOpacity>
-          </View>
-          <View className="px-4 py-2">
-            <Text className="text-sm text-gray-600 mb-4">
-              Completa los datos para crear un nuevo detalle de guía
-            </Text>
-          </View>
-          <GuideDetailForm
-            onSubmit={(data) => {
-              // No hacer nada aquí, solo cerrar y pasar datos al ScanForm
-            }}
-            onCancel={() => setShowDetailForm(false)}
-            submitting={false}
-            guideData={savedGuideData}
-            initialValues={{ 
-              // Pasar datos de la guía principal
-              total_weight: totalWeight,
-              total_garments: totalGarments,
-              // Pasar la sucursal del usuario logueado
-              branch_office_id: branchOfficeId,
-              branch_office_name: branchOfficeName,
-              // Prefill desde el primer detalle existente en modo edición
-              ...(guideToEdit && existingGarments.length > 0 ? {
-                garment_type: existingGarments[0].garment_type,
-                predominant_color: existingGarments[0].predominant_color,
-                requested_services: existingGarments[0].requested_services,
-                initial_state_description: existingGarments[0].initial_state_desc,
-                additional_cost: existingGarments[0].additional_cost ? String(existingGarments[0].additional_cost) : '0',
-                observations: existingGarments[0].observations || '',
-                label_printed: !!existingGarments[0].label_printed,
-                incidents: Array.isArray(existingGarments[0].novelties) ? existingGarments[0].novelties.join(', ') : '',
-              } : {})
-            }}
-            scannedTags={guideToEdit ? existingRfids : guideItems.map(item => item.tagEPC)}
-            initialRfidScan={guideToEdit && rfidScan ? {
-              scan_type: rfidScan.scan_type,
-              location: rfidScan.location,
-              differences_detected: rfidScan.differences_detected,
-            } : undefined}
-            editContext={guideToEdit ? {
-              guideId: guideToEdit.id,
-              guideGarmentId: existingGarments[0]?.id,
-              rfidScanId: rfidScan?.id,
-            } : undefined}
-            initialGuide={guideToEdit || undefined}
-            initialGuideGarment={existingGarments[0] || undefined}
-            initialRfidScanFull={rfidScan || undefined}
-            onNavigate={onNavigate}
-          />
-        </View>
-      </Modal>
+      {/* Detalle de guía eliminado */}
 
       {/* Modal de Selección de Vehículos */}
       <VehicleSelectionModal

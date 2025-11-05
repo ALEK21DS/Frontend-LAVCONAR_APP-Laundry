@@ -6,6 +6,7 @@ import { GUIDE_STATUS_LABELS, GUIDE_STATUS_COLORS } from '@/constants/processes'
 import { formatDateTime } from '@/helpers/formatters.helper';
 import { usePrintGuide } from '@/laundry/hooks/guides';
 import { useCreateAuthorizationRequest, useGetAuthorizationById, useInvalidateAuthorization } from '@/laundry/hooks/authorizations';
+import { translateEnum } from '@/helpers';
 
 interface GuideDetailsModalProps {
   visible: boolean;
@@ -124,238 +125,197 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
 
   return (
     <>
-      <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-        <View className="flex-1 bg-black/40" />
-        <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl" style={{ elevation: 8 }}>
-          {/* Header */}
-            <View className="flex-row items-center p-4 border-b border-gray-200">
-            <View className="flex-row items-center flex-1">
-              <View className="rounded-lg p-2 mr-3" style={{ backgroundColor: '#8EB02120' }}>
-                <IonIcon name="document-text-outline" size={24} color="#8EB021" />
-              </View>
-              <Text className="text-xl font-bold text-gray-900">Detalles de la Guía</Text>
+    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
+      <View className="flex-1 bg-black/40" />
+      <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl" style={{ elevation: 8 }}>
+        {/* Header - alineado al de prenda */}
+        <View className="flex-row items-center p-4 border-b border-gray-200">
+          <View className="flex-row items-center flex-1">
+            <View className="rounded-lg p-2 mr-3" style={{ backgroundColor: '#8EB02120' }}>
+              <IonIcon name="document-text-outline" size={24} color="#8EB021" />
             </View>
-            <TouchableOpacity onPress={onClose}>
-              <IonIcon name="close" size={24} color="#111827" />
-            </TouchableOpacity>
+            <Text className="text-xl font-bold text-gray-900">Detalles de la Guía</Text>
           </View>
+          <TouchableOpacity onPress={onClose}>
+            <IonIcon name="close" size={24} color="#111827" />
+          </TouchableOpacity>
+        </View>
 
-          {/* Content */}
-          <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
-            {/* Información Básica */}
-            <Card padding="md" variant="outlined" className="mb-4">
-              <View className="flex-row items-center mb-3">
-                <IonIcon name="information-circle-outline" size={20} color="#8EB021" />
-                <Text className="text-lg font-semibold text-gray-900 ml-2">Información Básica</Text>
+        {/* Content - secciones espejo del modal de prenda */}
+        <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
+          {/* Información Básica */}
+          <Card padding="md" variant="outlined" className="mb-4">
+            <View className="flex-row items-center mb-3">
+              <IonIcon name="information-circle-outline" size={20} color="#8EB021" />
+              <Text className="text-lg font-semibold text-gray-900 ml-2">Información</Text>
+            </View>
+
+            <View className="mb-3">
+              <Text className="text-xs text-gray-500 mb-2">Número de Guía</Text>
+              <View className="bg-gray-50 rounded-lg p-3">
+                <Text className="text-xl font-bold text-blue-900">{guide.guide_number || 'N/A'}</Text>
               </View>
+            </View>
 
-              <View className="mb-3">
-                <Text className="text-xs text-gray-500 mb-1">Número de Guía</Text>
-                <Text className="text-base text-gray-900 font-medium">{guide.guide_number}</Text>
-              </View>
-
-              <View className="mb-3">
+            <View className="flex-row flex-wrap -mx-2">
+              <View className="w-1/2 px-2 mb-3">
                 <Text className="text-xs text-gray-500 mb-1">Cliente</Text>
-                <Text className="text-base text-gray-900 font-medium">{guide.client_name}</Text>
+                <View className="flex-row items-center">
+                  <IonIcon name="person-outline" size={16} color="#4B5563" />
+                  <Text className="text-sm text-gray-800 ml-2">{guide.client_name || 'N/A'}</Text>
+                </View>
               </View>
-
-              <View className="mb-3">
+              <View className="w-1/2 px-2 mb-3">
                 <Text className="text-xs text-gray-500 mb-1">Estado</Text>
                 <View className={`px-3 py-1.5 rounded-full self-start`} style={{ backgroundColor: getStatusColor(guide.status) + '20' }}>
                   <Text className={`text-sm font-medium`} style={{ color: getStatusColor(guide.status) }}>
-                    {getStatusLabel(guide.status)}
+                    {translateEnum(guide.status, 'guide_status')}
                   </Text>
                 </View>
               </View>
+            </View>
+          </Card>
 
-              <View className="mb-3">
-                <Text className="text-xs text-gray-500 mb-1">Fecha de Recolección</Text>
-                <Text className="text-base text-gray-900">{guide.collection_date ? formatDateTime(guide.collection_date) : 'N/A'}</Text>
+          {/* Números de Identificación */}
+          <Card padding="md" variant="outlined" className="mb-4">
+            <View className="flex-row items-center mb-3">
+              <IonIcon name="id-card-outline" size={20} color="#8EB021" />
+              <Text className="text-lg font-semibold text-gray-900 ml-2">Números de Identificación</Text>
+            </View>
+            <View className="flex-row items-center justify-between">
+              <Text className="text-sm text-gray-700">Número de Precinto:</Text>
+              <View className="px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
+                <Text className="text-sm text-blue-800">{guide.precinct_number || '—'}</Text>
               </View>
+            </View>
+          </Card>
 
-              {guide.service_priority && (
-                <View>
-                  <Text className="text-xs text-gray-500 mb-1">Prioridad</Text>
-                  <View className={`px-3 py-1.5 rounded-full self-start ${
-                    guide.service_priority === 'HIGH' ? 'bg-red-100' :
-                    guide.service_priority === 'URGENT' ? 'bg-red-200' :
-                    guide.service_priority === 'NORMAL' ? 'bg-blue-100' :
-                    'bg-gray-100'
-                  }`}>
-                    <Text className={`text-sm font-medium ${
-                      guide.service_priority === 'HIGH' ? 'text-red-700' :
-                      guide.service_priority === 'URGENT' ? 'text-red-800' :
-                      guide.service_priority === 'NORMAL' ? 'text-blue-700' :
-                      'text-gray-700'
-                    }`}>
-                      {guide.service_priority === 'HIGH' ? 'Alta' :
-                       guide.service_priority === 'URGENT' ? 'Urgente' :
-                       guide.service_priority === 'NORMAL' ? 'Normal' :
-                       guide.service_priority === 'LOW' ? 'Baja' :
-                       guide.service_priority}
-                    </Text>
+          {/* Información del Servicio */}
+          <Card padding="md" variant="outlined" className="mb-4">
+            <View className="flex-row items-center mb-3">
+              <IonIcon name="construct-outline" size={20} color="#8EB021" />
+              <Text className="text-lg font-semibold text-gray-900 ml-2">Información del Servicio</Text>
+            </View>
+
+            <View className="mb-3">
+              <Text className="text-xs text-gray-500 mb-1">Tipo de Servicio</Text>
+              <View className="px-3 py-1 rounded-full self-start bg-gray-100">
+              <Text className="text-sm text-gray-800">{guide.service_type === 'PERSONAL' ? 'Personal' : 'Industrial'}</Text>
+              </View>
+            </View>
+
+            <View className="mb-3">
+              <Text className="text-xs text-gray-500 mb-1">Condición General</Text>
+              <View className="px-3 py-1 rounded-full self-start bg-gray-100">
+                <Text className="text-sm text-gray-800">{translateEnum(guide.general_condition, 'general_condition') || '—'}</Text>
+              </View>
+            </View>
+
+            <View className="flex-row -mx-2 mb-3">
+              <View className="w-1/2 px-2">
+                <Text className="text-xs text-gray-500 mb-1">Prioridad del Servicio</Text>
+                <View className="px-3 py-1 rounded-full self-start bg-gray-100">
+                  <Text className="text-sm text-gray-800">{translateEnum(guide.service_priority, 'service_priority') || '—'}</Text>
+                </View>
+              </View>
+              <View className="w-1/2 px-2">
+                <Text className="text-xs text-gray-500 mb-1">Tipo de Lavado</Text>
+                <View className="px-3 py-1 rounded-full self-start bg-gray-100">
+                  <Text className="text-sm text-gray-800">{translateEnum(guide.washing_type, 'washing_type') || '—'}</Text>
+                </View>
+              </View>
+            </View>
+
+            <View>
+              <Text className="text-xs text-gray-500 mb-2">Servicios Solicitados</Text>
+              <View className="flex-row flex-wrap -m-1">
+                {(Array.isArray(guide.requested_services) ? guide.requested_services : []).map((srv: string) => (
+                  <View key={srv} className="m-1 px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
+                  <Text className="text-xs text-blue-800">{translateEnum(srv, 'requested_service') || srv}</Text>
                   </View>
+                ))}
+                {(!guide.requested_services || guide.requested_services.length === 0) && (
+                  <Text className="text-sm text-gray-500">—</Text>
+                )}
+              </View>
+            </View>
+          </Card>
+
+          {/* Resumen de Guía */}
+          <Card padding="md" variant="outlined" className="mb-4">
+            <View className="flex-row items-center mb-3">
+              <IonIcon name="shirt-outline" size={20} color="#8EB021" />
+              <Text className="text-lg font-semibold text-gray-900 ml-2">Resumen</Text>
+            </View>
+
+            <View className="flex-row flex-wrap -mx-2">
+              <View className="w-1/2 px-2 mb-3">
+                <Text className="text-xs text-gray-500 mb-1">Total Prendas</Text>
+                <Text className="text-sm text-gray-800">{guide.total_garments ?? 0}</Text>
+              </View>
+              <View className="w-1/2 px-2 mb-3">
+                <Text className="text-xs text-gray-500 mb-1">Peso Total</Text>
+                <Text className="text-sm text-gray-800">{guide.total_weight ? `${guide.total_weight} kg` : 'N/A'}</Text>
+              </View>
+              {guide.collection_date && (
+                <View className="w-1/2 px-2 mb-3">
+                  <Text className="text-xs text-gray-500 mb-1">Fecha de Recolección</Text>
+                  <Text className="text-sm text-gray-800">{formatDateTime(guide.collection_date)}</Text>
                 </View>
               )}
-            </Card>
-
-            {/* Información Adicional */}
-            <Card padding="md" variant="outlined" className="mb-4">
-              <View className="flex-row items-center mb-3">
-                <IonIcon name="shirt-outline" size={20} color="#8EB021" />
-                <Text className="text-lg font-semibold text-gray-900 ml-2">Prendas</Text>
-              </View>
-
-              <View className="flex-row -mx-2">
-                <View className="flex-1 px-2">
-                  <Text className="text-xs text-gray-500 mb-1">Total de Prendas</Text>
-                  <Text className="text-base text-gray-900 font-medium">{guide.total_garments || 'N/A'}</Text>
-                </View>
-
-                {guide.total_weight && (
-                  <View className="flex-1 px-2">
-                    <Text className="text-xs text-gray-500 mb-1">Peso Total</Text>
-                    <Text className="text-base text-gray-900 font-medium">{guide.total_weight} kg</Text>
-                  </View>
-                )}
-              </View>
-            </Card>
-
-            {/* Información de Servicio */}
-            <Card padding="md" variant="outlined" className="mb-4">
-              <View className="flex-row items-center mb-3">
-                <IonIcon name="settings-outline" size={20} color="#8EB021" />
-                <Text className="text-lg font-semibold text-gray-900 ml-2">Información de Servicio</Text>
-              </View>
-
-              <View className="mb-3">
-                <Text className="text-xs text-gray-500 mb-1">Tipo de Servicio</Text>
-                <Text className="text-base text-gray-900 font-medium">
-                  {guide.service_type === 'PERSONAL' ? 'Personal' : 'Industrial'}
-                </Text>
-              </View>
-
-              <View className="mb-3">
-                <Text className="text-xs text-gray-500 mb-1">Tipo de Cobro</Text>
-                <Text className="text-base text-gray-900 font-medium">
-                  {guide.charge_type === 'BY_WEIGHT' ? 'Por Peso' : guide.charge_type === 'BY_UNIT' ? 'Por Unidad' : 'Fijo'}
-                </Text>
-              </View>
-
-              {guide.washing_type && (
-                <View className="mb-3">
-                  <Text className="text-xs text-gray-500 mb-1">Tipo de Lavado</Text>
-                  <Text className="text-base text-gray-900 font-medium">
-                    {guide.washing_type === 'DRY' ? 'En Seco' : guide.washing_type === 'WET' ? 'Húmedo' : 'Mixto'}
-                  </Text>
+              {guide.delivery_date && (
+                <View className="w-1/2 px-2 mb-3">
+                  <Text className="text-xs text-gray-500 mb-1">Fecha de Entrega</Text>
+                  <Text className="text-sm text-gray-800">{formatDateTime(guide.delivery_date)}</Text>
                 </View>
               )}
+            </View>
 
-              <View className="mb-3">
-                <Text className="text-xs text-gray-500 mb-1">Condición General</Text>
-                <Text className="text-base text-gray-900 font-medium">
-                  {guide.general_condition === 'GOOD' ? 'Buena' : 
-                   guide.general_condition === 'REGULAR' ? 'Regular' : 
-                   guide.general_condition === 'POOR' ? 'Deficiente' : 
-                   guide.general_condition === 'DAMAGED' ? 'Dañado' : 'N/A'}
-                </Text>
+            {guide.notes && (
+              <View className="mt-2">
+                <Text className="text-xs text-gray-500 mb-1">Notas</Text>
+                <View className="bg-gray-50 rounded-lg p-3">
+                  <Text className="text-sm text-gray-800">{guide.notes}</Text>
+                </View>
               </View>
-
-              {guide.notes && (
-                <View>
-                  <Text className="text-xs text-gray-500 mb-1">Notas</Text>
-                  <Text className="text-sm text-gray-700">{guide.notes}</Text>
-                </View>
-              )}
-            </Card>
-
-            {/* Personal Involucrado */}
-            {guide.service_type === 'INDUSTRIAL' && (
-              <Card padding="md" variant="outlined" className="mb-4">
-                <View className="flex-row items-center mb-3">
-                  <IonIcon name="people-outline" size={20} color="#10B981" />
-                  <Text className="text-lg font-semibold text-gray-900 ml-2">Personal Involucrado</Text>
-                </View>
-
-                {guide.driver_name && (
-                  <View className="mb-3">
-                    <Text className="text-xs text-gray-500 mb-1">Conductor</Text>
-                    <Text className="text-base text-gray-900 font-medium">{guide.driver_name}</Text>
-                  </View>
-                )}
-
-                {guide.delivered_by && (
-                  <View className="mb-3">
-                    <Text className="text-xs text-gray-500 mb-1">Entregado Por</Text>
-                    <Text className="text-base text-gray-900 font-medium">{guide.delivered_by}</Text>
-                  </View>
-                )}
-
-                {guide.received_by && (
-                  <View className="mb-3">
-                    <Text className="text-xs text-gray-500 mb-1">Recibido Por</Text>
-                    <Text className="text-base text-gray-900 font-medium">{guide.received_by}</Text>
-                  </View>
-                )}
-
-                {guide.vehicle_plate && (
-                  <View className="mb-3">
-                    <Text className="text-xs text-gray-500 mb-1">Vehículo</Text>
-                    <View className="flex-row items-center">
-                <IonIcon name="car-outline" size={16} color="#8EB021" />
-                      <Text className="text-base text-gray-900 font-medium ml-2">{guide.vehicle_plate}</Text>
-                    </View>
-                  </View>
-                )}
-
-                {(!guide.driver_name && !guide.delivered_by && !guide.received_by && !guide.vehicle_plate) && (
-                  <Text className="text-sm text-gray-500 italic">No hay información de personal registrada</Text>
-                )}
-              </Card>
             )}
+          </Card>
 
-            {/* Exportar Guía */}
-            <Card padding="md" variant="outlined" className="mb-4">
-              <View className="flex-row items-center mb-3">
-                <IonIcon name="download-outline" size={20} color="#F59E0B" />
-                <Text className="text-lg font-semibold text-gray-900 ml-2">Exportar Guía</Text>
-              </View>
+          {/* Exportar Guía */}
+          <Card padding="md" variant="outlined" className="mb-4">
+            <View className="flex-row items-center mb-3">
+              <IonIcon name="download-outline" size={20} color="#F59E0B" />
+              <Text className="text-lg font-semibold text-gray-900 ml-2">Exportar Guía</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => downloadGuidePDF(guide.id)}
+              disabled={isPrinting}
+              className={`flex-row items-center justify-center p-4 rounded-lg ${isPrinting ? 'bg-gray-300' : 'bg-red-500'}`}
+            >
+              <IonIcon name={isPrinting ? 'hourglass-outline' : 'document-text-outline'} size={20} color="white" />
+              <Text className="text-white font-semibold ml-2">{isPrinting ? 'Generando PDF...' : 'Generar PDF'}</Text>
+            </TouchableOpacity>
+            <Text className="text-xs text-gray-500 mt-2 text-center">El PDF se descargará y aparecerá en las notificaciones</Text>
+          </Card>
 
-              <TouchableOpacity
-                onPress={() => downloadGuidePDF(guide.id)}
-                disabled={isPrinting}
-                className={`flex-row items-center justify-center p-4 rounded-lg ${
-                  isPrinting ? 'bg-gray-300' : 'bg-red-500'
-                }`}
-              >
-                <IonIcon 
-                  name={isPrinting ? "hourglass-outline" : "document-text-outline"} 
-                  size={20} 
-                  color="white" 
-                />
-                <Text className="text-white font-semibold ml-2">
-                  {isPrinting ? 'Generando PDF...' : 'Generar PDF'}
-                </Text>
-              </TouchableOpacity>
+          {/* (Sin bloque de Exportar para igualar al modal de prenda) */}
+        </ScrollView>
 
-              <Text className="text-xs text-gray-500 mt-2 text-center">
-                El PDF se descargará y aparecerá en las notificaciones
-              </Text>
-            </Card>
-          </ScrollView>
-
-          {/* Actions */}
-          <View className="p-4 border-t border-gray-200 bg-white">
-            <Button
-              title="Editar Guía"
-              onPress={handleEditRequest}
-              variant="primary"
-              icon={<IonIcon name="pencil-outline" size={18} color="white" />}
-              fullWidth
-            />
-          </View>
+        {/* Actions */}
+        <View className="p-4 border-t border-gray-200 bg-white">
+          <Button
+            title="Editar Guía"
+            onPress={() => {
+              onClose();
+              onEdit();
+            }}
+            variant="primary"
+            icon={<IonIcon name="pencil-outline" size={18} color="white" />}
+            fullWidth
+          />
         </View>
-      </Modal>
+      </View>
+    </Modal>
 
       {/* Modal de Autorización */}
       <Modal transparent visible={showAuthModal} animationType="fade" onRequestClose={() => setShowAuthModal(false)}>
@@ -429,3 +389,5 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
     </>
   );
 };
+
+

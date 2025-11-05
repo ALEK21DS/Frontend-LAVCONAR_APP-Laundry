@@ -4,9 +4,9 @@ import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Button, Input, Dropdown } from '@/components/common';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { useBranchOffices } from '@/laundry/hooks/branch-offices';
-import { useCreateRfidScan, useCreateGuide, useCreateGuideGarment } from '@/laundry/hooks/guides';
+import { useCreateRfidScan, useCreateGuide } from '@/laundry/hooks/guides';
 import { useUpdateGuide } from '@/laundry/hooks/guides/guide';
-import { useUpdateGuideGarment } from '@/laundry/hooks/guides/guide-garments';
+// Detalles de guía removidos del flujo
 import { useUpdateRfidScan } from '@/laundry/hooks/guides/rfid-scan';
 import { safeParseFloat, safeParseInt } from '@/helpers/validators.helper';
 
@@ -15,13 +15,13 @@ type ScanFormProps = {
   onCancel: () => void;
   submitting?: boolean;
   guideData: any; // Datos de la guía guardados en memoria
-  guideGarmentData: any; // Datos del detalle guardados en memoria
+  // Detalles de guía removidos del flujo
   scannedTags?: string[];
   onNavigate?: (route: string, params?: any) => void;
   initialRfidScan?: { scan_type?: string; location?: string; differences_detected?: string } | undefined;
   editContext?: { guideId: string; guideGarmentId?: string; rfidScanId?: string } | undefined;
   initialGuide?: any;
-  initialGuideGarment?: any;
+  // Detalles de guía removidos del flujo
   initialRfidScanFull?: any;
 };
 
@@ -42,10 +42,8 @@ export const ScanForm: React.FC<ScanFormProps> = ({
   const { user } = useAuthStore();
   const { sucursales } = useBranchOffices();
   const { createGuideAsync, isCreating: isCreatingGuide } = useCreateGuide();
-  const { createGuideGarmentAsync, isCreating: isCreatingGuideGarment } = useCreateGuideGarment();
   const { createRfidScanAsync, isCreating: isCreatingRfidScan } = useCreateRfidScan();
   const { updateGuideAsync } = useUpdateGuide();
-  const { updateGuideGarmentAsync } = useUpdateGuideGarment();
   const { updateRfidScanAsync } = useUpdateRfidScan();
   
   // Obtener la sucursal del usuario logueado
@@ -117,33 +115,7 @@ export const ScanForm: React.FC<ScanFormProps> = ({
       }
 
       try {
-        // ========== PASO 2: CREAR/ACTUALIZAR DETALLE ==========
-        const guideGarmentPayload = {
-          guide_id: createdGuide.id,
-          branch_offices_id: guideGarmentData.branch_office_id,
-          garment_type: guideGarmentData.garment_type,
-          predominant_color: guideGarmentData.predominant_color,
-          requested_services: guideGarmentData.requested_services,
-          initial_state_desc: guideGarmentData.initial_state_description || undefined,
-          additional_cost: safeParseFloat(guideGarmentData.additional_cost) || 0,
-          observations: guideGarmentData.observations || undefined,
-          garment_weight: safeParseFloat(guideGarmentData.garment_weight),
-          quantity: safeParseInt(guideGarmentData.quantity) || 1,
-          novelties: guideGarmentData.incidents ? guideGarmentData.incidents.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
-          label_printed: guideGarmentData.label_printed || false,
-        } as any;
-
-        if (editContext?.guideGarmentId) {
-          const ggDiff = buildDiff(initialGuideGarment, guideGarmentPayload);
-          if (Object.keys(ggDiff).length > 0) {
-            await updateGuideGarmentAsync({ id: editContext.guideGarmentId, data: ggDiff });
-          }
-        } else {
-          await createGuideGarmentAsync(guideGarmentPayload);
-        }
-
-        try {
-          // ========== PASO 3: CREAR/ACTUALIZAR ESCANEO RFID ==========
+          // ========== PASO 2: CREAR/ACTUALIZAR ESCANEO RFID ==========
           // NOTA: user_id NO se envía, el backend lo obtiene del token JWT
           
           const rfidScanData = {
@@ -172,19 +144,12 @@ export const ScanForm: React.FC<ScanFormProps> = ({
             onNavigate('Dashboard');
           }
 
-        } catch (scanError: any) {
+      } catch (scanError: any) {
           const errorMessage = scanError.response?.data?.message || scanError.message;
           Alert.alert(
             'Error - Contacte al Superadmin',
-            `Guía creada: ${createdGuide.guide_number}\nDetalle creado correctamente\n\n❌ Error al crear escaneo RFID:\n${errorMessage}\n\nContacte al superadmin para completar manualmente el escaneo.`
+            `Guía creada: ${createdGuide.guide_number}\n\n❌ Error al crear escaneo RFID:\n${errorMessage}\n\nContacte al superadmin para completar manualmente el escaneo.`
           );
-        }
-
-      } catch (detailError: any) {
-        Alert.alert(
-          'Error - Contacte al Superadmin',
-          `Guía creada: ${createdGuide.guide_number}\n\n❌ Error al crear detalle\n\nContacte al superadmin para completar manualmente el detalle y escaneo.`
-        );
       }
 
     } catch (guideError: any) {
@@ -279,7 +244,7 @@ export const ScanForm: React.FC<ScanFormProps> = ({
               title="Guardar Escaneo"
               variant="primary"
               onPress={handleSubmit}
-              isLoading={isCreatingGuide || isCreatingGuideGarment || isCreatingRfidScan || submitting}
+              isLoading={isCreatingGuide || isCreatingRfidScan || submitting}
               fullWidth
               disabled={!formData.scan_type}
             />

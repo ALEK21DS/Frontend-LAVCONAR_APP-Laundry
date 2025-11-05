@@ -9,12 +9,12 @@ import { useInvalidateAuthorization } from '@/laundry/hooks/authorizations';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { GuideForm } from './ui/GuideForm';
-import { GuideDetailsModal } from './ui/GuideDetailsModal';
 import { ServiceTypeModal } from '@/laundry/components/ServiceTypeModal';
 import { GarmentForm } from '@/laundry/pages/garments/ui/GarmentForm';
 import { rfidModule } from '@/lib/rfid/rfid.module';
 import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
 import { QrScanner } from '@/laundry/components';
+import { GuideDetailsModal } from './ui/GuideDetailsModal';
 import { translateEnum } from '@/helpers';
 
  type GuidesPageProps = { navigation: NativeStackNavigationProp<any> };
@@ -441,7 +441,7 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
         </View>
       )}
 
-      {/* Modal de Detalles */}
+      {/* Modal de Detalles de Guía (componente unificado) */}
       <GuideDetailsModal
         visible={detailsOpen}
         onClose={() => setDetailsOpen(false)}
