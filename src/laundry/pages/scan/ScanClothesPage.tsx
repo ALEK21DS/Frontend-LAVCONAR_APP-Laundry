@@ -10,6 +10,7 @@ import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
 import { GuideForm } from '@/laundry/pages/guides/ui/GuideForm';
 import { ProcessForm } from '@/laundry/pages/processes/ui/ProcessForm';
 import { GarmentForm } from '@/laundry/pages/garments/ui/GarmentForm';
+import { ScanFormModal } from '@/laundry/pages/scan/ui/ScanFormModal';
 import { useClients } from '@/laundry/hooks/clients';
 import { useGarments, useCreateGarment, useUpdateGarment, useGuides, useGarmentsByRfidCodes } from '@/laundry/hooks/guides';
 import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
@@ -54,6 +55,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   }, [scannedTags]);
   const [guideModalOpen, setGuideModalOpen] = useState(false);
   const [garmentModalOpen, setGarmentModalOpen] = useState(false);
+  const [scanFormModalOpen, setScanFormModalOpen] = useState(false);
   // Al entrar a esta pantalla o cuando cambien los params, asegurarnos de que no haya modales abiertos
   useEffect(() => {
     setGuideModalOpen(false);
@@ -156,6 +158,49 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const unregisteredCount = React.useMemo(() => {
     return scannedTags.filter(tag => !garmentsByRfid.has(tag.epc)).length;
   }, [scannedTags, garmentsByRfid]);
+
+  // Agrupar tags por tipo de prenda (solo para servicio industrial)
+  const groupedTagsByGarmentType = React.useMemo(() => {
+    if (serviceType !== 'industrial') {
+      return [];
+    }
+
+    const grouped = new Map<string, { garmentType: string; count: number; tags: ScannedTag[] }>();
+    
+    scannedTags.forEach(tag => {
+      const garment = garmentsByRfid.get(tag.epc);
+      
+      if (garment && garment.garment_type) {
+        // Prenda registrada con tipo
+        const garmentType = garment.garment_type;
+        if (!grouped.has(garmentType)) {
+          grouped.set(garmentType, {
+            garmentType,
+            count: 0,
+            tags: []
+          });
+        }
+        const group = grouped.get(garmentType)!;
+        group.count++;
+        group.tags.push(tag);
+      } else {
+        // Prenda no registrada
+        const unregisteredKey = 'UNREGISTERED';
+        if (!grouped.has(unregisteredKey)) {
+          grouped.set(unregisteredKey, {
+            garmentType: 'UNREGISTERED',
+            count: 0,
+            tags: []
+          });
+        }
+        const group = grouped.get(unregisteredKey)!;
+        group.count++;
+        group.tags.push(tag);
+      }
+    });
+
+    return Array.from(grouped.values());
+  }, [scannedTags, garmentsByRfid, serviceType]);
 
   // Calcular peso total de las prendas registradas
   const calculateTotalWeight = useCallback(() => {
@@ -490,9 +535,14 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     } else if (mode === 'process') {
       const processType = route?.params?.processType;
       const guideId = route?.params?.guideId;
+      const rfidScanId = route?.params?.rfidScanId;
       
-      // Para EMPAQUE, CARGA y ENTREGA, ir a la página de validación
-      if (processType === 'PACKAGING' || processType === 'LOADING' || processType === 'DELIVERY') {
+      // Procesos con escaneo opcional u obligatorio: abrir ScanForm para actualizar RFID scan
+      const processesWithScan = ['WASHING', 'DRYING', 'IRONING', 'FOLDING', 'IN_PROCESS', 'PACKAGING', 'SHIPPING', 'LOADING', 'DELIVERY'];
+      if (processesWithScan.includes(processType || '') && rfidScanId) {
+        setScanFormModalOpen(true);
+      } else if (processType === 'PACKAGING' || processType === 'LOADING' || processType === 'DELIVERY') {
+        // Para EMPAQUE, CARGA y ENTREGA (sin rfidScanId), ir a la página de validación
         navigation.navigate('GarmentValidation', {
           guideId: guideId || selectedGuideId,
           processType: processType,
@@ -779,6 +829,72 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     );
   };
 
+  // Función para renderizar grupos de prendas por tipo (solo servicio industrial)
+  const renderGarmentTypeGroup = ({ item }: { item: { garmentType: string; count: number; tags: ScannedTag[] } }) => {
+    const isUnregistered = item.garmentType === 'UNREGISTERED';
+    
+    // Función para eliminar todos los tags de este grupo
+    const handleRemoveGroup = () => {
+      const tagEpcSet = new Set(item.tags.map(tag => tag.epc));
+      const updatedTags = scannedTags.filter(tag => !tagEpcSet.has(tag.epc));
+      clearScannedTags();
+      updatedTags.forEach(tag => {
+        addScannedTag(tag);
+        seenSetRef.current.add(tag.epc);
+      });
+      item.tags.forEach(tag => seenSetRef.current.delete(tag.epc));
+      scannedTagsCountRef.current = updatedTags.length;
+    };
+
+    // Obtener el nombre del tipo de prenda (traducido o el código)
+    const getGarmentTypeLabel = () => {
+      if (isUnregistered) {
+        return 'Prendas no registradas';
+      }
+      // Mostrar el garment_type directamente (se puede mejorar con traducciones si es necesario)
+      // Formatear el nombre: convertir "CAMISETA" a "Camisetas" o mantener el formato original
+      const typeName = item.garmentType;
+      // Si está en mayúsculas, convertir a título con plural
+      if (typeName === typeName.toUpperCase()) {
+        return typeName.charAt(0) + typeName.slice(1).toLowerCase() + (item.count > 1 ? 's' : '');
+      }
+      return typeName;
+    };
+
+    return (
+      <Card variant="outlined" className="mb-2">
+        <View className="flex-row justify-between items-center">
+          <View className="flex-1">
+            <View className="flex-row items-center">
+              <View 
+                className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
+                  isUnregistered ? 'bg-orange-500' : 'bg-green-500'
+                }`}
+              >
+                <Text className="text-white font-bold text-sm">{item.count}</Text>
+              </View>
+              <View className="flex-1">
+                <Text className="text-base font-semibold text-gray-900">
+                  {item.count} {getGarmentTypeLabel()}
+                </Text>
+                {isUnregistered && (
+                  <Text className="text-xs text-orange-600 font-medium mt-1">
+                    Estas prendas necesitan ser registradas
+                  </Text>
+                )}
+              </View>
+            </View>
+          </View>
+          
+          {/* Botón X para eliminar todo el grupo */}
+          <TouchableOpacity onPress={handleRemoveGroup} className="ml-2">
+            <Icon name="close-circle" size={24} color="#EF4444" />
+          </TouchableOpacity>
+        </View>
+      </Card>
+    );
+  };
+
   return (
     <Container safe>
       <View className="flex-row items-center mb-6">
@@ -933,7 +1049,15 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
                 title="No hay prendas escaneadas"
                 message="Inicia el escaneo para detectar tags RFID"
               />
+            ) : serviceType === 'industrial' ? (
+              // Mostrar grupos agrupados por tipo de prenda para servicio industrial
+              <FlatList
+                data={groupedTagsByGarmentType}
+                renderItem={renderGarmentTypeGroup}
+                keyExtractor={item => item.garmentType}
+              />
             ) : (
+              // Mostrar lista individual para otros servicios
               <FlatList
                 data={scannedTags}
                 renderItem={renderScannedTag}
@@ -1160,6 +1284,27 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         }))}
         serviceType={serviceType}
       />
+
+      {/* Modal de ScanForm para actualizar RFID scan en procesos */}
+      {scanFormModalOpen && route?.params?.rfidScanId && route?.params?.guideId && (
+        <ScanFormModal
+          visible={scanFormModalOpen}
+          guideId={route.params.guideId}
+          rfidScanId={route.params.rfidScanId}
+          guideToEdit={route.params.guideToEdit}
+          scannedTags={scannedTags.map(tag => tag.epc)}
+          processType={route.params.processType}
+          onSuccess={() => {
+            setScanFormModalOpen(false);
+            clearScannedTags();
+            // Navegar de vuelta a Processes - MainLayout detectará y abrirá el form automáticamente
+            navigation.navigate('Processes');
+          }}
+          onCancel={() => {
+            setScanFormModalOpen(false);
+          }}
+        />
+      )}
     </Container>
   );
 };

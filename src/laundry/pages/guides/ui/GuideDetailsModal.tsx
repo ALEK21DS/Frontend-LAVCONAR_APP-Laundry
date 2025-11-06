@@ -125,37 +125,37 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
 
   return (
     <>
-    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1 bg-black/40" />
-      <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl" style={{ elevation: 8 }}>
+      <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
+        <View className="flex-1 bg-black/40" />
+        <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl" style={{ elevation: 8 }}>
         {/* Header - alineado al de prenda */}
-        <View className="flex-row items-center p-4 border-b border-gray-200">
-          <View className="flex-row items-center flex-1">
-            <View className="rounded-lg p-2 mr-3" style={{ backgroundColor: '#8EB02120' }}>
-              <IonIcon name="document-text-outline" size={24} color="#8EB021" />
+            <View className="flex-row items-center p-4 border-b border-gray-200">
+            <View className="flex-row items-center flex-1">
+              <View className="rounded-lg p-2 mr-3" style={{ backgroundColor: '#8EB02120' }}>
+                <IonIcon name="document-text-outline" size={24} color="#8EB021" />
+              </View>
+              <Text className="text-xl font-bold text-gray-900">Detalles de la Guía</Text>
             </View>
-            <Text className="text-xl font-bold text-gray-900">Detalles de la Guía</Text>
+            <TouchableOpacity onPress={onClose}>
+              <IonIcon name="close" size={24} color="#111827" />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={onClose}>
-            <IonIcon name="close" size={24} color="#111827" />
-          </TouchableOpacity>
-        </View>
 
         {/* Content - secciones espejo del modal de prenda */}
-        <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
-          {/* Información Básica */}
-          <Card padding="md" variant="outlined" className="mb-4">
-            <View className="flex-row items-center mb-3">
-              <IonIcon name="information-circle-outline" size={20} color="#8EB021" />
+          <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
+            {/* Información Básica */}
+            <Card padding="md" variant="outlined" className="mb-4">
+              <View className="flex-row items-center mb-3">
+                <IonIcon name="information-circle-outline" size={20} color="#8EB021" />
               <Text className="text-lg font-semibold text-gray-900 ml-2">Información</Text>
-            </View>
+              </View>
 
-            <View className="mb-3">
+              <View className="mb-3">
               <Text className="text-xs text-gray-500 mb-2">Número de Guía</Text>
               <View className="bg-gray-50 rounded-lg p-3">
                 <Text className="text-xl font-bold text-blue-900">{guide.guide_number || 'N/A'}</Text>
               </View>
-            </View>
+              </View>
 
             <View className="flex-row flex-wrap -mx-2">
               <View className="w-1/2 px-2 mb-3">
@@ -195,21 +195,21 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
             <View className="flex-row items-center mb-3">
               <IonIcon name="construct-outline" size={20} color="#8EB021" />
               <Text className="text-lg font-semibold text-gray-900 ml-2">Información del Servicio</Text>
-            </View>
+              </View>
 
-            <View className="mb-3">
+              <View className="mb-3">
               <Text className="text-xs text-gray-500 mb-1">Tipo de Servicio</Text>
               <View className="px-3 py-1 rounded-full self-start bg-gray-100">
               <Text className="text-sm text-gray-800">{guide.service_type === 'PERSONAL' ? 'Personal' : 'Industrial'}</Text>
               </View>
-            </View>
+              </View>
 
             <View className="mb-3">
               <Text className="text-xs text-gray-500 mb-1">Condición General</Text>
               <View className="px-3 py-1 rounded-full self-start bg-gray-100">
                 <Text className="text-sm text-gray-800">{translateEnum(guide.general_condition, 'general_condition') || '—'}</Text>
               </View>
-            </View>
+                  </View>
 
             <View className="flex-row -mx-2 mb-3">
               <View className="w-1/2 px-2">
@@ -224,7 +224,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
                   <Text className="text-sm text-gray-800">{translateEnum(guide.washing_type, 'washing_type') || '—'}</Text>
                 </View>
               </View>
-            </View>
+                </View>
 
             <View>
               <Text className="text-xs text-gray-500 mb-2">Servicios Solicitados</Text>
@@ -238,15 +238,15 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
                   <Text className="text-sm text-gray-500">—</Text>
                 )}
               </View>
-            </View>
-          </Card>
+              </View>
+            </Card>
 
           {/* Resumen de Guía */}
-          <Card padding="md" variant="outlined" className="mb-4">
-            <View className="flex-row items-center mb-3">
+            <Card padding="md" variant="outlined" className="mb-4">
+              <View className="flex-row items-center mb-3">
               <IonIcon name="shirt-outline" size={20} color="#8EB021" />
               <Text className="text-lg font-semibold text-gray-900 ml-2">Resumen</Text>
-            </View>
+              </View>
 
             <View className="flex-row flex-wrap -mx-2">
               <View className="w-1/2 px-2 mb-3">
@@ -276,46 +276,46 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
                 <Text className="text-xs text-gray-500 mb-1">Notas</Text>
                 <View className="bg-gray-50 rounded-lg p-3">
                   <Text className="text-sm text-gray-800">{guide.notes}</Text>
-                </View>
-              </View>
-            )}
-          </Card>
+                    </View>
+                  </View>
+                )}
+              </Card>
 
-          {/* Exportar Guía */}
-          <Card padding="md" variant="outlined" className="mb-4">
-            <View className="flex-row items-center mb-3">
-              <IonIcon name="download-outline" size={20} color="#F59E0B" />
-              <Text className="text-lg font-semibold text-gray-900 ml-2">Exportar Guía</Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => downloadGuidePDF(guide.id)}
-              disabled={isPrinting}
+            {/* Exportar Guía */}
+            <Card padding="md" variant="outlined" className="mb-4">
+              <View className="flex-row items-center mb-3">
+                <IonIcon name="download-outline" size={20} color="#F59E0B" />
+                <Text className="text-lg font-semibold text-gray-900 ml-2">Exportar Guía</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => downloadGuidePDF(guide.id)}
+                disabled={isPrinting}
               className={`flex-row items-center justify-center p-4 rounded-lg ${isPrinting ? 'bg-gray-300' : 'bg-red-500'}`}
-            >
+              >
               <IonIcon name={isPrinting ? 'hourglass-outline' : 'document-text-outline'} size={20} color="white" />
               <Text className="text-white font-semibold ml-2">{isPrinting ? 'Generando PDF...' : 'Generar PDF'}</Text>
-            </TouchableOpacity>
+              </TouchableOpacity>
             <Text className="text-xs text-gray-500 mt-2 text-center">El PDF se descargará y aparecerá en las notificaciones</Text>
-          </Card>
+            </Card>
 
           {/* (Sin bloque de Exportar para igualar al modal de prenda) */}
-        </ScrollView>
+          </ScrollView>
 
-        {/* Actions */}
-        <View className="p-4 border-t border-gray-200 bg-white">
-          <Button
-            title="Editar Guía"
+          {/* Actions */}
+          <View className="p-4 border-t border-gray-200 bg-white">
+            <Button
+              title="Editar Guía"
             onPress={() => {
               onClose();
               onEdit();
             }}
-            variant="primary"
-            icon={<IonIcon name="pencil-outline" size={18} color="white" />}
-            fullWidth
-          />
+              variant="primary"
+              icon={<IonIcon name="pencil-outline" size={18} color="white" />}
+              fullWidth
+            />
+          </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
 
       {/* Modal de Autorización */}
       <Modal transparent visible={showAuthModal} animationType="fade" onRequestClose={() => setShowAuthModal(false)}>

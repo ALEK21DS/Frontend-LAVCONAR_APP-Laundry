@@ -6,6 +6,7 @@ import { GuideItem } from '@/laundry/interfaces/guides/guides.interface';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { SUCURSALES } from '@/constants';
 import { GUIDE_STATUS, GUIDE_STATUS_LABELS, SERVICE_PRIORITIES, WASHING_TYPES } from '@/constants/processes';
+import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
 import { ClientForm } from '@/laundry/pages/clients/ui/ClientForm';
 import { useCreateClient } from '@/laundry/hooks/clients';
 import { useBranchOffices } from '@/laundry/hooks/branch-offices';
@@ -93,6 +94,45 @@ export const GuideForm: React.FC<GuideFormProps> = ({
     return initialServiceType === 'PERSONAL' ? GUIDE_STATUS.SENT : GUIDE_STATUS.COLLECTED;
   };
   const [status, setStatus] = useState<string>(getInitialStatus());
+  // Catálogos dinámicos (frescos) para condiciones, estados y tipos de servicio
+  const { data: generalConditionCatalog } = useCatalogValuesByType('general_condition', true, { forceFresh: true });
+  const { data: guideStatusCatalog } = useCatalogValuesByType('guide_status', true, { forceFresh: true });
+  const { data: serviceTypeCatalog } = useCatalogValuesByType('service_type', true, { forceFresh: true });
+  const { data: servicePriorityCatalog } = useCatalogValuesByType('service_priority', true, { forceFresh: true });
+  const { data: washingTypeCatalog } = useCatalogValuesByType('washing_type', true, { forceFresh: true });
+
+  const GENERAL_CONDITION_OPTIONS = useMemo(() => {
+    return (generalConditionCatalog?.data || [])
+      .filter(v => v.is_active)
+      .sort((a,b) => (a.display_order||0) - (b.display_order||0))
+      .map(v => ({ label: v.label, value: v.code }));
+  }, [generalConditionCatalog]);
+
+  const SERVICE_TYPE_OPTIONS = useMemo(() => {
+    return (serviceTypeCatalog?.data || [])
+      .filter(v => v.is_active)
+      .sort((a,b) => (a.display_order||0) - (b.display_order||0))
+      .map(v => ({ label: v.label, value: v.code }));
+  }, [serviceTypeCatalog]);
+
+  const statusLabelFromCatalog = useMemo(() => {
+    const found = (guideStatusCatalog?.data || []).find(v => v.code === status);
+    return found?.label || (GUIDE_STATUS_LABELS[status as keyof typeof GUIDE_STATUS_LABELS] || 'Recibida');
+  }, [guideStatusCatalog, status]);
+
+  const SERVICE_PRIORITY_OPTIONS_DYNAMIC = useMemo(() => {
+    return (servicePriorityCatalog?.data || [])
+      .filter(v => v.is_active)
+      .sort((a,b) => (a.display_order||0) - (b.display_order||0))
+      .map(v => ({ label: v.label, value: v.code }));
+  }, [servicePriorityCatalog]);
+
+  const WASHING_TYPE_OPTIONS_DYNAMIC = useMemo(() => {
+    return (washingTypeCatalog?.data || [])
+      .filter(v => v.is_active)
+      .sort((a,b) => (a.display_order||0) - (b.display_order||0))
+      .map(v => ({ label: v.label, value: v.code }));
+  }, [washingTypeCatalog]);
   const [notes, setNotes] = useState<string>('');
   const [supplierGuideNumber, setSupplierGuideNumber] = useState<string>('');
   const [requestedServices, setRequestedServices] = useState<string[]>([]);
@@ -336,7 +376,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         <Dropdown
           label="Tipo de Servicio *"
           placeholder="Selecciona un tipo"
-          options={[
+          options={SERVICE_TYPE_OPTIONS.length > 0 ? SERVICE_TYPE_OPTIONS : [
             { label: 'Industrial', value: 'INDUSTRIAL' },
             { label: 'Personal', value: 'PERSONAL' },
           ]}
@@ -386,13 +426,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           <Dropdown
             label="Condición General"
             placeholder="Selecciona la condición"
-            options={[
-              { label: 'Excelente', value: 'EXCELLENT' },
-              { label: 'Buena', value: 'GOOD' },
-              { label: 'Regular', value: 'REGULAR' },
-              { label: 'Deficiente', value: 'POOR' },
-              { label: 'Dañado', value: 'DAMAGED' },
-            ]}
+            options={GENERAL_CONDITION_OPTIONS}
             value={condition}
             onValueChange={setCondition}
             icon="checkmark-circle-outline"
@@ -415,7 +449,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         </View>
         <Input
           label="Estado"
-          value={GUIDE_STATUS_LABELS[status as keyof typeof GUIDE_STATUS_LABELS] || 'Recibida'}
+          value={statusLabelFromCatalog}
           editable={false}
           className="bg-gray-50"
         />
@@ -512,7 +546,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             <Dropdown
               label="Prioridad"
               placeholder="Seleccionar prioridad"
-              options={SERVICE_PRIORITIES}
+              options={SERVICE_PRIORITY_OPTIONS_DYNAMIC.length > 0 ? SERVICE_PRIORITY_OPTIONS_DYNAMIC : SERVICE_PRIORITIES}
               value={servicePriority}
               onValueChange={setServicePriority}
               icon="flag-outline"
@@ -522,7 +556,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             <Dropdown
               label="Tipo de Lavado"
               placeholder="Seleccionar tipo de lavado"
-              options={WASHING_TYPES}
+              options={WASHING_TYPE_OPTIONS_DYNAMIC.length > 0 ? WASHING_TYPE_OPTIONS_DYNAMIC : WASHING_TYPES}
               value={washingType}
               onValueChange={setWashingType}
               icon="water-outline"

@@ -30,3 +30,6 @@ export * from './dashboard';
 
 // Vehículos
 export * from './vehicles';
+
+// Catálogos
+export * from './catalogs';

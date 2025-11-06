@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, TextInput, Alert } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Button, Input, Dropdown } from '@/components/common';
@@ -9,6 +9,7 @@ import { useUpdateGuide } from '@/laundry/hooks/guides/guide';
 // Detalles de guía removidos del flujo
 import { useUpdateRfidScan } from '@/laundry/hooks/guides/rfid-scan';
 import { safeParseFloat, safeParseInt } from '@/helpers/validators.helper';
+import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
 
 type ScanFormProps = {
   onSubmit: (data: any) => void;
@@ -50,6 +51,18 @@ export const ScanForm: React.FC<ScanFormProps> = ({
   const branchOfficeId = user?.branch_office_id || user?.sucursalId || '';
   const currentBranch = sucursales.find(branch => branch.id === branchOfficeId);
   const branchOfficeName = currentBranch?.name || 'Sucursal no asignada';
+
+  // Número de guía para mostrar en cabecera
+  const guideNumber = initialGuide?.guide_number || guideData?.guide_number || '';
+
+  // Calcular códigos inesperados (tags nuevos no presentes en el escaneo anterior)
+  const initialCodes: string[] = Array.isArray(initialRfidScanFull?.scanned_rfid_codes)
+    ? initialRfidScanFull.scanned_rfid_codes
+    : (Array.isArray(initialRfidScan?.scanned_rfid_codes) ? (initialRfidScan as any).scanned_rfid_codes : []);
+  const computedUnexpected = useMemo(() => {
+    const prevSet = new Set((initialCodes || []).map((c: string) => c?.trim()));
+    return (scannedTags || []).filter((c) => !prevSet.has(c?.trim()));
+  }, [initialCodes, scannedTags]);
   
   const [formData, setFormData] = useState({
     branch_offices_id: branchOfficeId,
@@ -59,17 +72,41 @@ export const ScanForm: React.FC<ScanFormProps> = ({
     scanned_rfid_codes: scannedTags,
     location: initialRfidScan?.location || '',
     differences_detected: initialRfidScan?.differences_detected || '',
+    unexpected_codes: computedUnexpected,
   });
 
-  const scanTypes = [
-    { label: 'Recolección', value: 'COLLECTION' },
-    { label: 'Recepción en Almacén', value: 'WAREHOUSE_RECEPTION' },
-    { label: 'Pre-lavado', value: 'PRE_WASH' },
-    { label: 'Post-lavado', value: 'POST_WASH' },
-    { label: 'Post-secado', value: 'POST_DRY' },
-    { label: 'Conteo Final', value: 'FINAL_COUNT' },
-    { label: 'Entrega', value: 'DELIVERY' },
-  ];
+  // Mantener sincronizados cantidad y códigos inesperados si cambia el escaneo en tiempo real
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      scanned_quantity: scannedTags.length || 0,
+      scanned_rfid_codes: scannedTags,
+      unexpected_codes: computedUnexpected,
+    }));
+  }, [scannedTags, computedUnexpected]);
+
+  // Catálogo dinámico de tipos de escaneo (scan_type) con datos frescos
+  const { data: scanTypeCatalog } = useCatalogValuesByType('scan_type', true, { forceFresh: true });
+
+  const scanTypes = useMemo(() => {
+    const catalogOptions = (scanTypeCatalog?.data || [])
+      .filter(v => v.is_active)
+      .sort((a,b) => (a.display_order||0) - (b.display_order||0))
+      .map(v => ({ label: v.label, value: v.code }));
+
+    if (catalogOptions.length > 0) return catalogOptions;
+
+    // Fallback por si el catálogo llega vacío
+    return [
+      { label: 'Recolección', value: 'COLLECTION' },
+      { label: 'Recepción en Almacén', value: 'WAREHOUSE_RECEPTION' },
+      { label: 'Pre-lavado', value: 'PRE_WASH' },
+      { label: 'Post-lavado', value: 'POST_WASH' },
+      { label: 'Post-secado', value: 'POST_DRY' },
+      { label: 'Conteo Final', value: 'FINAL_COUNT' },
+      { label: 'Entrega', value: 'DELIVERY' },
+    ];
+  }, [scanTypeCatalog]);
 
   const buildDiff = (prev: any, curr: any) => {
     const diff: any = {};
@@ -124,7 +161,7 @@ export const ScanForm: React.FC<ScanFormProps> = ({
             scan_type: formData.scan_type as any,
             scanned_quantity: formData.scanned_quantity,
             scanned_rfid_codes: formData.scanned_rfid_codes,
-            unexpected_codes: [],
+            unexpected_codes: formData.unexpected_codes || [],
             location: formData.location || undefined,
             differences_detected: formData.differences_detected || undefined,
           } as any;
@@ -164,13 +201,14 @@ export const ScanForm: React.FC<ScanFormProps> = ({
     >
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         <View className="p-4">
-          {/* Sucursal */}
+          {/* Guía */}
           <View className="mb-4">
             <Input
-              label="Sucursal"
-              value={formData.branch_office_name}
+              label="Guía"
+              value={guideNumber || 'Sin número'}
               editable={false}
               className="bg-gray-50"
+              icon="document-text-outline"
             />
           </View>
 
@@ -183,7 +221,7 @@ export const ScanForm: React.FC<ScanFormProps> = ({
               onValueChange={(value) => setFormData(prev => ({ ...prev, scan_type: value }))}
               placeholder="Seleccionar tipo de escaneo"
               icon="scan-outline"
-              disabled={!!editContext?.rfidScanId}
+              disabled
             />
           </View>
 
@@ -204,6 +242,32 @@ export const ScanForm: React.FC<ScanFormProps> = ({
               <TextInput
                 className="text-gray-900 min-h-[100px] text-left"
                 value={formData.scanned_rfid_codes.join(', ')}
+                editable={false}
+                multiline
+                textAlignVertical="top"
+              />
+            </View>
+          </View>
+
+          {/* Alertas de diferencias */}
+          {Array.isArray(formData.unexpected_codes) && formData.unexpected_codes.length > 0 && (
+            <View className="mb-4 p-3 rounded-lg" style={{ backgroundColor: '#FEF3C7', borderColor: '#FBBF24', borderWidth: 1 }}>
+              <Text className="text-sm font-semibold" style={{ color: '#92400E' }}>
+                Atención: Códigos no coinciden con el escaneo inicial
+              </Text>
+              <Text className="text-xs mt-1" style={{ color: '#92400E' }}>
+                Se detectaron {formData.unexpected_codes.length} códigos inesperados.
+              </Text>
+            </View>
+          )}
+
+          {/* Códigos Inesperados */}
+          <View className="mb-4">
+            <Text className="text-sm font-medium text-gray-700 mb-2">Códigos Inesperados</Text>
+            <View className="bg-white border border-gray-300 rounded-lg p-3">
+              <TextInput
+                className="text-gray-900 min-h-[80px] text-left"
+                value={(formData.unexpected_codes || []).join(', ')}
                 editable={false}
                 multiline
                 textAlignVertical="top"

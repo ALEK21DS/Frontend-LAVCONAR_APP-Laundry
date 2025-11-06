@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Input, Button } from '@/components/common';
+import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
 import { CreateIncidentDto, IncidentType, IncidentStatus, ActionTaken } from '@/laundry/interfaces/incidents/incidents.interface';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { useGuides, useGarmentsByRfidCodes } from '@/laundry/hooks/guides';
@@ -135,28 +136,55 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
   }, [garmentsData?.data, rfidCodes]);
 
 
-  const incidentTypes: { label: string; value: IncidentType }[] = [
-    { label: 'Retraso', value: 'DELAY' },
-    { label: 'Problema de Calidad', value: 'QUALITY_ISSUE' },
-    { label: 'Daño', value: 'DAMAGE' },
-    { label: 'Pérdida', value: 'LOSS' },
-    { label: 'Otro', value: 'OTHER' },
-  ];
+  // Catálogos dinámicos (frescos)
+  const { data: incidentTypeCatalog } = useCatalogValuesByType('incident_type', true, { forceFresh: true });
+  const { data: actionTakenCatalog } = useCatalogValuesByType('action_taken', true, { forceFresh: true });
+  const { data: incidentStatusCatalog } = useCatalogValuesByType('incident_status', true, { forceFresh: true });
 
-  const actionTakenOptions: { label: string; value: ActionTaken }[] = [
-    { label: 'Reparar', value: 'REPAIR' },
-    { label: 'Reemplazar', value: 'REPLACE' },
-    { label: 'Compensar', value: 'COMPENSATE' },
-    { label: 'Reembolsar', value: 'REFUND' },
-    { label: 'Otro', value: 'OTHER' },
-  ];
+  const incidentTypes: { label: string; value: IncidentType }[] = useMemo(() => {
+    const opts = (incidentTypeCatalog?.data || [])
+      .filter(v => v.is_active)
+      .sort((a,b) => (a.display_order||0) - (b.display_order||0))
+      .map(v => ({ label: v.label, value: v.code as IncidentType }));
+    if (opts.length > 0) return opts;
+    return [
+      { label: 'Retraso', value: 'DELAY' },
+      { label: 'Problema de Calidad', value: 'QUALITY_ISSUE' },
+      { label: 'Daño', value: 'DAMAGE' },
+      { label: 'Pérdida', value: 'LOSS' },
+      { label: 'Otro', value: 'OTHER' },
+    ];
+  }, [incidentTypeCatalog]);
 
-  const statusOptions: { label: string; value: IncidentStatus }[] = [
-    { label: 'Abierto', value: 'OPEN' },
-    { label: 'En Progreso', value: 'IN_PROGRESS' },
-    { label: 'Resuelto', value: 'RESOLVED' },
-    { label: 'Cerrado', value: 'CLOSED' },
-  ];
+  const actionTakenOptions: { label: string; value: ActionTaken }[] = useMemo(() => {
+    const opts = (actionTakenCatalog?.data || [])
+      .filter(v => v.is_active)
+      .sort((a,b) => (a.display_order||0) - (b.display_order||0))
+      .map(v => ({ label: v.label, value: v.code as ActionTaken }));
+    if (opts.length > 0) return opts;
+    return [
+      { label: 'Ninguna', value: 'NONE' as ActionTaken },
+      { label: 'Reparar', value: 'REPAIR' },
+      { label: 'Reemplazar', value: 'REPLACE' },
+      { label: 'Compensar', value: 'COMPENSATE' },
+      { label: 'Reembolsar', value: 'REFUND' },
+      { label: 'Otro', value: 'OTHER' },
+    ];
+  }, [actionTakenCatalog]);
+
+  const statusOptions: { label: string; value: IncidentStatus }[] = useMemo(() => {
+    const opts = (incidentStatusCatalog?.data || [])
+      .filter(v => v.is_active)
+      .sort((a,b) => (a.display_order||0) - (b.display_order||0))
+      .map(v => ({ label: v.label, value: v.code as IncidentStatus }));
+    if (opts.length > 0) return opts;
+    return [
+      { label: 'Abierto', value: 'OPEN' },
+      { label: 'En Progreso', value: 'IN_PROGRESS' },
+      { label: 'Resuelto', value: 'RESOLVED' },
+      { label: 'Cerrado', value: 'CLOSED' },
+    ];
+  }, [incidentStatusCatalog]);
 
   const validateField = (field: string, value: any) => {
     const newErrors = { ...errors };
@@ -280,6 +308,37 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
           )}
         </View>
 
+        {/* RFID (opcional) */}
+        <View className="mb-4">
+          <Text className="text-sm font-semibold text-gray-700 mb-2">RFID (opcional)</Text>
+          <TouchableOpacity
+            onPress={() => {
+              if (formData.guide_id) {
+                setShowGarmentModal(true);
+              }
+            }}
+            disabled={!formData.guide_id}
+            className={`bg-white rounded-lg px-4 py-3 border border-gray-300 flex-row items-center justify-between ${
+              !formData.guide_id ? 'opacity-50' : ''
+            }`}
+          >
+            <View className="flex-1">
+              {formData.rfid_code ? (
+                <Text className="text-gray-900 font-mono">{formData.rfid_code}</Text>
+              ) : (
+                <Text className={formData.guide_id ? 'text-gray-400' : 'text-gray-300'}>
+                  {formData.guide_id ? 'Seleccionar prenda...' : 'Primero selecciona una guía'}
+                </Text>
+              )}
+            </View>
+            <IonIcon 
+              name="chevron-down" 
+              size={20} 
+              color={formData.guide_id ? "#6B7280" : "#9CA3AF"} 
+            />
+          </TouchableOpacity>
+        </View>
+
         {/* Tipo de Incidente */}
         <View className="mb-4">
           <Text className="text-sm font-semibold text-gray-700 mb-2">Tipo de Incidente *</Text>
@@ -346,36 +405,7 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
           )}
         </View>
 
-        {/* RFID (opcional) */}
-        <View className="mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-2">RFID (opcional)</Text>
-          <TouchableOpacity
-            onPress={() => {
-              if (formData.guide_id) {
-                setShowGarmentModal(true);
-              }
-            }}
-            disabled={!formData.guide_id}
-            className={`bg-white rounded-lg px-4 py-3 border border-gray-300 flex-row items-center justify-between ${
-              !formData.guide_id ? 'opacity-50' : ''
-            }`}
-          >
-            <View className="flex-1">
-              {formData.rfid_code ? (
-                <Text className="text-gray-900 font-mono">{formData.rfid_code}</Text>
-              ) : (
-                <Text className={formData.guide_id ? 'text-gray-400' : 'text-gray-300'}>
-                  {formData.guide_id ? 'Seleccionar prenda...' : 'Primero selecciona una guía'}
-                </Text>
-              )}
-            </View>
-            <IonIcon 
-              name="chevron-down" 
-              size={20} 
-              color={formData.guide_id ? "#6B7280" : "#9CA3AF"} 
-            />
-          </TouchableOpacity>
-        </View>
+        
 
         {/* Responsable (opcional) */}
         <View className="mb-4">
@@ -404,15 +434,6 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
           {showActionTakenDropdown && (
             <View className="bg-white rounded-lg border border-gray-300 mt-1" style={{ maxHeight: 200 }}>
               <ScrollView nestedScrollEnabled>
-                <TouchableOpacity
-                  onPress={() => {
-                    setFormData(prev => ({ ...prev, action_taken: '' as ActionTaken | '' }));
-                    setShowActionTakenDropdown(false);
-                  }}
-                  className="px-4 py-3 border-b border-gray-200"
-                >
-                  <Text className="text-gray-900">Ninguna</Text>
-                </TouchableOpacity>
                 {actionTakenOptions.map((action) => (
                   <TouchableOpacity
                     key={action.value}

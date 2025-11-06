@@ -4,6 +4,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Card, Button } from '@/components/common';
 import { useScanQr } from '@/laundry/hooks/guides';
 import { QrScanner } from './QrScanner';
+import { translateEnum } from '@/helpers/enum-translations';
 
 interface Guide {
   id: string;
@@ -112,7 +113,7 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
                   className="text-xs font-medium"
                   style={{ color: getStatusColor(item.status) }}
                 >
-                  {item.status}
+                  {translateEnum(item.status, 'guide_status')}
                 </Text>
               </View>
             </View>
@@ -152,15 +153,16 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
 
           {/* Search */}
           <View className="px-6 py-4">
-            <View className="flex-row items-center bg-gray-100 rounded-lg px-3 py-1.5 mb-3">
-              <Icon name="search-outline" size={18} color="#6B7280" />
+            <View className="flex-row items-center bg-gray-100 rounded-lg px-3 py-1 mb-3" style={{ minHeight: 36 }}>
+              <Icon name="search-outline" size={16} color="#6B7280" />
               <TextInput
-                className="flex-1 ml-2 text-gray-900"
+                className="flex-1 ml-2 text-gray-900 text-sm"
                 placeholder="Buscar por número de guía..."
                 placeholderTextColor="#9CA3AF"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 autoCorrect={false}
+                style={{ paddingVertical: 4, fontSize: 14 }}
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery('')}>

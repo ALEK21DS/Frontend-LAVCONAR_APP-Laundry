@@ -43,26 +43,54 @@ export const useGuides = ({
   } = useQuery({
     queryKey: ['guides', { page, limit, search, status, service_type }],
     queryFn: async (): Promise<BackendResponse> => {
-      const response = await guidesApi.get<BackendResponse>('/get-all-guides', {
-        params: {
-          page,
-          limit,
-          search,
-          // status: NO soportado por el backend, filtraremos en frontend
-          service_type,
-        }
-      });
+      const params: any = {
+        page,
+        limit,
+      };
       
-      // Filtrar por status en frontend si se proporciona
-      let filteredData = response.data.data || [];
-      if (status) {
-        filteredData = filteredData.filter(guide => guide.status === status);
+      if (search) {
+        params.search = search;
       }
       
-      return {
-        ...response.data,
-        data: filteredData,
-      };
+      // Solo enviar service_type si tiene un valor válido
+      if (service_type) {
+        params.service_type = service_type;
+      }
+      
+      try {
+        const response = await guidesApi.get<BackendResponse>('/get-all-guides', {
+          params,
+        });
+        
+        // Filtrar por status en frontend si se proporciona
+        let filteredData = response.data.data || [];
+        if (status) {
+          filteredData = filteredData.filter(guide => guide.status === status);
+        }
+        
+        return {
+          ...response.data,
+          data: filteredData,
+        };
+      } catch (error: any) {
+        // Si es un 404 (no encontrado), devolver respuesta vacía en lugar de error
+        if (error?.response?.status === 404) {
+          return {
+            status: 200,
+            message: 'No se encontraron guías',
+            data: [],
+            totalData: 0,
+            pagination: {
+              page: page,
+              limit: limit,
+              totalPages: 0,
+            },
+            timestamp: new Date().toISOString(),
+          };
+        }
+        
+        throw error;
+      }
     },
     staleTime: 1000 * 60 * 5, // 5 minutos
     retry: false,

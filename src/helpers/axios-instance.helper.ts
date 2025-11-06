@@ -97,16 +97,21 @@ export const createAuthenticatedAxiosInstance = (
           // Reintentar la petición original con el nuevo token
           return instance(originalRequest);
         } catch (refreshError) {
-          // Si el refresh falla, es necesario hacer logout
-          console.error('Error al refrescar token, sesión expirada:', refreshError);
-          
-          // Limpiar todo el estado
+          // Si el refresh falla, es porque el refresh token también expiró (comportamiento esperado)
+          // Limpiar todo el estado de autenticación
           await AsyncStorage.multiRemove(['auth-token', 'auth-refresh-token', 'auth-storage']);
           
           // Importar dinámicamente para evitar dependencias circulares
           const { useAuthStore } = await import('@/auth/store/auth.store');
-          useAuthStore.getState().logout();
           
+          try {
+            useAuthStore.getState().logout();
+          } catch (logoutError) {
+            // Si hay error en logout, no es crítico, ya limpiamos el storage
+            console.warn('Error al hacer logout automático:', logoutError);
+          }
+          
+          // Rechazar el error para que el componente pueda manejar la navegación a login
           return Promise.reject(refreshError);
         }
       }

@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Alert, KeyboardAvoidingView, Platform, Touchabl
 import { Button, Input, Card, Dropdown } from '@/components/common';
 import { useBranchOffices } from '@/laundry/hooks/branch-offices';
 import { useAuthStore } from '@/auth/store/auth.store';
+import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 
 // Paleta de colores (como en la web)
@@ -37,28 +38,7 @@ const COLOR_HEX: Record<string, string> = {
   'morado oscuro': '#5b21b6',
 };
 
-const GARMENT_TYPE_SUGGESTIONS = [
-  'Pantalón', 'Pantalones', 'Pantalón largo', 'Pantalón corto',
-  'Camisa', 'Camisas', 'Camisa manga larga', 'Camisa manga corta',
-  'Polo', 'Polos', 'Polo manga larga', 'Polo manga corta',
-  'Vestido', 'Vestidos', 'Vestido largo', 'Vestido corto',
-  'Gorra', 'Gorras',
-  'Chaqueta', 'Chaquetas',
-  'Saco', 'Sacos',
-  'Chaleco', 'Chalecos',
-  'Falda', 'Faldas',
-  'Blusa', 'Blusas',
-  'Bufanda', 'Bufandas',
-  'Guantes', 'Guante',
-  'Calcetines', 'Calcetín',
-  'Ropa interior', 'Bragas', 'Calzoncillos',
-  'Sábana', 'Sábanas',
-  'Funda', 'Fundas',
-  'Toalla', 'Toallas',
-  'Mantel', 'Manteles',
-  'Cortina', 'Cortinas',
-  'Otro',
-];
+// GARMENT_TYPE_SUGGESTIONS removido - ahora se obtiene del catálogo
 
 const PHYSICAL_STATE_OPTIONS = [
   { label: 'Excelente', value: 'EXCELLENT' },
@@ -72,6 +52,44 @@ const GARMENT_STATUS_OPTIONS = [
   { label: 'Activo', value: 'ACTIVE' },
   { label: 'Inactivo', value: 'INACTIVE' },
 ];
+
+// Componente para el dropdown de tipo de prenda que obtiene valores del catálogo
+interface GarmentTypeDropdownProps {
+  value: string;
+  onValueChange: (value: string) => void;
+}
+
+const GarmentTypeDropdown: React.FC<GarmentTypeDropdownProps> = ({ value, onValueChange }) => {
+  // forceFresh: asegura que al abrir el form se obtengan valores actualizados
+  const { data: catalogData, isLoading } = useCatalogValuesByType('garment_type', true, { forceFresh: true });
+  
+  // Convertir los valores del catálogo a formato para el Dropdown
+  const garmentTypeOptions = React.useMemo(() => {
+    if (!catalogData?.data) {
+      return [];
+    }
+    
+    // Filtrar solo activos y ordenar por display_order
+    return catalogData.data
+      .filter((v) => v.is_active)
+      .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+      .map((item) => ({
+        label: item.label,
+        value: item.code,
+      }));
+  }, [catalogData]);
+
+  return (
+    <Dropdown
+      label="Tipo de Prenda"
+      placeholder={isLoading ? "Cargando tipos..." : "Seleccionar tipo de prenda"}
+      options={garmentTypeOptions}
+      value={value}
+      onValueChange={onValueChange}
+      icon="shirt-outline"
+    />
+  );
+};
 
 interface GarmentFormProps {
   rfidCode: string;
@@ -226,12 +244,12 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
 
         <View className="mb-4">
           <Input
-            label="Color"
+          label="Color"
             placeholder="Escribe el color (ej: rojo)"
             value={colorInput}
             onChangeText={setColorInput}
-            icon="color-palette-outline"
-          />
+          icon="color-palette-outline"
+        />
           {/* Autocompletado simple */}
           {filteredColorSuggestions.length > 0 && (
             <View className="bg-white border border-gray-300 rounded-lg">
@@ -275,21 +293,9 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
         </View>
 
         <View className="mb-4">
-          <Dropdown
-            label="Tipo de Prenda"
-            placeholder="Seleccionar tipo de prenda"
-            options={[
-              { label: 'Uniformes', value: 'UNIFORMS' },
-              { label: 'Sábanas', value: 'SHEETS' },
-              { label: 'Toallas', value: 'TOWELS' },
-              { label: 'Manteles', value: 'TABLECLOTHS' },
-              { label: 'Cortinas', value: 'CURTAINS' },
-              { label: 'Tapetes', value: 'MATS' },
-              { label: 'Otros', value: 'OTHER' },
-            ]}
+          <GarmentTypeDropdown
             value={garmentType}
             onValueChange={setGarmentType}
-            icon="shirt-outline"
           />
         </View>
 
