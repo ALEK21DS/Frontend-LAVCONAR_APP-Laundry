@@ -1294,9 +1294,17 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           guideToEdit={route.params.guideToEdit}
           scannedTags={scannedTags.map(tag => tag.epc)}
           processType={route.params.processType}
-          onSuccess={() => {
+          onSuccess={async (rfidScanUpdateData) => {
             setScanFormModalOpen(false);
             clearScannedTags();
+            // Guardar los datos del RFID scan actualizado en AsyncStorage para que MainLayout los pueda leer
+            if (rfidScanUpdateData) {
+              try {
+                await AsyncStorage.setItem('pendingRfidScanUpdate', JSON.stringify(rfidScanUpdateData));
+              } catch (error) {
+                console.error('Error al guardar datos del RFID scan:', error);
+              }
+            }
             // Navegar de vuelta a Processes - MainLayout detectará y abrirá el form automáticamente
             navigation.navigate('Processes');
           }}

@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Alert, TextInput, Modal } from 'react-native';
+import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Alert, TextInput, Modal, TouchableOpacity } from 'react-native';
 import { Button, Input, Dropdown } from '@/components/common';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
-import { useMachines } from '@/laundry/hooks/machines';
+import { useMachines, Machine } from '@/laundry/hooks/machines';
 import { useCreateWashingProcess, useUpdateWashingProcess, useWashingProcessByGuide } from '@/laundry/hooks/washing-processes';
+import { useUpdateRfidScan } from '@/laundry/hooks/guides/rfid-scan';
 import { safeParseFloat, safeParseInt } from '@/helpers/validators.helper';
+import { MachineSelectionModal } from '@/laundry/components';
 
 interface WashingProcessFormProps {
   visible: boolean;
@@ -15,6 +17,10 @@ interface WashingProcessFormProps {
   branchOfficeId: string;
   branchOfficeName: string;
   processType: string;
+  rfidScanId?: string;
+  rfidScan?: any;
+  pendingScanTypeUpdate?: string;
+  rfidScanUpdateData?: any; // Datos del RFID scan actualizado desde ScanForm
   onSuccess: () => void;
   onCancel: () => void;
   initialProcess?: any;
@@ -27,6 +33,10 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
   branchOfficeId,
   branchOfficeName,
   processType,
+  rfidScanId,
+  rfidScan,
+  pendingScanTypeUpdate,
+  rfidScanUpdateData,
   onSuccess,
   onCancel,
   initialProcess,
@@ -34,6 +44,7 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
   const { user } = useAuthStore();
   const { createWashingProcessAsync, isCreating } = useCreateWashingProcess();
   const { updateWashingProcessAsync, isUpdating } = useUpdateWashingProcess();
+  const { updateRfidScanAsync } = useUpdateRfidScan();
 
   // Buscar proceso existente por tipo
   const { data: existingProcess } = useWashingProcessByGuide(guideId, processType, true);
@@ -70,6 +81,8 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [machineModalOpen, setMachineModalOpen] = useState(false);
+  const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
 
   // Opciones de catálogos
   const specialTreatmentOptions = useMemo(() => {
@@ -101,10 +114,16 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
     ];
   }, [washTemperatureCatalog]);
 
-  const machineOptions = useMemo(() => {
-    return (machines || [])
-      .filter(m => m.is_active && m.status_machine === 'ACTIVE')
-      .map(m => ({ label: `${m.code} - ${m.type}`, value: m.code }));
+  // Obtener máquina seleccionada por código
+  const selectedMachineByCode = useMemo(() => {
+    if (!formData.machine_code || !machines || !Array.isArray(machines)) return null;
+    return machines.find((m: Machine) => m.code === formData.machine_code) || null;
+  }, [formData.machine_code, machines]);
+
+  // Filtrar máquinas activas (is_active y status_machine === 'ACTIVE')
+  const availableMachines = useMemo(() => {
+    if (!machines || !Array.isArray(machines)) return [];
+    return machines.filter((m: Machine) => m.is_active && m.status_machine === 'ACTIVE');
   }, [machines]);
 
   const validateForm = () => {
@@ -114,12 +133,18 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
       newErrors.start_time = 'La fecha de inicio es requerida';
     }
 
-    if (formData.load_weight && safeParseFloat(formData.load_weight) < 0) {
-      newErrors.load_weight = 'El peso debe ser mayor o igual a 0';
+    if (formData.load_weight) {
+      const weight = safeParseFloat(formData.load_weight);
+      if (weight !== undefined && weight < 0) {
+        newErrors.load_weight = 'El peso debe ser mayor o igual a 0';
+      }
     }
 
-    if (formData.garment_quantity && safeParseInt(formData.garment_quantity) < 0) {
-      newErrors.garment_quantity = 'La cantidad debe ser mayor o igual a 0';
+    if (formData.garment_quantity) {
+      const quantity = safeParseInt(formData.garment_quantity);
+      if (quantity !== undefined && quantity < 0) {
+        newErrors.garment_quantity = 'La cantidad debe ser mayor o igual a 0';
+      }
     }
 
     setErrors(newErrors);
@@ -136,6 +161,7 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
         guide_id: guideId,
         branch_offices_id: branchOfficeId,
         machine_code: formData.machine_code || undefined,
+        process_type: processType,
         start_time: new Date(formData.start_time).toISOString(),
         end_time: formData.end_time ? new Date(formData.end_time).toISOString() : undefined,
         load_weight: formData.load_weight ? safeParseFloat(formData.load_weight) : undefined,
@@ -153,6 +179,42 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
         await updateWashingProcessAsync({ id: existingProcess.id, data: processData });
       } else {
         await createWashingProcessAsync(processData);
+      }
+
+      // Actualizar el RFID scan si hay datos pendientes
+      // Esto se hace DESPUÉS de guardar el proceso para que solo se actualice si todo fue exitoso
+      const rfidScanIdToUpdate = rfidScanUpdateData?.id || rfidScanId;
+      if (rfidScanIdToUpdate) {
+        try {
+          let rfidScanDataToUpdate: any = null;
+          
+          // Si hay rfidScanUpdateData (viene del ScanForm), usar esos datos
+          if (rfidScanUpdateData?.data) {
+            rfidScanDataToUpdate = rfidScanUpdateData.data;
+          }
+          // Si hay pendingScanTypeUpdate (viene de "No escanear"), usar esos datos
+          else if (pendingScanTypeUpdate && rfidScan) {
+            rfidScanDataToUpdate = {
+              guide_id: rfidScan.guide_id,
+              branch_offices_id: rfidScan.branch_offices_id,
+              scan_type: pendingScanTypeUpdate,
+              scanned_quantity: rfidScan.scanned_quantity,
+              scanned_rfid_codes: rfidScan.scanned_rfid_codes,
+              unexpected_codes: rfidScan.unexpected_codes || [],
+              differences_detected: rfidScan.differences_detected,
+            };
+          }
+          
+          if (rfidScanDataToUpdate) {
+            await updateRfidScanAsync({
+              id: rfidScanIdToUpdate,
+              data: rfidScanDataToUpdate,
+            });
+          }
+        } catch (rfidError: any) {
+          // Si falla la actualización del RFID scan, mostrar error pero no revertir el proceso
+          Alert.alert('Advertencia', 'El proceso se guardó correctamente, pero no se pudo actualizar el estado del escaneo RFID: ' + (rfidError.message || 'Error desconocido'));
+        }
       }
 
       Alert.alert('Éxito', 'Proceso guardado correctamente');
@@ -192,14 +254,12 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
                 </Text>
                 <Text className="text-sm text-gray-600 mt-1">Complete los datos del proceso</Text>
               </View>
-              <Button
-                title=""
-                variant="outline"
+              <TouchableOpacity
                 onPress={onCancel}
-                className="w-10 h-10 rounded-full p-0"
+                className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center"
               >
                 <Icon name="close" size={20} color="#6B7280" />
-              </Button>
+              </TouchableOpacity>
             </View>
 
             <ScrollView className="flex-1" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -252,15 +312,34 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
           {/* Máquina (solo para Lavado y Secado) */}
           {(processType === 'WASHING' || processType === 'DRYING') && (
             <View className="mb-4">
-              <Dropdown
-                label="Máquina"
-                options={machineOptions}
-                value={formData.machine_code}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, machine_code: value }))}
-                placeholder="Seleccionar máquina"
-                icon="construct-outline"
+              <Text className="text-sm font-medium text-gray-700 mb-1">Máquina</Text>
+              <TouchableOpacity
+                onPress={() => setMachineModalOpen(true)}
+                className="bg-purple-500 p-4 rounded-lg flex-row items-center justify-between"
                 disabled={isLoadingMachines}
-              />
+              >
+                {selectedMachineByCode ? (
+                  <>
+                    <View className="flex-row items-center flex-1">
+                      <Icon name="construct-outline" size={20} color="white" />
+                      <Text className="text-white font-semibold ml-2 text-base">
+                        {selectedMachineByCode.code}
+                      </Text>
+                    </View>
+                    <Icon name="create-outline" size={20} color="white" />
+                  </>
+                ) : (
+                  <>
+                    <View className="flex-row items-center flex-1">
+                      <Icon name="construct-outline" size={20} color="white" />
+                      <Text className="text-white font-medium ml-2">
+                        Seleccionar Máquina
+                      </Text>
+                    </View>
+                    <Icon name="qr-code-outline" size={20} color="white" />
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
           )}
 
@@ -384,6 +463,18 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Modal de Selección de Máquinas */}
+      <MachineSelectionModal
+        visible={machineModalOpen}
+        onClose={() => setMachineModalOpen(false)}
+        onSelectMachine={(machine) => {
+          setSelectedMachine(machine);
+          setFormData(prev => ({ ...prev, machine_code: machine.code }));
+          setMachineModalOpen(false);
+        }}
+        machines={availableMachines}
+      />
     </Modal>
   );
 };

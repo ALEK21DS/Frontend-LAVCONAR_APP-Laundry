@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { View, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Container } from '@/components/common';
 import { HeaderBar } from './HeaderBar';
 import { BottomNav } from './BottomNav';
 import { useAuth } from '@/auth/hooks/useAuth';
 import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
 import { GuideSelectionModal } from '@/laundry/components/GuideSelectionModal';
-import { GuideStatusConfirmationModal } from '@/laundry/components/GuideStatusConfirmationModal';
 import { ServiceTypeModal } from '@/laundry/components/ServiceTypeModal';
 import { useUpdateRfidScan, useGetAllRfidScans } from '@/laundry/hooks/guides/rfid-scan';
 import { useGuides } from '@/laundry/hooks/guides/guide';
@@ -34,12 +34,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
   const [serviceTypeModalOpen, setServiceTypeModalOpen] = useState(false);
   const [processTypeModalOpen, setProcessTypeModalOpen] = useState(false);
   const [guideSelectionModalOpen, setGuideSelectionModalOpen] = useState(false);
-  const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
   const [selectedProcessType, setSelectedProcessType] = useState<string>('');
   const [selectedServiceType, setSelectedServiceType] = useState<'industrial' | 'personal' | undefined>(undefined);
-  const [selectedGuideForConfirmation, setSelectedGuideForConfirmation] = useState<any>(null);
   const [selectedRfidScan, setSelectedRfidScan] = useState<any>(null);
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [selectedGuideForProcess, setSelectedGuideForProcess] = useState<any>(null);
   const [washingProcessFormOpen, setWashingProcessFormOpen] = useState(false);
 
@@ -49,9 +46,29 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
       // Si estamos esperando el escaneo y estamos en la pestaña Processes, abrir el form
       if (selectedGuideForProcess?.waitingForScan && activeTab === 'Processes') {
         // Usar setTimeout para asegurar que la navegación se complete primero
-        setTimeout(() => {
+        setTimeout(async () => {
           if (selectedGuideForProcess) {
-            setSelectedGuideForProcess({ ...selectedGuideForProcess, waitingForScan: false });
+            // Intentar obtener los datos del RFID scan actualizado desde AsyncStorage
+            // Estos datos se guardan en ScanClothesPage cuando se envía el ScanForm
+            try {
+              const rfidScanUpdateDataJson = await AsyncStorage.getItem('pendingRfidScanUpdate');
+              if (rfidScanUpdateDataJson) {
+                const rfidScanUpdateData = JSON.parse(rfidScanUpdateDataJson);
+                // Limpiar el dato temporal
+                await AsyncStorage.removeItem('pendingRfidScanUpdate');
+                // Actualizar selectedGuideForProcess con los datos del RFID scan
+                setSelectedGuideForProcess({
+                  ...selectedGuideForProcess,
+                  waitingForScan: false,
+                  rfidScanUpdateData: rfidScanUpdateData, // Guardar los datos para actualizar después
+                });
+              } else {
+                setSelectedGuideForProcess({ ...selectedGuideForProcess, waitingForScan: false });
+              }
+            } catch (error) {
+              // Si hay error, simplemente continuar sin los datos
+              setSelectedGuideForProcess({ ...selectedGuideForProcess, waitingForScan: false });
+            }
             setWashingProcessFormOpen(true);
           }
         }, 300);
@@ -209,33 +226,18 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
           {
             text: 'No',
             style: 'cancel',
-            onPress: async () => {
-              // Solo actualizar scan_type y abrir form de proceso
-              try {
-                const newScanType = getNewScanTypeFromProcess(selectedProcessType);
-                await updateRfidScanAsync({
-                  id: rfidScan.id,
-                  data: {
-                    guide_id: rfidScan.guide_id,
-                    branch_offices_id: rfidScan.branch_offices_id,
-                    scan_type: newScanType,
-                    scanned_quantity: rfidScan.scanned_quantity,
-                    scanned_rfid_codes: rfidScan.scanned_rfid_codes,
-                    unexpected_codes: rfidScan.unexpected_codes || [],
-                    differences_detected: rfidScan.differences_detected,
-                  }
-                });
-                // Abrir el form de proceso correspondiente
-                setSelectedGuideForProcess({
-                  id: rfidScan.guide_id,
-                  guide_number: rfidScan.guide?.guide_number || rfidScan.guide_number || 'Sin número',
-                  rfidScanId: rfidScan.id,
-                  rfidScan: rfidScan,
-                });
-                setWashingProcessFormOpen(true);
-              } catch (error: any) {
-                Alert.alert('Error', error.message || 'No se pudo actualizar el escaneo');
-              }
+            onPress: () => {
+              // NO actualizar scan_type aquí, se hará al enviar el form de proceso
+              // Guardar información para actualizar después
+              const newScanType = getNewScanTypeFromProcess(selectedProcessType);
+              setSelectedGuideForProcess({
+                id: rfidScan.guide_id,
+                guide_number: rfidScan.guide?.guide_number || rfidScan.guide_number || 'Sin número',
+                rfidScanId: rfidScan.id,
+                rfidScan: rfidScan,
+                pendingScanTypeUpdate: newScanType, // Guardar el nuevo scan_type para actualizar después
+              });
+              setWashingProcessFormOpen(true);
             },
           },
           {
@@ -269,6 +271,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
       return;
     }
     
+    // Si llegamos aquí, es un proceso que no requiere escaneo o hay retroceso
     if (isBackward) {
       // Mostrar advertencia de retroceso
       Alert.alert(
@@ -285,80 +288,120 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
           {
             text: 'Continuar',
             onPress: () => {
-              // Proceder con la confirmación
+              // Proceder directamente con el flujo del proceso seleccionado
               setGuideSelectionModalOpen(false);
               setSelectedRfidScan(rfidScan);
               
-              const guideId = rfidScan.guide_id;
-              const guideNumber = rfidScan.guide_number;
-              
-              setSelectedGuideForConfirmation({
-                id: guideId,
-                guide_number: guideNumber || 'Sin número',
-                status: rfidScan.scan_type || '',
-              });
-              setConfirmationModalOpen(true);
+              // Verificar si el proceso requiere escaneo
+              if (processesWithRequiredScan.includes(selectedProcessType)) {
+                // Proceso con escaneo obligatorio: abrir escáner
+                setSelectedGuideForProcess({
+                  id: rfidScan.guide_id,
+                  guide_number: rfidScan.guide?.guide_number || rfidScan.guide_number || 'Sin número',
+                  rfidScanId: rfidScan.id,
+                  rfidScan: rfidScan,
+                  waitingForScan: true,
+                });
+                
+                onNavigate('ScanClothes', {
+                  mode: 'process',
+                  processType: selectedProcessType,
+                  guideId: rfidScan.guide_id,
+                  rfidScanId: rfidScan.id,
+                  initialRfids: rfidScan.scanned_rfid_codes || [],
+                  isEditMode: true,
+                  guideToEdit: {
+                    id: rfidScan.guide_id,
+                    guide_number: rfidScan.guide?.guide_number || rfidScan.guide_number,
+                  },
+                });
+              } else if (processesWithOptionalScan.includes(selectedProcessType)) {
+                // Proceso con escaneo opcional: preguntar
+                setSelectedGuideForProcess({
+                  id: rfidScan.guide_id,
+                  guide_number: rfidScan.guide?.guide_number || rfidScan.guide_number || 'Sin número',
+                  rfidScanId: rfidScan.id,
+                  rfidScan: rfidScan,
+                });
+                
+                Alert.alert(
+                  'Escaneo de Prendas',
+                  '¿Quiere escanear las prendas?',
+                  [
+                    {
+                      text: 'No',
+                      style: 'cancel',
+                      onPress: () => {
+                        const newScanType = getNewScanTypeFromProcess(selectedProcessType);
+                        setSelectedGuideForProcess({
+                          id: rfidScan.guide_id,
+                          guide_number: rfidScan.guide?.guide_number || rfidScan.guide_number || 'Sin número',
+                          rfidScanId: rfidScan.id,
+                          rfidScan: rfidScan,
+                          pendingScanTypeUpdate: newScanType,
+                        });
+                        setWashingProcessFormOpen(true);
+                      },
+                    },
+                    {
+                      text: 'Sí',
+                      onPress: () => {
+                        setSelectedGuideForProcess({
+                          id: rfidScan.guide_id,
+                          guide_number: rfidScan.guide?.guide_number || rfidScan.guide_number || 'Sin número',
+                          rfidScanId: rfidScan.id,
+                          rfidScan: rfidScan,
+                          waitingForScan: true,
+                        });
+                        onNavigate('ScanClothes', {
+                          mode: 'process',
+                          processType: selectedProcessType,
+                          guideId: rfidScan.guide_id,
+                          rfidScanId: rfidScan.id,
+                          initialRfids: rfidScan.scanned_rfid_codes || [],
+                          isEditMode: true,
+                          guideToEdit: {
+                            id: rfidScan.guide_id,
+                            guide_number: rfidScan.guide?.guide_number || rfidScan.guide_number,
+                          },
+                        });
+                      },
+                    },
+                  ]
+                );
+              } else {
+                // Proceso sin escaneo: abrir form directamente
+                const newScanType = getNewScanTypeFromProcess(selectedProcessType);
+                setSelectedGuideForProcess({
+                  id: rfidScan.guide_id,
+                  guide_number: rfidScan.guide?.guide_number || rfidScan.guide_number || 'Sin número',
+                  rfidScanId: rfidScan.id,
+                  rfidScan: rfidScan,
+                  pendingScanTypeUpdate: newScanType,
+                });
+                setWashingProcessFormOpen(true);
+              }
             },
           },
         ]
       );
     } else {
-      // No hay retroceso, proceder normalmente
+      // No hay retroceso y no es proceso con escaneo: abrir form directamente
       setGuideSelectionModalOpen(false);
       setSelectedRfidScan(rfidScan);
       
-      const guideId = rfidScan.guide_id;
-      const guideNumber = rfidScan.guide_number;
-      
-      setSelectedGuideForConfirmation({
-        id: guideId,
-        guide_number: guideNumber || 'Sin número',
-        status: rfidScan.scan_type || '',
+      const newScanType = getNewScanTypeFromProcess(selectedProcessType);
+      setSelectedGuideForProcess({
+        id: rfidScan.guide_id,
+        guide_number: rfidScan.guide?.guide_number || rfidScan.guide_number || 'Sin número',
+        rfidScanId: rfidScan.id,
+        rfidScan: rfidScan,
+        pendingScanTypeUpdate: newScanType,
       });
-      setConfirmationModalOpen(true);
+      setWashingProcessFormOpen(true);
     }
   };
 
-  const handleConfirmStatusChange = async () => {
-    setIsUpdatingStatus(true);
-    
-    try {
-      // Obtener el scan type NUEVO correspondiente al proceso seleccionado
-      const newScanType = getNewScanTypeFromProcess(selectedProcessType);
-      
-      if (!selectedRfidScan) {
-        throw new Error('No se encontró el escaneo RFID de la guía');
-      }
-      
-      // Actualizar el scan_type del escaneo RFID
-      // El backend sincronizará automáticamente el estado de la guía y las prendas
-      await updateRfidScanAsync({
-        id: selectedRfidScan.id,
-        data: {
-          guide_id: selectedRfidScan.guide_id,
-          branch_offices_id: selectedRfidScan.branch_offices_id,
-          scan_type: newScanType,
-          scanned_quantity: selectedRfidScan.scanned_quantity,
-          scanned_rfid_codes: selectedRfidScan.scanned_rfid_codes,
-          unexpected_codes: selectedRfidScan.unexpected_codes,
-          differences_detected: selectedRfidScan.differences_detected,
-        }
-      });
-      
-      // El hook useUpdateRfidScan ya invalida y recarga todas las listas automáticamente
-      // Esperar un momento para que se complete la recarga
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setIsUpdatingStatus(false);
-      setConfirmationModalOpen(false);
-      
-      // Volver a abrir el modal de selección de guías para ver los cambios
-      setGuideSelectionModalOpen(true);
-    } catch (error: any) {
-      setIsUpdatingStatus(false);
-      Alert.alert('Error', error.message || 'No se pudo actualizar el estado de la guía');
-    }
-  };
 
   return (
     <Container safe padding="none">
@@ -408,21 +451,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
         isLoading={isLoadingScans || isLoadingGuides}
       />
 
-      {/* Modal de Confirmación de Cambio de Estado */}
-      <GuideStatusConfirmationModal
-        visible={confirmationModalOpen}
-        onClose={() => {
-          setConfirmationModalOpen(false);
-          setGuideSelectionModalOpen(true); // Volver al modal de selección
-        }}
-        onConfirm={handleConfirmStatusChange}
-        guideNumber={selectedGuideForConfirmation?.guide_number || ''}
-        currentStatus={selectedGuideForConfirmation?.status || ''}
-        newStatus={getNewScanTypeFromProcess(selectedProcessType)}
-        processType={selectedProcessType}
-        isLoading={isUpdatingStatus}
-      />
-
       {/* Modal de Form de Proceso (Lavado, Secado, Planchado, Doblado, etc.) */}
       {selectedGuideForProcess && (
         <WashingProcessForm
@@ -432,6 +460,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
           branchOfficeId={branchOfficeId}
           branchOfficeName={branchOfficeName}
           processType={selectedProcessType}
+          rfidScanId={selectedGuideForProcess.rfidScanId}
+          rfidScan={selectedGuideForProcess.rfidScan}
+          pendingScanTypeUpdate={selectedGuideForProcess.pendingScanTypeUpdate}
+          rfidScanUpdateData={selectedGuideForProcess.rfidScanUpdateData} // Datos del RFID scan actualizado desde ScanForm
           onSuccess={() => {
             setWashingProcessFormOpen(false);
             setSelectedGuideForProcess(null);

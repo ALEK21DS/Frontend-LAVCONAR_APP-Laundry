@@ -24,16 +24,32 @@ const isNetworkRelatedError = (...args: any[]): boolean => {
 };
 
 /**
+ * Verifica si un mensaje de error es de acceso denegado (400/403)
+ */
+const isAccessError = (...args: any[]): boolean => {
+  const message = args.join(' ').toLowerCase();
+  
+  return (
+    message.includes('no tienes acceso') ||
+    message.includes('no pertenece a tu sucursal') ||
+    message.includes('access denied') ||
+    message.includes('forbidden') ||
+    message.includes('bad request') && (message.includes('sucursal') || message.includes('acceso'))
+  );
+};
+
+/**
  * Inicializa el supresor de errores de red
  * Debe llamarse una sola vez al inicio de la aplicación
  */
 export const initializeErrorSuppressor = () => {
-  // Sobrescribir console.error para filtrar errores de red
+  // Sobrescribir console.error para filtrar errores de red y de acceso
   console.error = (...args: any[]) => {
-    if (!isNetworkRelatedError(...args)) {
+    // No mostrar errores de red ni de acceso (estos se manejan con Alert en los componentes)
+    if (!isNetworkRelatedError(...args) && !isAccessError(...args)) {
       originalConsoleError.apply(console, args);
     }
-    // Los errores de red se ignoran silenciosamente
+    // Los errores de red y de acceso se ignoran silenciosamente
   };
 
   // Sobrescribir console.warn para filtrar advertencias de red

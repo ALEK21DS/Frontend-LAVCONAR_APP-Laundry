@@ -570,7 +570,17 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
               setSelectedGuide(guide);
               setDetailsOpen(true);
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'No se pudo escanear el código QR');
+              // Mostrar alert con el mensaje del error (ya incluye "No tienes acceso a esta guía" para errores 400/403)
+              const errorMessage = error.message || 'No se pudo escanear el código QR';
+              const isAccessError = errorMessage.includes('No tienes acceso');
+              Alert.alert(
+                isAccessError ? 'Acceso denegado' : 'Error',
+                errorMessage
+              );
+              // Prevenir que el error se propague y se muestre en la consola
+              if (isAccessError) {
+                return; // Salir silenciosamente
+              }
             }
           }}
         />

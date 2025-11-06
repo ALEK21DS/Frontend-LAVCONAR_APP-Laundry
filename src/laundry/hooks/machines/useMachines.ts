@@ -17,45 +17,39 @@ export interface Machine {
   branch_office_name?: string;
 }
 
-interface MachinesResponse {
-  status: number;
-  message: string;
-  data: Machine[];
-  totalData: number;
-  pagination?: {
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
-  timestamp: string;
-}
-
 /**
  * Hook para obtener máquinas filtradas por sucursal
  */
 export const useMachines = (branchOfficeId?: string, machineType?: string) => {
+  // Validar que branchOfficeId sea un string no vacío
+  const isValidBranchOfficeId = branchOfficeId && branchOfficeId.trim() !== '';
+  
   return useQuery({
     queryKey: ['machines', branchOfficeId, machineType],
     queryFn: async (): Promise<Machine[]> => {
+      if (!isValidBranchOfficeId) {
+        return [];
+      }
+
       const params: any = {
         page: 1,
-        limit: 100,
+        limit: 50,
+        branch_office_id: branchOfficeId!.trim(),
       };
-
-      if (branchOfficeId) {
-        params.branch_office_id = branchOfficeId;
-      }
 
       if (machineType) {
         params.machine_type = machineType;
       }
 
       try {
-        const { data } = await washingProcessesApi.get<ApiResponse<MachinesResponse>>(
+        const response = await washingProcessesApi.get<ApiResponse<Machine[]>>(
           '/get-all-machines',
           { params }
         );
-        return data.data?.data || [];
+        
+        // La respuesta es ApiResponse<Machine[]>, así que data.data contiene el array
+        const machines = response.data.data || [];
+        return machines;
       } catch (error: any) {
         if (error?.response?.status === 404) {
           return [];
@@ -63,7 +57,7 @@ export const useMachines = (branchOfficeId?: string, machineType?: string) => {
         throw error;
       }
     },
-    enabled: !!branchOfficeId,
+    enabled: isValidBranchOfficeId,
     staleTime: 1000 * 60 * 5, // 5 minutos
     retry: false,
   });

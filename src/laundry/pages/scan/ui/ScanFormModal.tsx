@@ -10,7 +10,7 @@ interface ScanFormModalProps {
   guideToEdit?: any;
   scannedTags: string[];
   processType?: string;
-  onSuccess: () => void;
+  onSuccess: (rfidScanUpdateData?: any) => void;
   onCancel: () => void;
 }
 
@@ -39,7 +39,10 @@ export const ScanFormModal: React.FC<ScanFormModalProps> = ({
         <ScanForm
           guideData={{ id: guideId }}
           scannedTags={scannedTags}
-          onSubmit={onSuccess}
+          onSubmit={(data) => {
+            // Pasar los datos del RFID scan actualizado al callback
+            onSuccess(data.rfidScanUpdateData);
+          }}
           onCancel={onCancel}
           editContext={{
             guideId: guideId,
@@ -51,6 +54,7 @@ export const ScanFormModal: React.FC<ScanFormModalProps> = ({
           }}
           initialRfidScanFull={fullRfidScan}
           initialGuide={guideToEdit}
+          deferRfidScanUpdate={true} // NO actualizar el RFID scan inmediatamente, se hará al enviar el form de proceso
         />
       </View>
     </Modal>

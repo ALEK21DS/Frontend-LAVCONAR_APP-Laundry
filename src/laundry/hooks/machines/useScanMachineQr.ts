@@ -1,33 +1,33 @@
 import { useMutation } from '@tanstack/react-query';
-import { guidesApi } from '@/laundry/api/guides/guides.api';
-import { Guide } from '@/laundry/interfaces/guides/guides.interface';
+import { washingProcessesApi } from '@/laundry/api/washing-processes/washing-processes.api';
+import { Machine } from './useMachines';
 import { ApiResponse } from '@/interfaces/base.response';
 
-interface ScanQrDto {
+interface ScanMachineQrDto {
   qr_data: string;
 }
 
 /**
- * Hook para escanear código QR de una guía
+ * Hook para escanear código QR de máquina
  */
-export const useScanQr = () => {
+export const useScanMachineQr = () => {
   const mutation = useMutation({
-    mutationFn: async (qrData: string): Promise<Guide> => {
+    mutationFn: async (qrData: string): Promise<Machine> => {
       try {
-        const payload: ScanQrDto = { qr_data: qrData };
-        const { data } = await guidesApi.post<ApiResponse<Guide>>('/scan-qr', payload);
+        const payload: ScanMachineQrDto = { qr_data: qrData };
+        const { data } = await washingProcessesApi.post<ApiResponse<Machine>>('/scan-machine-qr', payload);
         return data.data!;
       } catch (err: any) {
         const status = err?.response?.status;
         const backendMsg = err?.response?.data?.message;
         if (status === 400 || status === 403) {
           // Crear un error personalizado que no se mostrará en la consola
-          const accessError = new Error('No tienes acceso a esta guía');
+          const accessError = new Error('Esta máquina no pertenece a tu sucursal');
           // Marcar el error para que no se muestre en la consola
           (accessError as any).isAccessError = true;
           throw accessError;
         }
-        throw new Error(backendMsg || 'No se pudo escanear el código QR');
+        throw new Error(backendMsg || 'No se pudo escanear el código QR de la máquina');
       }
     },
     onError: (err: any) => {
@@ -35,11 +35,11 @@ export const useScanQr = () => {
       // Estos errores se manejan con Alert en los componentes
       const status = err?.response?.status;
       const errorMessage = err?.message || '';
-      const isAccessError = err?.isAccessError || status === 400 || status === 403 || errorMessage.includes('No tienes acceso');
+      const isAccessError = err?.isAccessError || status === 400 || status === 403 || errorMessage.includes('no pertenece a tu sucursal');
       
       // Solo mostrar error en consola si NO es un error de acceso
       if (!isAccessError) {
-        console.error('Error al escanear QR:', err);
+        console.error('Error al escanear QR de máquina:', err);
       }
       // Para errores de acceso, silenciar completamente el error
     },
@@ -48,11 +48,9 @@ export const useScanQr = () => {
   });
 
   return {
-    scanQr: mutation.mutate,
-    scanQrAsync: mutation.mutateAsync,
+    scanMachineQrAsync: mutation.mutateAsync,
     isScanning: mutation.isPending,
-    scanError: mutation.error,
-    scannedGuide: mutation.data,
+    error: mutation.error,
   };
 };
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform, Modal } from 'react-native';
 import { RNCamera } from 'react-native-camera';
 import Icon from 'react-native-vector-icons/Ionicons';
 
@@ -19,56 +19,62 @@ export const QrScanner: React.FC<QrScannerProps> = ({ visible, onClose, onScan }
     onScan(data);
   };
 
-  if (!visible) return null;
-
   return (
-    <View style={styles.container}>
-      <RNCamera
-        style={StyleSheet.absoluteFill}
-        type={RNCamera.Constants.Type.back}
-        onBarCodeRead={handleBarCodeRead}
-        barCodeTypes={[RNCamera.Constants.BarCodeType.qr]}
-        captureAudio={false}
-        androidCameraPermissionOptions={{
-          title: 'Permiso para usar la cámara',
-          message: 'Necesitamos tu permiso para escanear códigos QR',
-          buttonPositive: 'Aceptar',
-          buttonNegative: 'Cancelar',
-        }}
-      />
-      
-      {/* Overlay */}
-      <View style={styles.overlay}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.headerButton}>
-            <Icon name="close" size={28} color="white" />
-          </TouchableOpacity>
-        </View>
+    <Modal
+      visible={visible}
+      transparent={false}
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent={true}
+    >
+      <View style={styles.container}>
+        <RNCamera
+          style={StyleSheet.absoluteFill}
+          type={RNCamera.Constants.Type.back}
+          onBarCodeRead={handleBarCodeRead}
+          barCodeTypes={[RNCamera.Constants.BarCodeType.qr]}
+          captureAudio={false}
+          androidCameraPermissionOptions={{
+            title: 'Permiso para usar la cámara',
+            message: 'Necesitamos tu permiso para escanear códigos QR',
+            buttonPositive: 'Aceptar',
+            buttonNegative: 'Cancelar',
+          }}
+        />
+        
+        {/* Overlay */}
+        <View style={styles.overlay}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={onClose} style={styles.headerButton}>
+              <Icon name="close" size={28} color="white" />
+            </TouchableOpacity>
+          </View>
 
-        {/* Scanning Area */}
-        <View style={styles.scanArea}>
-          <View style={styles.scanFrame}>
-            {/* Corners */}
-            <View style={[styles.corner, styles.topLeft]} />
-            <View style={[styles.corner, styles.topRight]} />
-            <View style={[styles.corner, styles.bottomLeft]} />
-            <View style={[styles.corner, styles.bottomRight]} />
+          {/* Scanning Area */}
+          <View style={styles.scanArea}>
+            <View style={styles.scanFrame}>
+              {/* Corners */}
+              <View style={[styles.corner, styles.topLeft]} />
+              <View style={[styles.corner, styles.topRight]} />
+              <View style={[styles.corner, styles.bottomLeft]} />
+              <View style={[styles.corner, styles.bottomRight]} />
+            </View>
+          </View>
+
+          {/* Instructions */}
+          <View style={styles.instructions}>
+            <Icon name="scan-outline" size={48} color="white" />
+            <Text style={styles.instructionsText}>
+              Apunta la cámara al código QR
+            </Text>
+            <Text style={styles.instructionsSubtext}>
+              El escaneo se realizará automáticamente
+            </Text>
           </View>
         </View>
-
-        {/* Instructions */}
-        <View style={styles.instructions}>
-          <Icon name="scan-outline" size={48} color="white" />
-          <Text style={styles.instructionsText}>
-            Apunta la cámara al código QR
-          </Text>
-          <Text style={styles.instructionsSubtext}>
-            El escaneo se realizará automáticamente
-          </Text>
-        </View>
       </View>
-    </View>
+    </Modal>
   );
 };
 

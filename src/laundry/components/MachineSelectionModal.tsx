@@ -1,119 +1,108 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, Modal, FlatList, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, FlatList, TextInput, Alert } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { Card, Button } from '@/components/common';
-import { useScanQr } from '@/laundry/hooks/guides';
+import { Card } from '@/components/common';
+import { useScanMachineQr, Machine } from '@/laundry/hooks/machines';
 import { QrScanner } from './QrScanner';
-import { translateEnum } from '@/helpers/enum-translations';
 
-interface Guide {
-  id: string;
-  guide_number: string;
-  client_name?: string;
-  status: string;
-  created_at: string;
-  total_garments?: number;
-}
-
-interface GuideSelectionModalProps {
+interface MachineSelectionModalProps {
   visible: boolean;
   onClose: () => void;
-  onSelectGuide: (guideId: string) => void;
-  processType: string;
-  guides: Guide[];
-  serviceType?: 'industrial' | 'personal';
-  isLoading?: boolean;
+  onSelectMachine: (machine: Machine) => void;
+  machines: Machine[];
 }
 
-export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
+export const MachineSelectionModal: React.FC<MachineSelectionModalProps> = ({
   visible,
   onClose,
-  onSelectGuide,
-  processType,
-  guides,
-  serviceType = 'industrial',
-  isLoading = false,
+  onSelectMachine,
+  machines,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showQrScanner, setShowQrScanner] = useState(false);
-  const [scannedGuide, setScannedGuide] = useState<Guide | null>(null);
-  const { scanQrAsync, isScanning } = useScanQr();
+  const [scannedMachine, setScannedMachine] = useState<Machine | null>(null);
+  const { scanMachineQrAsync, isScanning } = useScanMachineQr();
 
-  const filteredGuides = useMemo(() => {
-    if (!searchQuery.trim()) return guides;
+  const filteredMachines = useMemo(() => {
+    if (!searchQuery.trim()) return machines;
     const query = searchQuery.toLowerCase();
-    return guides.filter(guide => 
-      guide.guide_number.toLowerCase().includes(query)
+    return machines.filter(machine => 
+      machine.code.toLowerCase().includes(query) ||
+      machine.type.toLowerCase().includes(query) ||
+      (machine.description && machine.description.toLowerCase().includes(query))
     );
-  }, [guides, searchQuery]);
-
-  const getProcessTypeLabel = (type: string) => {
-    const processLabels: Record<string, string> = {
-      'IN_PROCESS': 'EN PROCESO',
-      'WASHING': 'LAVADO',
-      'DRYING': 'SECADO',
-      'PACKAGING': 'EMPAQUE',
-      'SHIPPING': 'EMBARQUE',
-      'LOADING': 'CARGA',
-      'DELIVERY': 'ENTREGA',
-    };
-    return processLabels[type] || type;
-  };
+  }, [machines, searchQuery]);
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      'RECEIVED': '#10B981',
-      'IN_PROCESS': '#3B82F6',
-      'WASHING': '#06B6D4',
-      'DRYING': '#F59E0B',
-      'PACKAGING': '#8B5CF6',
-      'SHIPPING': '#EF4444',
-      'LOADING': '#84CC16',
-      'DELIVERY': '#22C55E',
+      'ACTIVE': '#10B981',
+      'INACTIVE': '#6B7280',
+      'MAINTENANCE': '#F59E0B',
+      'OUT_OF_SERVICE': '#EF4444',
     };
     return colors[status] || '#6B7280';
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${day}/${month}/${year} ${hours}:${minutes}`;
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      'ACTIVE': 'Activa',
+      'INACTIVE': 'Inactiva',
+      'MAINTENANCE': 'Mantenimiento',
+      'OUT_OF_SERVICE': 'Fuera de Servicio',
+    };
+    return labels[status] || status;
   };
 
-  const renderGuide = ({ item }: { item: Guide }) => (
+  const getTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      'WASHER': 'Lavadora',
+      'DRYER': 'Secadora',
+      'IRON': 'Plancha',
+      'FOLDER': 'Dobladora',
+    };
+    return labels[type] || type;
+  };
+
+  const renderMachine = ({ item }: { item: Machine }) => (
     <TouchableOpacity
-      onPress={() => onSelectGuide(item.id)}
+      onPress={() => {
+        onSelectMachine(item);
+        onClose();
+      }}
       className="mb-3"
     >
       <Card padding="md" variant="outlined">
         <View className="flex-row items-center">
           <View className="flex-1">
             <View className="flex-row items-center mb-2">
-              <Icon name="document-text-outline" size={20} color="#6B7280" />
+              <Icon name="construct-outline" size={20} color="#6B7280" />
               <Text className="text-lg font-bold text-gray-900 ml-2">
-                {item.guide_number}
+                {item.code}
               </Text>
             </View>
             <Text className="text-sm text-gray-600 mb-1">
-              Fecha: {formatDate(item.created_at)}
+              {getTypeLabel(item.type)}
             </Text>
-            <View className="flex-row items-center justify-between">
-              <Text className="text-sm text-gray-500">
-                {item.total_garments || 0} prendas
+            {item.description && (
+              <Text className="text-sm text-gray-500 mb-1">
+                {item.description}
               </Text>
+            )}
+            <View className="flex-row items-center justify-between">
+              {item.weight_capacity && (
+                <Text className="text-sm text-gray-500">
+                  Capacidad: {item.weight_capacity} kg
+                </Text>
+              )}
               <View 
                 className="px-2 py-1 rounded-full"
-                style={{ backgroundColor: `${getStatusColor(item.status)}20` }}
+                style={{ backgroundColor: `${getStatusColor(item.status_machine)}20` }}
               >
                 <Text 
                   className="text-xs font-medium"
-                  style={{ color: getStatusColor(item.status) }}
+                  style={{ color: getStatusColor(item.status_machine) }}
                 >
-                  {translateEnum(item.status, 'guide_status')}
+                  {getStatusLabel(item.status_machine)}
                 </Text>
               </View>
             </View>
@@ -137,10 +126,10 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
           <View className="flex-row items-center justify-between p-6 border-b border-gray-200">
             <View>
               <Text className="text-2xl font-bold text-gray-900">
-                Guías
+                Seleccionar Máquina
               </Text>
               <Text className="text-sm text-gray-600 mt-1">
-                Selecciona una guía para continuar
+                Selecciona una máquina para el proceso
               </Text>
             </View>
             <TouchableOpacity
@@ -153,16 +142,15 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
 
           {/* Search */}
           <View className="px-6 py-4">
-            <View className="flex-row items-center bg-gray-100 rounded-lg px-3 py-1 mb-3" style={{ minHeight: 36 }}>
-              <Icon name="search-outline" size={16} color="#6B7280" />
+            <View className="flex-row items-center bg-gray-100 rounded-lg px-3 py-2 mb-3">
+              <Icon name="search-outline" size={18} color="#6B7280" />
               <TextInput
-                className="flex-1 ml-2 text-gray-900 text-sm"
-                placeholder="Buscar por número de guía..."
+                className="flex-1 ml-2 text-gray-900"
+                placeholder="Buscar por código, tipo o descripción..."
                 placeholderTextColor="#9CA3AF"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 autoCorrect={false}
-                style={{ paddingVertical: 4, fontSize: 14 }}
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery('')}>
@@ -184,29 +172,22 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Guides List */}
+          {/* Machines List */}
           <View className="flex-1 px-6">
-            {isLoading ? (
+            {filteredMachines.length === 0 ? (
               <View className="flex-1 items-center justify-center">
-              <ActivityIndicator size="large" color="#8EB021" />
-                <Text className="text-sm text-gray-500 mt-4">
-                  Cargando guías...
-                </Text>
-              </View>
-            ) : filteredGuides.length === 0 ? (
-              <View className="flex-1 items-center justify-center">
-                <Icon name="document-outline" size={48} color="#D1D5DB" />
+                <Icon name="construct-outline" size={48} color="#D1D5DB" />
                 <Text className="text-lg font-medium text-gray-500 mt-4">
-                  No hay guías disponibles
+                  No hay máquinas disponibles
                 </Text>
                 <Text className="text-sm text-gray-400 mt-2 text-center">
-                  No se encontraron guías para este proceso
+                  No se encontraron máquinas
                 </Text>
               </View>
             ) : (
               <FlatList
-                data={filteredGuides}
-                renderItem={renderGuide}
+                data={filteredMachines}
+                renderItem={renderMachine}
                 keyExtractor={item => item.id}
                 showsVerticalScrollIndicator={false}
               />
@@ -223,26 +204,12 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
           onScan={async (qrData: string) => {
             setShowQrScanner(false);
             try {
-              const guide = await scanQrAsync(qrData);
-              
-              // Validar que el tipo de servicio de la guía coincida con el seleccionado
-              const guideServiceType = guide.service_type?.toUpperCase();
-              const expectedServiceType = serviceType === 'industrial' ? 'INDUSTRIAL' : 'PERSONAL';
-              
-              if (guideServiceType !== expectedServiceType) {
-                const serviceTypeLabel = serviceType === 'industrial' ? 'Industrial' : 'Personal';
-                Alert.alert(
-                  'Tipo de servicio no coincide',
-                  `Esta guía es de servicio ${guideServiceType === 'INDUSTRIAL' ? 'Industrial' : 'Personal'}, pero has seleccionado servicio ${serviceTypeLabel}. Por favor, selecciona el tipo de servicio correcto.`
-                );
-                return;
-              }
-              
-              setScannedGuide(guide);
+              const machine = await scanMachineQrAsync(qrData);
+              setScannedMachine(machine);
             } catch (error: any) {
-              // Mostrar alert con el mensaje del error (ya incluye "No tienes acceso a esta guía" para errores 400/403)
-              const errorMessage = error.message || 'No se pudo escanear el código QR';
-              const isAccessError = errorMessage.includes('No tienes acceso');
+              // Mostrar alert con el mensaje del error (ya incluye "no pertenece a tu sucursal" para errores 400/403)
+              const errorMessage = error.message || 'No se pudo escanear el código QR de la máquina';
+              const isAccessError = errorMessage.includes('no pertenece a tu sucursal');
               Alert.alert(
                 isAccessError ? 'Acceso denegado' : 'Error',
                 errorMessage
@@ -256,12 +223,12 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
         />
       )}
       
-      {/* Modal de Detalles de Guía Escaneada */}
+      {/* Modal de Detalles de Máquina Escaneada */}
       <Modal
-        visible={!!scannedGuide}
+        visible={!!scannedMachine}
         transparent
         animationType="fade"
-        onRequestClose={() => setScannedGuide(null)}
+        onRequestClose={() => setScannedMachine(null)}
       >
         <View className="flex-1 bg-black/60 justify-center items-center">
           <View className="bg-white rounded-3xl mx-4 w-11/12 max-w-md" style={{ elevation: 10 }}>
@@ -271,11 +238,11 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
                 <View className="flex-row items-center flex-1">
                   <Icon name="qr-code-outline" size={28} color="white" />
                   <Text className="text-white text-2xl font-bold ml-3">
-                    Guía Encontrada
+                    Máquina Encontrada
                   </Text>
                 </View>
                 <TouchableOpacity
-                  onPress={() => setScannedGuide(null)}
+                  onPress={() => setScannedMachine(null)}
                   className="w-8 h-8 rounded-full bg-white/20 items-center justify-center"
                 >
                   <Icon name="close" size={20} color="white" />
@@ -287,59 +254,61 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
             </View>
 
             {/* Body */}
-            {scannedGuide && (
+            {scannedMachine && (
               <View className="p-6">
-                {/* Número de Guía */}
+                {/* Código de la Máquina */}
                 <View className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <Text className="text-sm font-medium mb-1" style={{ color: '#0b1f36' }}>Número de Guía</Text>
+                  <Text className="text-sm font-medium mb-1" style={{ color: '#0b1f36' }}>Código</Text>
                   <Text className="text-2xl font-bold text-blue-900">
-                    {scannedGuide.guide_number}
+                    {scannedMachine.code}
                   </Text>
                 </View>
 
                 {/* Información Principal */}
                 <View className="space-y-3 mb-6">
                   <View className="flex-row justify-between py-2 border-b border-gray-100">
-                    <Text className="text-sm text-gray-600">Cliente:</Text>
+                    <Text className="text-sm text-gray-600">Tipo:</Text>
                     <Text className="text-sm font-semibold text-gray-900">
-                      {scannedGuide.client_name || 'Sin cliente'}
+                      {getTypeLabel(scannedMachine.type)}
                     </Text>
                   </View>
                   
-                  <View className="flex-row justify-between py-2 border-b border-gray-100">
-                    <Text className="text-sm text-gray-600">Total Prendas:</Text>
-                    <Text className="text-sm font-semibold text-gray-900">
-                      {scannedGuide.total_garments || 0}
-                    </Text>
-                  </View>
-                  
-                  <View className="flex-row justify-between py-2 border-b border-gray-100">
-                    <Text className="text-sm text-gray-600">Estado:</Text>
-                    <View 
-                      className="px-3 py-1 rounded-full"
-                      style={{ backgroundColor: `${getStatusColor(scannedGuide.status)}20` }}
-                    >
-                      <Text 
-                        className="text-xs font-bold"
-                        style={{ color: getStatusColor(scannedGuide.status) }}
-                      >
-                        {scannedGuide.status}
+                  {scannedMachine.description && (
+                    <View className="flex-row justify-between py-2 border-b border-gray-100">
+                      <Text className="text-sm text-gray-600">Descripción:</Text>
+                      <Text className="text-sm font-semibold text-gray-900">
+                        {scannedMachine.description}
                       </Text>
                     </View>
+                  )}
+                  
+                  <View className="flex-row justify-between py-2 border-b border-gray-100">
+                    <Text className="text-sm text-gray-600">Capacidad:</Text>
+                    <Text className="text-sm font-semibold text-gray-900">
+                      {scannedMachine.weight_capacity} kg
+                    </Text>
                   </View>
                   
                   <View className="flex-row justify-between py-2">
-                    <Text className="text-sm text-gray-600">Fecha de Creación:</Text>
-                    <Text className="text-sm font-medium text-gray-900">
-                      {new Date(scannedGuide.created_at).toLocaleDateString('es-ES')}
-                    </Text>
+                    <Text className="text-sm text-gray-600">Estado:</Text>
+                    <View 
+                      className="px-3 py-1 rounded-full"
+                      style={{ backgroundColor: `${getStatusColor(scannedMachine.status_machine)}20` }}
+                    >
+                      <Text 
+                        className="text-xs font-bold"
+                        style={{ color: getStatusColor(scannedMachine.status_machine) }}
+                      >
+                        {getStatusLabel(scannedMachine.status_machine)}
+                      </Text>
+                    </View>
                   </View>
                 </View>
 
                 {/* Botones */}
                 <View className="flex-row space-x-2">
                   <TouchableOpacity
-                    onPress={() => setScannedGuide(null)}
+                    onPress={() => setScannedMachine(null)}
                     className="flex-1 bg-gray-100 p-4 rounded-lg items-center"
                   >
                     <Text className="text-gray-700 font-semibold">Cancelar</Text>
@@ -347,13 +316,14 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
                   
                   <TouchableOpacity
                     onPress={() => {
-                      onSelectGuide(scannedGuide.id);
-                      setScannedGuide(null);
+                      onSelectMachine(scannedMachine);
+                      setScannedMachine(null);
+                      onClose();
                     }}
                     className="flex-1 bg-blue-500 p-4 rounded-lg flex-row items-center justify-center"
                   >
-                    <Icon name="arrow-forward-circle-outline" size={20} color="white" />
-                    <Text className="text-white font-semibold ml-2">Continuar</Text>
+                    <Icon name="checkmark-circle-outline" size={20} color="white" />
+                    <Text className="text-white font-semibold ml-2">Seleccionar</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -364,3 +334,4 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
     </Modal>
   );
 };
+

@@ -202,7 +202,17 @@ export const VehicleSelectionModal: React.FC<VehicleSelectionModalProps> = ({
               const vehicle = await scanVehicleQrAsync(qrData);
               setScannedVehicle(vehicle);
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'No se pudo escanear el código QR del vehículo');
+              // Mostrar alert con el mensaje del error (ya incluye "no pertenece a tu sucursal" para errores 400/403)
+              const errorMessage = error.message || 'No se pudo escanear el código QR del vehículo';
+              const isAccessError = errorMessage.includes('no pertenece a tu sucursal');
+              Alert.alert(
+                isAccessError ? 'Acceso denegado' : 'Error',
+                errorMessage
+              );
+              // Prevenir que el error se propague y se muestre en la consola
+              if (isAccessError) {
+                return; // Salir silenciosamente
+              }
             }
           }}
         />

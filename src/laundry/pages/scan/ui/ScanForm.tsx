@@ -24,6 +24,8 @@ type ScanFormProps = {
   initialGuide?: any;
   // Detalles de guía removidos del flujo
   initialRfidScanFull?: any;
+  // Si es true, NO actualiza el RFID scan inmediatamente, sino que pasa los datos al callback
+  deferRfidScanUpdate?: boolean;
 };
 
 export const ScanForm: React.FC<ScanFormProps> = ({
@@ -38,7 +40,8 @@ export const ScanForm: React.FC<ScanFormProps> = ({
   editContext,
   initialGuide,
   initialGuideGarment,
-  initialRfidScanFull
+  initialRfidScanFull,
+  deferRfidScanUpdate = false,
 }) => {
   const { user } = useAuthStore();
   const { sucursales } = useBranchOffices();
@@ -151,35 +154,50 @@ export const ScanForm: React.FC<ScanFormProps> = ({
         createdGuide = await createGuideAsync(guideData);
       }
 
+      // ========== PASO 2: CREAR/ACTUALIZAR ESCANEO RFID ==========
+      // NOTA: user_id NO se envía, el backend lo obtiene del token JWT
+      
+      const rfidScanData = {
+        guide_id: createdGuide.id,
+        branch_offices_id: formData.branch_offices_id,
+        scan_type: formData.scan_type as any,
+        scanned_quantity: formData.scanned_quantity,
+        scanned_rfid_codes: formData.scanned_rfid_codes,
+        unexpected_codes: formData.unexpected_codes || [],
+        location: formData.location || undefined,
+        differences_detected: formData.differences_detected || undefined,
+      } as any;
+
+      // Si deferRfidScanUpdate es true, NO actualizar el RFID scan aquí
+      // Los datos se pasarán al callback para actualizarlos después junto con el proceso
+      if (deferRfidScanUpdate && editContext?.rfidScanId) {
+        // Pasar los datos actualizados al callback sin actualizar el RFID scan
+        onSubmit({
+          ...formData,
+          rfidScanUpdateData: {
+            id: editContext.rfidScanId,
+            data: rfidScanData,
+          },
+        });
+        return;
+      }
+
+      // Comportamiento normal: actualizar el RFID scan inmediatamente
       try {
-          // ========== PASO 2: CREAR/ACTUALIZAR ESCANEO RFID ==========
-          // NOTA: user_id NO se envía, el backend lo obtiene del token JWT
-          
-          const rfidScanData = {
-            guide_id: createdGuide.id,
-            branch_offices_id: formData.branch_offices_id,
-            scan_type: formData.scan_type as any,
-            scanned_quantity: formData.scanned_quantity,
-            scanned_rfid_codes: formData.scanned_rfid_codes,
-            unexpected_codes: formData.unexpected_codes || [],
-            location: formData.location || undefined,
-            differences_detected: formData.differences_detected || undefined,
-          } as any;
-
-          if (editContext?.rfidScanId) {
-            const rsDiff = buildDiff(initialRfidScanFull, rfidScanData);
-            if (Object.keys(rsDiff).length > 0) {
-              await updateRfidScanAsync({ id: editContext.rfidScanId, data: rsDiff });
-            }
-          } else {
-            await createRfidScanAsync(rfidScanData);
+        if (editContext?.rfidScanId) {
+          const rsDiff = buildDiff(initialRfidScanFull, rfidScanData);
+          if (Object.keys(rsDiff).length > 0) {
+            await updateRfidScanAsync({ id: editContext.rfidScanId, data: rsDiff });
           }
+        } else {
+          await createRfidScanAsync(rfidScanData);
+        }
 
-          // ✅ TODO EXITOSO
-          onSubmit(formData);
-          if (onNavigate) {
-            onNavigate('Dashboard');
-          }
+        // ✅ TODO EXITOSO
+        onSubmit(formData);
+        if (onNavigate) {
+          onNavigate('Dashboard');
+        }
 
       } catch (scanError: any) {
           const errorMessage = scanError.response?.data?.message || scanError.message;
