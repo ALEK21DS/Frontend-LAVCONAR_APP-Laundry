@@ -9,27 +9,10 @@
  * import { useClients, useCreateClient } from '@/laundry/hooks/clients';
  */
 
-// Clientes
 export * from './clients';
-
-// Guías (incluye guías, prendas, detalles de guías, escaneos RFID)
-// Todos unificados bajo /admin-guides endpoint
 export * from './guides';
-
-// Tags RFID
-export * from './tags';
-
-// Procesos de lavado
-export * from './washing-processes';
-
-// Sucursales
-export * from './branch-offices';
-
-// Dashboard
-export * from './dashboard';
-
-// Vehículos
-export * from './vehicles';
-
-// Catálogos
 export * from './catalogs';
+export * from './vehicles';
+export * from './machines';
+export * from './washing-processes';
+export * from './dashboard';

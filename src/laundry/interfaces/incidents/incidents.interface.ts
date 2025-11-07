@@ -31,11 +31,14 @@ export interface Incident {
     description?: string;
   };
   incident_type: IncidentType;
+  incident_type_label?: string;
   description: string;
   responsible?: string;
   action_taken?: ActionTaken;
+  action_taken_label?: string;
   compensation_amount?: number;
   status: IncidentStatus;
+  status_label?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;

@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
-import { Button, Card } from '@/components/common';
+import { Card, Button } from '@/components/common';
 import { Incident } from '@/laundry/interfaces/incidents/incidents.interface';
-import { translateEnum, formatDateTime } from '@/helpers';
+import { formatDateTime } from '@/helpers/formatters.helper';
+import { getStatusColor, getTypeColor } from '@/laundry/pages/incidents/incidents.utils';
+import { useCatalogLabelMap } from '@/laundry/hooks';
 
 interface IncidentDetailsModalProps {
   visible: boolean;
@@ -18,28 +20,11 @@ export const IncidentDetailsModal: React.FC<IncidentDetailsModalProps> = ({
   incident,
   onEdit,
 }) => {
+  const { getLabel: getIncidentTypeLabel } = useCatalogLabelMap('incident_type', { forceFresh: true });
+  const { getLabel: getIncidentStatusLabel } = useCatalogLabelMap('incident_status', { forceFresh: true });
+  const { getLabel: getActionTakenLabel } = useCatalogLabelMap('action_taken', { forceFresh: true, fallbackLabel: '—' });
+
   if (!incident) return null;
-
-  const getTypeColor = (type: string) => {
-    const colors: Record<string, string> = {
-      'DELAY': '#F59E0B',
-      'QUALITY_ISSUE': '#8B5CF6',
-      'DAMAGE': '#EF4444',
-      'LOSS': '#DC2626',
-      'OTHER': '#6B7280',
-    };
-    return colors[type] || '#6B7280';
-  };
-
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      'OPEN': '#EF4444',
-      'IN_PROGRESS': '#3B82F6',
-      'RESOLVED': '#10B981',
-      'CLOSED': '#6B7280',
-    };
-    return colors[status] || '#6B7280';
-  };
 
   const guideNumber = incident.guide?.guide_number || incident.guide_number || 'Sin guía';
   const userName = incident.user?.name || (incident as any).user_name || 'N/A';
@@ -82,7 +67,7 @@ export const IncidentDetailsModal: React.FC<IncidentDetailsModalProps> = ({
                   className="text-sm font-medium"
                   style={{ color: getTypeColor(incident.incident_type) }}
                 >
-                  {translateEnum(incident.incident_type, 'incident_type')}
+                  {getIncidentTypeLabel(incident.incident_type, incident.incident_type_label || incident.incident_type || '—')}
                 </Text>
               </View>
               <View 
@@ -93,7 +78,7 @@ export const IncidentDetailsModal: React.FC<IncidentDetailsModalProps> = ({
                   className="text-sm font-medium"
                   style={{ color: getStatusColor(incident.status) }}
                 >
-                  {translateEnum(incident.status, 'incident_status')}
+                  {getIncidentStatusLabel(incident.status, incident.status_label || incident.status || '—')}
                 </Text>
               </View>
             </View>
@@ -173,7 +158,7 @@ export const IncidentDetailsModal: React.FC<IncidentDetailsModalProps> = ({
                     <View className="flex-row items-center">
                       <IonIcon name="construct-outline" size={16} color="#4B5563" />
                       <Text className="text-sm text-gray-800 ml-2">
-                        {translateEnum(incident.action_taken, 'action_taken')}
+                        {getActionTakenLabel(incident.action_taken, incident.action_taken_label || incident.action_taken || '—')}
                       </Text>
                     </View>
                   </View>

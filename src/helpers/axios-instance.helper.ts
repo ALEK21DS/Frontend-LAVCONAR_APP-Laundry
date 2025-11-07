@@ -105,7 +105,7 @@ export const createAuthenticatedAxiosInstance = (
           const { useAuthStore } = await import('@/auth/store/auth.store');
           
           try {
-            useAuthStore.getState().logout();
+          useAuthStore.getState().logout();
           } catch (logoutError) {
             // Si hay error en logout, no es crítico, ya limpiamos el storage
             console.warn('Error al hacer logout automático:', logoutError);

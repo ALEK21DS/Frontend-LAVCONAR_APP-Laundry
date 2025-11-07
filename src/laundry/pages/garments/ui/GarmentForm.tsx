@@ -136,7 +136,20 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
   const userBranchId = user?.branch_office_id || (user as any)?.sucursalId || '';
   const branchOptions = sucursales.map(s => ({ label: s.name, value: s.id }));
   const [colorInput, setColorInput] = useState('');
-  const [colors, setColors] = useState<string[]>(Array.isArray(initialValues?.colors) ? initialValues!.colors! : []);
+  // Filtrar valores undefined/null y asegurar que sean strings
+  // También manejar el caso donde puede venir como 'color' (singular) en initialValues
+  const initialColors = React.useMemo(() => {
+    if (Array.isArray(initialValues?.colors)) {
+      return initialValues.colors.filter((c): c is string => typeof c === 'string' && c.trim() !== '');
+    }
+    // Verificar si hay una propiedad 'color' (puede venir del backend como singular)
+    const colorValue = (initialValues as any)?.color;
+    if (colorValue && typeof colorValue === 'string' && colorValue.trim() !== '') {
+      return [colorValue];
+    }
+    return [];
+  }, [initialValues]);
+  const [colors, setColors] = useState<string[]>(initialColors);
   const [garmentType, setGarmentType] = useState(initialValues?.garmentType || '');
   const [brand, setBrand] = useState(initialValues?.brand || '');
   const [description, setDescription] = useState(initialValues?.description || '');
@@ -273,7 +286,7 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
             <Card padding="sm" variant="outlined" className="mt-3">
               <Text className="text-sm font-medium text-gray-700 mb-2">Colores seleccionados</Text>
               <View className="flex-row flex-wrap -m-1">
-                {colors.map((c) => {
+                {colors.filter((c): c is string => typeof c === 'string' && c.trim() !== '').map((c) => {
                   const key = c.toLowerCase();
                   const dot = COLOR_HEX[key] || '#6b7280';
                   return (

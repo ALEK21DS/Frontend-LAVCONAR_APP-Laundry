@@ -148,12 +148,12 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
       .map(v => ({ label: v.label, value: v.code as IncidentType }));
     if (opts.length > 0) return opts;
     return [
-      { label: 'Retraso', value: 'DELAY' },
-      { label: 'Problema de Calidad', value: 'QUALITY_ISSUE' },
-      { label: 'Daño', value: 'DAMAGE' },
-      { label: 'Pérdida', value: 'LOSS' },
-      { label: 'Otro', value: 'OTHER' },
-    ];
+    { label: 'Retraso', value: 'DELAY' },
+    { label: 'Problema de Calidad', value: 'QUALITY_ISSUE' },
+    { label: 'Daño', value: 'DAMAGE' },
+    { label: 'Pérdida', value: 'LOSS' },
+    { label: 'Otro', value: 'OTHER' },
+  ];
   }, [incidentTypeCatalog]);
 
   const actionTakenOptions: { label: string; value: ActionTaken }[] = useMemo(() => {
@@ -164,12 +164,12 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
     if (opts.length > 0) return opts;
     return [
       { label: 'Ninguna', value: 'NONE' as ActionTaken },
-      { label: 'Reparar', value: 'REPAIR' },
-      { label: 'Reemplazar', value: 'REPLACE' },
-      { label: 'Compensar', value: 'COMPENSATE' },
-      { label: 'Reembolsar', value: 'REFUND' },
-      { label: 'Otro', value: 'OTHER' },
-    ];
+    { label: 'Reparar', value: 'REPAIR' },
+    { label: 'Reemplazar', value: 'REPLACE' },
+    { label: 'Compensar', value: 'COMPENSATE' },
+    { label: 'Reembolsar', value: 'REFUND' },
+    { label: 'Otro', value: 'OTHER' },
+  ];
   }, [actionTakenCatalog]);
 
   const statusOptions: { label: string; value: IncidentStatus }[] = useMemo(() => {
@@ -179,11 +179,11 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
       .map(v => ({ label: v.label, value: v.code as IncidentStatus }));
     if (opts.length > 0) return opts;
     return [
-      { label: 'Abierto', value: 'OPEN' },
-      { label: 'En Progreso', value: 'IN_PROGRESS' },
-      { label: 'Resuelto', value: 'RESOLVED' },
-      { label: 'Cerrado', value: 'CLOSED' },
-    ];
+    { label: 'Abierto', value: 'OPEN' },
+    { label: 'En Progreso', value: 'IN_PROGRESS' },
+    { label: 'Resuelto', value: 'RESOLVED' },
+    { label: 'Cerrado', value: 'CLOSED' },
+  ];
   }, [incidentStatusCatalog]);
 
   const validateField = (field: string, value: any) => {

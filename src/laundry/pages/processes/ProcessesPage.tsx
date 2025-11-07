@@ -8,7 +8,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { ProcessForm } from './ui/ProcessForm';
 import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
 import { useWashingProcesses } from '@/laundry/hooks/washing-processes';
-import { translateEnum } from '@/helpers/enum-translations';
+import { useCatalogLabelMap } from '@/laundry/hooks';
 
 type ProcessesPageProps = { navigation: NativeStackNavigationProp<any> };
 
@@ -36,6 +36,9 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
     limit,
     search: debouncedQuery,
   });
+
+  const { getLabel: getProcessTypeLabel } = useCatalogLabelMap('process_type', { forceFresh: true });
+  const { getLabel: getProcessStatusLabel } = useCatalogLabelMap('process_status', { forceFresh: true });
 
   // Refrescar al entrar a la pantalla
   useFocusEffect(
@@ -124,7 +127,7 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
                               {p.guide?.guide_number || p.machine_code || 'Sin código'}
                             </Text>
                             <Text className="text-gray-500 text-xs">
-                              {translateEnum(p.process_type, 'process_type') || 'Sin tipo'}
+                              {getProcessTypeLabel(p.process_type, (p as any).process_type_label || p.process_type || 'Sin tipo')}
                             </Text>
                             {p.guide?.client?.name && (
                               <Text className="text-gray-400 text-xs mt-1">
@@ -158,7 +161,7 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
                                 p.status === 'FAILED' ? 'text-red-700' :
                                 'text-gray-700'
                               }`}>
-                                {translateEnum(p.status, 'process_status') || 'Sin estado'}
+                                {getProcessStatusLabel(p.status, (p as any).status_label || p.status || 'Sin estado')}
                               </Text>
                             </View>
                             {p.garment_quantity && (

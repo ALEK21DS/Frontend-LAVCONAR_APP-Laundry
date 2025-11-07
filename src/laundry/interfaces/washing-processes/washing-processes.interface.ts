@@ -4,6 +4,7 @@ export interface WashingProcess {
   branch_offices_id: string;
   machine_code?: string;
   process_type: string;
+  process_type_label?: string;
   start_time: Date | string;
   load_weight?: number;
   garment_quantity?: number;
@@ -14,6 +15,7 @@ export interface WashingProcess {
   bleach_used?: boolean;
   end_time?: Date | string;
   status?: string;
+  status_label?: string;
   notes?: string;
   is_active?: boolean;
   created_at?: Date | string;

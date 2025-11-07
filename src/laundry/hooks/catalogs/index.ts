@@ -1,2 +1,3 @@
-export { useCatalogValuesByType } from './useCatalogValuesByType';
+export * from './useCatalogValuesByType';
+export * from './useCatalogLabelMap';
 

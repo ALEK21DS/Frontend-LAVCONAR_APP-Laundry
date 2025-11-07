@@ -3,12 +3,14 @@ export interface Garment {
   rfid_code: string;
   branch_offices_id?: string;
   description?: string;
-  color?: string;
+  color?: string[]; // Array de códigos de colores del catálogo
   garment_type?: string;
-  brand?: string;
-  physical_state?: string;
+  garment_brand?: string; // Nota: en el backend es garment_brand, no brand
+  garment_condition?: string;
+  physical_condition?: string;
   weight?: number; // Peso de la prenda en kg
   observations?: string;
+  qr_code?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -20,22 +22,25 @@ export interface CreateGarmentDto {
   rfid_code?: string;
   branch_offices_id?: string;
   description?: string;
-  color?: string;
+  color?: string[]; // Array de códigos de colores del catálogo
   garment_type?: string;
-  brand?: string;
-  physical_state?: string;
+  garment_brand?: string; // Nota: en el backend es garment_brand, no brand
+  garment_condition?: string;
+  physical_condition?: string;
   weight?: number;
   observations?: string;
+  qr_code?: string;
 }
 
 export interface UpdateGarmentDto {
   description?: string;
-  color?: string;
+  color?: string[]; // Array de códigos de colores del catálogo
   garment_type?: string;
-  brand?: string;
-  physical_state?: string;
+  garment_brand?: string; // Nota: en el backend es garment_brand, no brand
+  garment_condition?: string;
+  physical_condition?: string;
   observations?: string;
   weight?: number;
-  status?: string;
+  qr_code?: string;
 }
 

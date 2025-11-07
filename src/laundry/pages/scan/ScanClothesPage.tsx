@@ -12,10 +12,13 @@ import { ProcessForm } from '@/laundry/pages/processes/ui/ProcessForm';
 import { GarmentForm } from '@/laundry/pages/garments/ui/GarmentForm';
 import { ScanFormModal } from '@/laundry/pages/scan/ui/ScanFormModal';
 import { useClients } from '@/laundry/hooks/clients';
+import { useCatalogValuesByType } from '@/laundry/hooks';
 import { useGarments, useCreateGarment, useUpdateGarment, useGuides, useGarmentsByRfidCodes } from '@/laundry/hooks/guides';
 import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
 import { GuideSelectionModal } from '@/laundry/components/GuideSelectionModal';
 import { garmentsApi } from '@/laundry/api/garments/garments.api';
+import { guidesApi } from '@/laundry/api/guides/guides.api';
+import { ApiResponse } from '@/interfaces/base.response';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type ScanClothesPageProps = {
@@ -135,29 +138,128 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   }, [registeredGarments]);
   
   // Para servicio industrial y modo garment: verificar prendas registradas por RFID
+  // También cuando viene desde procesos (mode === 'process') con serviceType industrial
+  // Y cuando es mode === 'guide' con serviceType === 'industrial'
   const rfidCodes = scannedTags.map(tag => tag.epc);
-  const { data: garmentsData } = useGarmentsByRfidCodes(
+  
+  // Determinar si debemos verificar prendas:
+  // - mode === 'garment' (registrar prenda): siempre verificar
+  // - mode === 'process' (procesos): siempre verificar
+  // - mode === 'guide' con serviceType === 'industrial': verificar
+  // - mode === 'guide' con serviceType === 'personal': NO verificar (usa registeredGarments)
+  const shouldCheckGarments = (
+    mode === 'garment' || 
+    mode === 'process' || 
+    (mode === 'guide' && serviceType === 'industrial')
+  ) && rfidCodes.length > 0;
+
+  // Catálogo de tipos de prenda para mostrar etiquetas en español
+  const { data: garmentTypeCatalog } = useCatalogValuesByType('garment_type', true, { forceFresh: true });
+
+  const garmentTypeLabelMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    if (garmentTypeCatalog?.data) {
+      garmentTypeCatalog.data
+        .filter((item) => item.is_active !== false)
+        .forEach((item) => {
+          const originalCode = item.code ?? '';
+          const normalizedCode = originalCode.trim().toUpperCase().replace(/[\s-]/g, '_');
+          if (normalizedCode) {
+            map.set(normalizedCode, item.label);
+          }
+          if (originalCode) {
+            map.set(originalCode, item.label);
+          }
+        });
+    }
+    return map;
+  }, [garmentTypeCatalog]);
+  
+  const { data: garmentsData, isLoading: isLoadingGarments, error: garmentsError } = useGarmentsByRfidCodes(
     rfidCodes, 
-    (serviceType === 'industrial' || mode === 'garment') && rfidCodes.length > 0
+    shouldCheckGarments
   );
   
   // Crear un mapa de RFID -> Prenda para búsqueda rápida
+  // Normalizar los códigos RFID a mayúsculas para la comparación
   const garmentsByRfid = React.useMemo(() => {
     const map = new Map();
-    if (garmentsData?.data) {
+    if (garmentsData?.data && Array.isArray(garmentsData.data)) {
       garmentsData.data.forEach((garment: any) => {
         if (garment.rfid_code) {
-          map.set(garment.rfid_code, garment);
+          // Normalizar a mayúsculas para la comparación
+          const normalizedRfid = garment.rfid_code.trim().toUpperCase();
+          map.set(normalizedRfid, garment);
         }
       });
     }
     return map;
   }, [garmentsData]);
   
-  // Contar prendas no registradas
+  // Función helper para obtener una prenda por RFID (con normalización)
+  const getGarmentByRfid = React.useCallback((rfidCode: string) => {
+    if (!rfidCode) return null;
+    const normalizedRfid = rfidCode.trim().toUpperCase();
+    return garmentsByRfid.get(normalizedRfid);
+  }, [garmentsByRfid]);
+  
+  // Debug: Log para verificar qué está pasando
+  React.useEffect(() => {
+    if (shouldCheckGarments && rfidCodes.length > 0 && !isLoadingGarments) {
+      const sampleTags = scannedTags.slice(0, 3).map(t => ({
+        epc: t.epc,
+        found: !!getGarmentByRfid(t.epc),
+        garment: getGarmentByRfid(t.epc) ? {
+          id: getGarmentByRfid(t.epc)?.id,
+          description: getGarmentByRfid(t.epc)?.description,
+        } : null,
+      }));
+      
+      console.log('🔍 Verificando prendas:', {
+        mode,
+        serviceType,
+        shouldCheckGarments,
+        rfidCodesCount: rfidCodes.length,
+        rfidCodes: rfidCodes.slice(0, 3), // Primeros 3 para no saturar
+        isLoadingGarments,
+        garmentsError: garmentsError?.message,
+        garmentsFound: garmentsByRfid.size,
+        garmentsDataLength: garmentsData?.data?.length || 0,
+        garmentsDataSample: garmentsData?.data?.slice(0, 2)?.map((g: any) => ({
+          id: g.id,
+          rfid_code: g.rfid_code,
+          description: g.description,
+          garment_type: g.garment_type,
+        })),
+        scannedTagsSample: sampleTags,
+      });
+    }
+  }, [shouldCheckGarments, rfidCodes.length, isLoadingGarments, garmentsError, garmentsByRfid.size, mode, serviceType, garmentsData, scannedTags, getGarmentByRfid]);
+  
+  // Contar prendas no registradas (usando normalización)
   const unregisteredCount = React.useMemo(() => {
-    return scannedTags.filter(tag => !garmentsByRfid.has(tag.epc)).length;
-  }, [scannedTags, garmentsByRfid]);
+    return scannedTags.filter(tag => !getGarmentByRfid(tag.epc)).length;
+  }, [scannedTags, getGarmentByRfid]);
+
+  // Peso total de prendas obtenidas del backend (para industrial y procesos)
+  const totalWeightFromScannedGarments = React.useMemo(() => {
+    if (scannedTags.length === 0) {
+      return 0;
+    }
+
+    return scannedTags.reduce((total, tag) => {
+      const garment = getGarmentByRfid(tag.epc);
+      if (!garment) return total;
+
+      const rawWeight = (garment as any).weight ?? (garment as any).weight_kg ?? (garment as any).peso;
+      if (rawWeight === undefined || rawWeight === null) return total;
+
+      const numericWeight = typeof rawWeight === 'string' ? parseFloat(rawWeight) : Number(rawWeight);
+      if (Number.isNaN(numericWeight)) return total;
+
+      return total + numericWeight;
+    }, 0);
+  }, [scannedTags, getGarmentByRfid]);
 
   // Agrupar tags por tipo de prenda (solo para servicio industrial)
   const groupedTagsByGarmentType = React.useMemo(() => {
@@ -168,11 +270,12 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     const grouped = new Map<string, { garmentType: string; count: number; tags: ScannedTag[] }>();
     
     scannedTags.forEach(tag => {
-      const garment = garmentsByRfid.get(tag.epc);
+      const garment = getGarmentByRfid(tag.epc);
       
-      if (garment && garment.garment_type) {
-        // Prenda registrada con tipo
-        const garmentType = garment.garment_type;
+      if (garment) {
+        // Prenda registrada (con o sin tipo)
+        // Si tiene garment_type, agrupar por tipo; si no, agrupar como "REGISTERED"
+        const garmentType = garment.garment_type || 'REGISTERED';
         if (!grouped.has(garmentType)) {
           grouped.set(garmentType, {
             garmentType,
@@ -199,8 +302,23 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       }
     });
 
-    return Array.from(grouped.values());
-  }, [scannedTags, garmentsByRfid, serviceType]);
+    const result = Array.from(grouped.values());
+    
+    // Log de depuración para modo guide-industrial
+    if (mode === 'guide' && serviceType === 'industrial' && scannedTags.length > 0) {
+      console.log('📊 Agrupación de prendas (guide-industrial):', {
+        totalTags: scannedTags.length,
+        groupedCount: result.length,
+        groups: result.map(g => ({
+          type: g.garmentType,
+          count: g.count,
+          tagsCount: g.tags.length
+        }))
+      });
+    }
+    
+    return result;
+  }, [scannedTags, getGarmentByRfid, serviceType, mode]);
 
   // Calcular peso total de las prendas registradas
   const calculateTotalWeight = useCallback(() => {
@@ -227,29 +345,51 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         return null;
       }
       
-      const response = await garmentsApi.get<any>('/get-all-garments', {
-        params: { 
-          search: rfidCode,
-          limit: 100
-        }
-      });
-      
-      const garments = response.data?.data || [];
-      
-      if (garments.length > 0) {
-        // Buscar localmente la prenda con el RFID exacto
-        const normalizedScanned = rfidCode.trim().toUpperCase();
-        
-        const foundGarment = garments.find((g: any) => {
-          const normalizedFound = g.rfid_code.trim().toUpperCase();
-          return normalizedFound === normalizedScanned;
+      // Usar el mismo endpoint que useGarmentsByRfidCodes para obtener todos los campos
+      try {
+        const normalizedRfid = rfidCode.trim().toUpperCase();
+        const response = await guidesApi.post<ApiResponse<any[]>>('/get-garment-by-rfid-codes', {
+          rfid_codes: [normalizedRfid]
         });
         
-        if (foundGarment) {
-          return foundGarment; // Retorna la prenda si existe
+        const garments = response.data?.data || [];
+        
+        if (garments.length > 0) {
+          // Buscar la prenda con el RFID exacto (ya está normalizado)
+          const foundGarment = garments.find((g: any) => {
+            const normalizedFound = (g.rfid_code || '').trim().toUpperCase();
+            return normalizedFound === normalizedRfid;
+          });
+          
+          if (foundGarment) {
+            return foundGarment; // Retorna la prenda si existe
+          }
         }
+        return null; // No existe
+      } catch (error: any) {
+        // Si falla, intentar con el endpoint anterior como fallback
+        const response = await garmentsApi.get<any>('/get-all-garments', {
+          params: { 
+            search: rfidCode,
+            limit: 100
+          }
+        });
+        
+        const garments = response.data?.data || [];
+        
+        if (garments.length > 0) {
+          const normalizedScanned = rfidCode.trim().toUpperCase();
+          const foundGarment = garments.find((g: any) => {
+            const normalizedFound = (g.rfid_code || '').trim().toUpperCase();
+            return normalizedFound === normalizedScanned;
+          });
+          
+          if (foundGarment) {
+            return foundGarment;
+          }
+        }
+        return null;
       }
-      return null; // No existe
     } catch (error: any) {
       const errorStatus = error?.response?.status;
       
@@ -587,8 +727,13 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     
     const currentTag = scannedTags[scannedTags.length - 1];
     
-    // Verificar si ya existe en el backend
-    const existingGarmentData = await checkRfidInBackend(currentTag.epc);
+    // PRIMERO: Intentar obtener desde el hook useGarmentsByRfidCodes (si está disponible)
+    let existingGarmentData = getGarmentByRfid(currentTag.epc);
+    
+    // Si no se encontró en el hook, hacer búsqueda directa en el backend
+    if (!existingGarmentData) {
+      existingGarmentData = await checkRfidInBackend(currentTag.epc);
+    }
     
     if (existingGarmentData) {
       // Si existe, abrir directamente el formulario de actualización
@@ -611,24 +756,33 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         let savedGarmentId = existingGarment?.id;
         
         if (existingGarment) {
-          // Actualizar prenda existente
+          // Actualizar prenda existente con todos los campos
           await updateGarmentAsync({
             id: existingGarment.id,
             data: {
               description: garmentData.description,
-              color: garmentData.color,
-              weight: garmentData.weight,
+              color: garmentData.colors || [], // Array de colores
+              garment_type: garmentData.garmentType,
+              garment_brand: garmentData.brand, // garment_brand en lugar de brand
+              garment_condition: garmentData.garmentCondition,
+              physical_condition: garmentData.physicalCondition,
+              weight: garmentData.weight ? parseFloat(garmentData.weight.toString()) : undefined,
               observations: garmentData.observations,
             }
           });
           Alert.alert('Prenda actualizada', `${garmentData.description} actualizada y agregada a la guía`);
         } else {
-          // Crear nueva prenda
+          // Crear nueva prenda con todos los campos
           const newGarmentResponse = await createGarmentAsync({
             rfid_code: currentTag.epc,
+            branch_offices_id: garmentData.branchOfficeId, // Requerido para crear
             description: garmentData.description,
-            color: garmentData.color,
-            weight: garmentData.weight,
+            color: garmentData.colors || [], // Array de colores
+            garment_type: garmentData.garmentType,
+            garment_brand: garmentData.brand, // garment_brand en lugar de brand
+            garment_condition: garmentData.garmentCondition,
+            physical_condition: garmentData.physicalCondition,
+            weight: garmentData.weight ? parseFloat(garmentData.weight.toString()) : undefined,
             observations: garmentData.observations,
           });
           savedGarmentId = newGarmentResponse.id;
@@ -772,7 +926,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
 
   const renderScannedTag = ({ item, index }: { item: ScannedTag; index: number }) => {
     // En modo garment o servicio industrial, verificar si la prenda está registrada
-    const garment = (serviceType === 'industrial' || mode === 'garment') ? garmentsByRfid.get(item.epc) : null;
+    const garment = (serviceType === 'industrial' || mode === 'garment' || mode === 'process') ? getGarmentByRfid(item.epc) : null;
     const isRegistered = !!garment;
     
     // Función para eliminar una prenda específica de la lista
@@ -804,7 +958,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
               </View>
               <View className="flex-1">
                 <Text className="text-sm font-mono text-gray-900">{item.epc}</Text>
-                {(serviceType === 'industrial' || mode === 'garment') && (
+                {(serviceType === 'industrial' || mode === 'garment' || mode === 'process') && (
                   <Text className={`text-xs mt-1 ${isRegistered ? 'text-gray-600' : 'text-orange-600 font-medium'}`}>
                     {isRegistered ? garment?.description || garment?.garment_type || 'Sin nombre' : 'Prenda no registrada'}
                   </Text>
@@ -813,15 +967,15 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             </View>
           </View>
           
-          {/* Botón X para eliminar prenda (servicio industrial y modo garment) */}
-          {(serviceType === 'industrial' || mode === 'garment') && (
+          {/* Botón X para eliminar prenda (servicio industrial y modo garment/process) */}
+          {(serviceType === 'industrial' || mode === 'garment' || mode === 'process') && (
             <TouchableOpacity onPress={handleRemoveTag} className="ml-2">
               <Icon name="close-circle" size={24} color="#EF4444" />
             </TouchableOpacity>
           )}
           
           {/* Checkmark solo para modos que no tienen botón X */}
-          {serviceType !== 'industrial' && mode !== 'garment' && (
+          {serviceType !== 'industrial' && mode !== 'garment' && mode !== 'process' && (
             <Icon name="checkmark-circle" size={24} color="#10B981" />
           )}
         </View>
@@ -851,6 +1005,24 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       if (isUnregistered) {
         return 'Prendas no registradas';
       }
+      if (item.garmentType === 'REGISTERED') {
+        return 'Prendas registradas';
+      }
+      const normalizedCode = item.garmentType
+        ? item.garmentType.trim().toUpperCase().replace(/[\s-]/g, '_')
+        : '';
+      if (normalizedCode) {
+        const catalogLabel = garmentTypeLabelMap.get(normalizedCode);
+        if (catalogLabel) {
+          return catalogLabel;
+        }
+      }
+      if (item.garmentType) {
+        const catalogLabelOriginal = garmentTypeLabelMap.get(item.garmentType);
+        if (catalogLabelOriginal) {
+          return catalogLabelOriginal;
+        }
+      }
       // Mostrar el garment_type directamente (se puede mejorar con traducciones si es necesario)
       // Formatear el nombre: convertir "CAMISETA" a "Camisetas" o mantener el formato original
       const typeName = item.garmentType;
@@ -875,7 +1047,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
               </View>
               <View className="flex-1">
                 <Text className="text-base font-semibold text-gray-900">
-                  {item.count} {getGarmentTypeLabel()}
+                  {getGarmentTypeLabel()}
                 </Text>
                 {isUnregistered && (
                   <Text className="text-xs text-orange-600 font-medium mt-1">
@@ -1049,12 +1221,26 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
                 title="No hay prendas escaneadas"
                 message="Inicia el escaneo para detectar tags RFID"
               />
-            ) : serviceType === 'industrial' ? (
+            ) : serviceType === 'industrial' && groupedTagsByGarmentType.length > 0 ? (
               // Mostrar grupos agrupados por tipo de prenda para servicio industrial
               <FlatList
                 data={groupedTagsByGarmentType}
                 renderItem={renderGarmentTypeGroup}
                 keyExtractor={item => item.garmentType}
+                ListEmptyComponent={
+                  <EmptyState
+                    icon="alert-circle-outline"
+                    title="No se pudieron agrupar las prendas"
+                    message="Intenta escanear nuevamente"
+                  />
+                }
+              />
+            ) : serviceType === 'industrial' && scannedTags.length > 0 ? (
+              // Fallback: si hay tags pero no se agruparon, mostrar individualmente
+              <FlatList
+                data={scannedTags}
+                renderItem={renderScannedTag}
+                keyExtractor={item => item.epc}
               />
             ) : (
               // Mostrar lista individual para otros servicios
@@ -1169,7 +1355,11 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
               navigation.navigate(route, params);
             }}
             initialServiceType={serviceType === 'industrial' ? 'INDUSTRIAL' : 'PERSONAL'}
-            initialTotalWeight={serviceType === 'personal' ? calculateTotalWeight() : 0}
+            initialTotalWeight={
+              serviceType === 'personal'
+                ? calculateTotalWeight()
+                : Number(totalWeightFromScannedGarments.toFixed(2))
+            }
             unregisteredCount={serviceType === 'industrial' ? unregisteredCount : 0}
             // Indicar al formulario que estamos editando cuando corresponda y pasar guía completa si viene
             guideToEdit={isEditMode ? (passedGuide || { id: route?.params?.guideId }) : undefined}
@@ -1223,7 +1413,16 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             rfidCode={scannedTags[scannedTags.length - 1]?.epc || ''}
             initialValues={existingGarment ? {
               description: existingGarment.description || '',
-              color: existingGarment.color || '',
+              colors: Array.isArray(existingGarment.color) 
+                ? existingGarment.color.filter((c: any): c is string => typeof c === 'string' && c.trim() !== '')
+                : (existingGarment.color && typeof existingGarment.color === 'string' 
+                    ? [existingGarment.color] 
+                    : []),
+              garmentType: existingGarment.garment_type || '',
+              brand: existingGarment.garment_brand || '', // Usar garment_brand en lugar de brand
+              branchOfficeId: existingGarment.branch_offices_id || existingGarment.branch_office_id || '',
+              garmentCondition: existingGarment.garment_condition || '',
+              physicalCondition: existingGarment.physical_condition || '',
               weight: existingGarment.weight ? String(existingGarment.weight) : '',
               observations: existingGarment.observations || '',
             } : undefined}

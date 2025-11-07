@@ -4,7 +4,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Card, Button } from '@/components/common';
 import { useScanQr } from '@/laundry/hooks/guides';
 import { QrScanner } from './QrScanner';
-import { translateEnum } from '@/helpers/enum-translations';
+import { useCatalogLabelMap } from '@/laundry/hooks';
 
 interface Guide {
   id: string;
@@ -13,6 +13,7 @@ interface Guide {
   status: string;
   created_at: string;
   total_garments?: number;
+  status_label?: string; // Added for catalog labels
 }
 
 interface GuideSelectionModalProps {
@@ -38,6 +39,8 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
   const [showQrScanner, setShowQrScanner] = useState(false);
   const [scannedGuide, setScannedGuide] = useState<Guide | null>(null);
   const { scanQrAsync, isScanning } = useScanQr();
+
+  const { getLabel: getGuideStatusLabel } = useCatalogLabelMap('guide_status', { forceFresh: true });
 
   const filteredGuides = useMemo(() => {
     if (!searchQuery.trim()) return guides;
@@ -113,7 +116,7 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
                   className="text-xs font-medium"
                   style={{ color: getStatusColor(item.status) }}
                 >
-                  {translateEnum(item.status, 'guide_status')}
+                  {getGuideStatusLabel(item.status, item.status_label || item.status || '—')}
                 </Text>
               </View>
             </View>

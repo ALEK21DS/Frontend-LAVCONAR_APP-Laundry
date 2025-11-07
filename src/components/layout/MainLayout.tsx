@@ -193,11 +193,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
       });
       
       // Navegar directamente al escáner
+      // Obtener serviceType de la guía o usar el seleccionado
+      const guideServiceType = rfidScan.guide?.service_type || (selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL');
       onNavigate('ScanClothes', {
         mode: 'process',
         processType: selectedProcessType,
         guideId: rfidScan.guide_id,
         rfidScanId: rfidScan.id,
+        serviceType: guideServiceType === 'PERSONAL' ? 'personal' : 'industrial',
         initialRfids: rfidScan.scanned_rfid_codes || [],
         isEditMode: true,
         guideToEdit: {
@@ -252,11 +255,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
                 waitingForScan: true, // Marcar que estamos esperando el escaneo
               });
               // Navegar al escáner
+              // Obtener serviceType de la guía o usar el seleccionado
+              const guideServiceTypeForOptional = rfidScan.guide?.service_type || (selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL');
               onNavigate('ScanClothes', {
                 mode: 'process',
                 processType: selectedProcessType,
                 guideId: rfidScan.guide_id,
                 rfidScanId: rfidScan.id,
+                serviceType: guideServiceTypeForOptional === 'PERSONAL' ? 'personal' : 'industrial',
                 initialRfids: rfidScan.scanned_rfid_codes || [],
                 isEditMode: true,
                 guideToEdit: {
@@ -303,11 +309,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
                   waitingForScan: true,
                 });
                 
+                // Obtener serviceType de la guía o usar el seleccionado
+                const guideServiceTypeForBackwardRequired = rfidScan.guide?.service_type || (selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL');
                 onNavigate('ScanClothes', {
                   mode: 'process',
                   processType: selectedProcessType,
                   guideId: rfidScan.guide_id,
                   rfidScanId: rfidScan.id,
+                  serviceType: guideServiceTypeForBackwardRequired === 'PERSONAL' ? 'personal' : 'industrial',
                   initialRfids: rfidScan.scanned_rfid_codes || [],
                   isEditMode: true,
                   guideToEdit: {
@@ -353,11 +362,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
                           rfidScan: rfidScan,
                           waitingForScan: true,
                         });
+                        // Obtener serviceType de la guía o usar el seleccionado
+                        const guideServiceTypeForScan = rfidScan.guide?.service_type || (selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL');
                         onNavigate('ScanClothes', {
                           mode: 'process',
                           processType: selectedProcessType,
                           guideId: rfidScan.guide_id,
                           rfidScanId: rfidScan.id,
+                          serviceType: guideServiceTypeForScan === 'PERSONAL' ? 'personal' : 'industrial',
                           initialRfids: rfidScan.scanned_rfid_codes || [],
                           isEditMode: true,
                           guideToEdit: {

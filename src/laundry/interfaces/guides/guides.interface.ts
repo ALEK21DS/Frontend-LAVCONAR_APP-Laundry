@@ -13,6 +13,7 @@ export interface Guide {
   branch_office_id: string;
   branch_office_name?: string;
   general_condition?: 'GOOD' | 'REGULAR' | 'BAD';
+  general_condition_label?: string;
   service_type?: 'INDUSTRIAL' | 'DOMESTIC' | 'HOSPITAL' | 'HOTEL';
   charge_type?: 'BY_WEIGHT' | 'BY_UNIT' | 'MIXED';
   total_weight?: number;
@@ -20,7 +21,11 @@ export interface Guide {
   collection_date: string;
   delivery_date?: string;
   status: 'COLLECTED' | 'IN_TRANSIT' | 'RECEIVED' | 'IN_PROCESS' | 'COMPLETED' | 'DELIVERED';
+  status_label?: string;
   notes?: string;
+  requested_services_labels?: Record<string, string>;
+  service_priority_label?: string;
+  washing_type_label?: string;
   items: GuideItem[];
   is_active: boolean;
   created_at: string;

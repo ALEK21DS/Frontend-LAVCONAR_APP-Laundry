@@ -101,14 +101,14 @@ export const ScanForm: React.FC<ScanFormProps> = ({
 
     // Fallback por si el catálogo llega vacío
     return [
-      { label: 'Recolección', value: 'COLLECTION' },
-      { label: 'Recepción en Almacén', value: 'WAREHOUSE_RECEPTION' },
-      { label: 'Pre-lavado', value: 'PRE_WASH' },
-      { label: 'Post-lavado', value: 'POST_WASH' },
-      { label: 'Post-secado', value: 'POST_DRY' },
-      { label: 'Conteo Final', value: 'FINAL_COUNT' },
-      { label: 'Entrega', value: 'DELIVERY' },
-    ];
+    { label: 'Recolección', value: 'COLLECTION' },
+    { label: 'Recepción en Almacén', value: 'WAREHOUSE_RECEPTION' },
+    { label: 'Pre-lavado', value: 'PRE_WASH' },
+    { label: 'Post-lavado', value: 'POST_WASH' },
+    { label: 'Post-secado', value: 'POST_DRY' },
+    { label: 'Conteo Final', value: 'FINAL_COUNT' },
+    { label: 'Entrega', value: 'DELIVERY' },
+  ];
   }, [scanTypeCatalog]);
 
   const buildDiff = (prev: any, curr: any) => {
@@ -155,18 +155,18 @@ export const ScanForm: React.FC<ScanFormProps> = ({
       }
 
       // ========== PASO 2: CREAR/ACTUALIZAR ESCANEO RFID ==========
-      // NOTA: user_id NO se envía, el backend lo obtiene del token JWT
-      
-      const rfidScanData = {
-        guide_id: createdGuide.id,
-        branch_offices_id: formData.branch_offices_id,
-        scan_type: formData.scan_type as any,
-        scanned_quantity: formData.scanned_quantity,
-        scanned_rfid_codes: formData.scanned_rfid_codes,
+          // NOTA: user_id NO se envía, el backend lo obtiene del token JWT
+          
+          const rfidScanData = {
+            guide_id: createdGuide.id,
+            branch_offices_id: formData.branch_offices_id,
+            scan_type: formData.scan_type as any,
+            scanned_quantity: formData.scanned_quantity,
+            scanned_rfid_codes: formData.scanned_rfid_codes,
         unexpected_codes: formData.unexpected_codes || [],
-        location: formData.location || undefined,
-        differences_detected: formData.differences_detected || undefined,
-      } as any;
+            location: formData.location || undefined,
+            differences_detected: formData.differences_detected || undefined,
+          } as any;
 
       // Si deferRfidScanUpdate es true, NO actualizar el RFID scan aquí
       // Los datos se pasarán al callback para actualizarlos después junto con el proceso
@@ -184,27 +184,27 @@ export const ScanForm: React.FC<ScanFormProps> = ({
 
       // Comportamiento normal: actualizar el RFID scan inmediatamente
       try {
-        if (editContext?.rfidScanId) {
-          const rsDiff = buildDiff(initialRfidScanFull, rfidScanData);
-          if (Object.keys(rsDiff).length > 0) {
-            await updateRfidScanAsync({ id: editContext.rfidScanId, data: rsDiff });
+          if (editContext?.rfidScanId) {
+            const rsDiff = buildDiff(initialRfidScanFull, rfidScanData);
+            if (Object.keys(rsDiff).length > 0) {
+              await updateRfidScanAsync({ id: editContext.rfidScanId, data: rsDiff });
+            }
+          } else {
+            await createRfidScanAsync(rfidScanData);
           }
-        } else {
-          await createRfidScanAsync(rfidScanData);
-        }
 
-        // ✅ TODO EXITOSO
-        onSubmit(formData);
-        if (onNavigate) {
-          onNavigate('Dashboard');
-        }
+          // ✅ TODO EXITOSO
+          onSubmit(formData);
+          if (onNavigate) {
+            onNavigate('Dashboard');
+          }
 
-      } catch (scanError: any) {
+        } catch (scanError: any) {
           const errorMessage = scanError.response?.data?.message || scanError.message;
           Alert.alert(
             'Error - Contacte al Superadmin',
             `Guía creada: ${createdGuide.guide_number}\n\n❌ Error al crear escaneo RFID:\n${errorMessage}\n\nContacte al superadmin para completar manualmente el escaneo.`
-          );
+        );
       }
 
     } catch (guideError: any) {

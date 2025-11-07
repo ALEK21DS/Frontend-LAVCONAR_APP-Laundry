@@ -93,35 +93,35 @@ export const ProcessTypeModal: React.FC<ProcessTypeModalProps> = ({
                 <Text className="text-gray-500">No hay procesos disponibles</Text>
               </View>
             ) : (
-              <View className="flex-row flex-wrap -mx-2">
+            <View className="flex-row flex-wrap -mx-2">
                 {processes.map((process) => (
-                  <TouchableOpacity
-                    key={process.value}
-                    onPress={() => onSelectProcess(process.value)}
-                    className="w-1/2 px-2 mb-4"
+                <TouchableOpacity
+                  key={process.value}
+                  onPress={() => onSelectProcess(process.value)}
+                  className="w-1/2 px-2 mb-4"
+                >
+                  <View 
+                    className="p-4 rounded-2xl border-2 border-gray-100 active:border-gray-200"
+                    style={{ backgroundColor: `${process.color}10` }}
                   >
-                    <View 
-                      className="p-4 rounded-2xl border-2 border-gray-100 active:border-gray-200"
-                      style={{ backgroundColor: `${process.color}10` }}
-                    >
-                      <View className="items-center mb-3">
-                        <View 
-                          className="w-12 h-12 rounded-full items-center justify-center mb-2"
-                          style={{ backgroundColor: process.color }}
-                        >
-                          <Icon name={process.icon} size={24} color="white" />
-                        </View>
-                        <Text className="text-lg font-bold text-gray-900 text-center">
-                          {process.label}
-                        </Text>
+                    <View className="items-center mb-3">
+                      <View 
+                        className="w-12 h-12 rounded-full items-center justify-center mb-2"
+                        style={{ backgroundColor: process.color }}
+                      >
+                        <Icon name={process.icon} size={24} color="white" />
                       </View>
-                      <Text className="text-sm text-gray-600 text-center leading-5">
-                        {process.description}
+                      <Text className="text-lg font-bold text-gray-900 text-center">
+                        {process.label}
                       </Text>
                     </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                    <Text className="text-sm text-gray-600 text-center leading-5">
+                      {process.description}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
             )}
           </ScrollView>
         </View>

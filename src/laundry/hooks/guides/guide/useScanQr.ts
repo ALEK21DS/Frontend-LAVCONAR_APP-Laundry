@@ -14,9 +14,9 @@ export const useScanQr = () => {
   const mutation = useMutation({
     mutationFn: async (qrData: string): Promise<Guide> => {
       try {
-        const payload: ScanQrDto = { qr_data: qrData };
-        const { data } = await guidesApi.post<ApiResponse<Guide>>('/scan-qr', payload);
-        return data.data!;
+      const payload: ScanQrDto = { qr_data: qrData };
+      const { data } = await guidesApi.post<ApiResponse<Guide>>('/scan-qr', payload);
+      return data.data!;
       } catch (err: any) {
         const status = err?.response?.status;
         const backendMsg = err?.response?.data?.message;
@@ -39,7 +39,7 @@ export const useScanQr = () => {
       
       // Solo mostrar error en consola si NO es un error de acceso
       if (!isAccessError) {
-        console.error('Error al escanear QR:', err);
+      console.error('Error al escanear QR:', err);
       }
       // Para errores de acceso, silenciar completamente el error
     },

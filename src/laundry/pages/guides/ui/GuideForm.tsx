@@ -423,14 +423,14 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         </View>
         
         <View className="mt-2">
-          <Dropdown
-            label="Condición General"
-            placeholder="Selecciona la condición"
+        <Dropdown
+          label="Condición General"
+          placeholder="Selecciona la condición"
             options={GENERAL_CONDITION_OPTIONS}
-            value={condition}
-            onValueChange={setCondition}
-            icon="checkmark-circle-outline"
-          />
+          value={condition}
+          onValueChange={setCondition}
+          icon="checkmark-circle-outline"
+        />
         </View>
 
         <View className="flex-row -mx-1 mt-2">

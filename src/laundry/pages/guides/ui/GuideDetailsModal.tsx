@@ -6,7 +6,7 @@ import { GUIDE_STATUS_LABELS, GUIDE_STATUS_COLORS } from '@/constants/processes'
 import { formatDateTime } from '@/helpers/formatters.helper';
 import { usePrintGuide } from '@/laundry/hooks/guides';
 import { useCreateAuthorizationRequest, useGetAuthorizationById, useInvalidateAuthorization } from '@/laundry/hooks/authorizations';
-import { translateEnum } from '@/helpers';
+import { useCatalogLabelMap } from '@/laundry/hooks';
 
 interface GuideDetailsModalProps {
   visible: boolean;
@@ -41,6 +41,12 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
     currentRequestId,
     checkingAuth && !!currentRequestId
   );
+
+  const { getLabel: getGuideStatusLabel } = useCatalogLabelMap('guide_status', { forceFresh: true, fallbackLabel: '—' });
+  const { getLabel: getGeneralConditionLabel } = useCatalogLabelMap('general_condition', { forceFresh: true, fallbackLabel: '—' });
+  const { getLabel: getServicePriorityLabel } = useCatalogLabelMap('service_priority', { forceFresh: true, fallbackLabel: '—' });
+  const { getLabel: getWashingTypeLabel } = useCatalogLabelMap('washing_type', { forceFresh: true, fallbackLabel: '—' });
+  const { getLabel: getRequestedServiceLabel } = useCatalogLabelMap('requested_service', { forceFresh: true, fallbackLabel: '—' });
 
   // Efecto para monitorear el estado de autorización
   useEffect(() => {
@@ -169,7 +175,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
                 <Text className="text-xs text-gray-500 mb-1">Estado</Text>
                 <View className={`px-3 py-1.5 rounded-full self-start`} style={{ backgroundColor: getStatusColor(guide.status) + '20' }}>
                   <Text className={`text-sm font-medium`} style={{ color: getStatusColor(guide.status) }}>
-                    {translateEnum(guide.status, 'guide_status')}
+                    {getGuideStatusLabel(guide.status, guide.status_label || GUIDE_STATUS_LABELS[guide.status as keyof typeof GUIDE_STATUS_LABELS] || guide.status || '—')}
                   </Text>
                 </View>
               </View>
@@ -207,7 +213,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
             <View className="mb-3">
               <Text className="text-xs text-gray-500 mb-1">Condición General</Text>
               <View className="px-3 py-1 rounded-full self-start bg-gray-100">
-                <Text className="text-sm text-gray-800">{translateEnum(guide.general_condition, 'general_condition') || '—'}</Text>
+                <Text className="text-sm text-gray-800">{getGeneralConditionLabel(guide.general_condition, guide.general_condition_label || '—')}</Text>
               </View>
                   </View>
 
@@ -215,13 +221,13 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
               <View className="w-1/2 px-2">
                 <Text className="text-xs text-gray-500 mb-1">Prioridad del Servicio</Text>
                 <View className="px-3 py-1 rounded-full self-start bg-gray-100">
-                  <Text className="text-sm text-gray-800">{translateEnum(guide.service_priority, 'service_priority') || '—'}</Text>
+                  <Text className="text-sm text-gray-800">{getServicePriorityLabel(guide.service_priority, guide.service_priority_label || '—')}</Text>
                 </View>
               </View>
               <View className="w-1/2 px-2">
                 <Text className="text-xs text-gray-500 mb-1">Tipo de Lavado</Text>
                 <View className="px-3 py-1 rounded-full self-start bg-gray-100">
-                  <Text className="text-sm text-gray-800">{translateEnum(guide.washing_type, 'washing_type') || '—'}</Text>
+                  <Text className="text-sm text-gray-800">{getWashingTypeLabel(guide.washing_type, guide.washing_type_label || '—')}</Text>
                 </View>
               </View>
                 </View>
@@ -231,7 +237,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
               <View className="flex-row flex-wrap -m-1">
                 {(Array.isArray(guide.requested_services) ? guide.requested_services : []).map((srv: string) => (
                   <View key={srv} className="m-1 px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
-                  <Text className="text-xs text-blue-800">{translateEnum(srv, 'requested_service') || srv}</Text>
+                  <Text className="text-xs text-blue-800">{getRequestedServiceLabel(srv, guide.requested_services_labels?.[srv] || srv)}</Text>
                   </View>
                 ))}
                 {(!guide.requested_services || guide.requested_services.length === 0) && (

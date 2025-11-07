@@ -15,7 +15,7 @@ import { rfidModule } from '@/lib/rfid/rfid.module';
 import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
 import { QrScanner } from '@/laundry/components';
 import { GuideDetailsModal } from './ui/GuideDetailsModal';
-import { translateEnum } from '@/helpers';
+import { useCatalogLabelMap } from '@/laundry/hooks';
 
  type GuidesPageProps = { navigation: NativeStackNavigationProp<any> };
 
@@ -38,9 +38,8 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const prefilledTags = route?.params?.prefilledTags || [];
   const [scannedTags, setScannedTags] = useState<ScannedTag[]>([]);
   const [isScanning, setIsScanning] = useState(false);
-  const seenSetRef = useRef<Set<string>>(new Set());
-  const isScanningRef = useRef<boolean>(false);
-  const MIN_RSSI = -65;
+
+  const { getLabel: getGuideStatusLabel } = useCatalogLabelMap('guide_status', { forceFresh: true });
 
   // Recargar la lista de guías y manejar el regreso del escáner
   useFocusEffect(
@@ -346,7 +345,7 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
                         <Text className="text-gray-900 font-semibold">{g.guide_number}</Text>
                         <Text className="text-gray-500 text-xs">{g.client_name}</Text>
                       </View>
-                      <Text className="text-gray-600 text-xs">{translateEnum(g.status, 'guide_status')}</Text>
+                      <Text className="text-gray-600 text-xs">{getGuideStatusLabel(g.status, g.status_label || g.status || '—')}</Text>
                     </View>
                   </Card>
                 </TouchableOpacity>

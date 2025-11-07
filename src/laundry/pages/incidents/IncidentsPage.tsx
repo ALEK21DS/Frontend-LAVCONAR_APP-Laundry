@@ -8,7 +8,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { IncidentForm } from './ui/IncidentForm';
 import { IncidentDetailsModal } from './ui/IncidentDetailsModal';
-import { translateEnum } from '@/helpers';
+import { useCatalogLabelMap } from '@/laundry/hooks';
+import { getStatusColor, getTypeColor } from '@/laundry/pages/incidents/incidents.utils';
 
 type IncidentsPageProps = {
   navigation: NativeStackNavigationProp<any>;
@@ -42,6 +43,9 @@ export const IncidentsPage: React.FC<IncidentsPageProps> = ({ navigation }) => {
   });
   const { createIncidentAsync, isCreating } = useCreateIncident();
   const { updateIncidentAsync, isUpdating } = useUpdateIncident();
+
+  const { getLabel: getIncidentTypeLabel } = useCatalogLabelMap('incident_type', { forceFresh: true });
+  const { getLabel: getIncidentStatusLabel } = useCatalogLabelMap('incident_status', { forceFresh: true });
 
   // Recargar la lista cada vez que la pantalla recibe foco
   useFocusEffect(
@@ -124,27 +128,6 @@ export const IncidentsPage: React.FC<IncidentsPageProps> = ({ navigation }) => {
       const errorMessage = error?.response?.data?.message || error?.message || 'Error al procesar el incidente';
       Alert.alert('Error', errorMessage);
     }
-  };
-
-  const getTypeColor = (type: string) => {
-    const colors: Record<string, string> = {
-      'DELAY': '#F59E0B',
-      'QUALITY_ISSUE': '#8B5CF6',
-      'DAMAGE': '#EF4444',
-      'LOSS': '#DC2626',
-      'OTHER': '#6B7280',
-    };
-    return colors[type] || '#6B7280';
-  };
-
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      'OPEN': '#EF4444',
-      'IN_PROGRESS': '#3B82F6',
-      'RESOLVED': '#10B981',
-      'CLOSED': '#6B7280',
-    };
-    return colors[status] || '#6B7280';
   };
 
   return (
@@ -231,7 +214,7 @@ export const IncidentsPage: React.FC<IncidentsPageProps> = ({ navigation }) => {
                                 className="text-xs font-medium"
                                 style={{ color: getTypeColor(incident.incident_type) }}
                               >
-                                {translateEnum(incident.incident_type, 'incident_type')}
+                                {getIncidentTypeLabel(incident.incident_type, incident.incident_type_label || incident.incident_type || '—')}
                               </Text>
                             </View>
                             <View 
@@ -242,7 +225,7 @@ export const IncidentsPage: React.FC<IncidentsPageProps> = ({ navigation }) => {
                                 className="text-xs font-medium"
                                 style={{ color: getStatusColor(incident.status) }}
                               >
-                                {translateEnum(incident.status, 'incident_status')}
+                                {getIncidentStatusLabel(incident.status, incident.status_label || incident.status || '—')}
                               </Text>
                             </View>
                           </View>

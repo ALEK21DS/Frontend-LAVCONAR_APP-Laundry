@@ -81,8 +81,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate, onOpen
     setRadialOpen(false);
     
     if (serviceType === 'industrial') {
-      // Flujo industrial: navegar directamente al escáner
-      onNavigate('ScanClothes', { mode: 'guide' });
+      // Flujo industrial: navegar directamente al escáner con serviceType explícito
+      onNavigate('ScanClothes', { mode: 'guide', serviceType: 'industrial' });
     } else {
       // Flujo personal: navegar al escáner con modo personal
       onNavigate('ScanClothes', { mode: 'guide', serviceType: 'personal' });

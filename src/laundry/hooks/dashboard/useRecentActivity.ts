@@ -4,6 +4,7 @@ import { OperationAudit } from '@/laundry/interfaces/audit/operation-audit.inter
 import { ApiResponse } from '@/interfaces/base.response';
 import { translateEnum } from '@/helpers/enum-translations';
 import { formatDateTime } from '@/helpers/formatters.helper';
+import { useCatalogLabelMap } from '@/laundry/hooks/catalogs';
 
 export interface ActivityItem {
   id: string;
@@ -100,7 +101,10 @@ const cleanDescription = (description: string | null): string => {
 /**
  * Extrae el nombre o identificador del recurso desde los datos de auditoría
  */
-const getResourceName = (audit: OperationAudit): string => {
+const getResourceName = (
+  audit: OperationAudit,
+  getGarmentTypeLabel: (code: string | null | undefined, fallback?: string) => string
+): string => {
   // Para DELETE, intentar obtener de previous_data primero
   if (audit.audit_action.toUpperCase() === 'DELETE' || audit.audit_action.toUpperCase() === 'DELETED') {
     if (audit.previous_data?.name) {
@@ -141,7 +145,10 @@ const getResourceName = (audit: OperationAudit): string => {
     }
     // Tipo de prenda (como último recurso para prendas)
     if (audit.new_data.garment_type) {
-      return translateEnum(audit.new_data.garment_type, 'garment_type') || audit.new_data.garment_type;
+      return getGarmentTypeLabel(
+        audit.new_data.garment_type,
+        audit.new_data.garment_type_label || audit.new_data.garment_type
+      );
     }
   }
   
@@ -161,11 +168,14 @@ const getResourceName = (audit: OperationAudit): string => {
 /**
  * Transforma los datos de auditoría en items de actividad reciente
  */
-const transformAuditToActivity = (audit: OperationAudit): ActivityItem => {
+const transformAuditToActivity = (
+  audit: OperationAudit,
+  getGarmentTypeLabel: (code: string | null | undefined, fallback?: string) => string
+): ActivityItem => {
   const entityName = getEntityName(audit.entity);
   const actionLabel = getActionLabel(audit.audit_action);
   const actionColor = getActionColor(audit.audit_action);
-  const resourceName = getResourceName(audit);
+  const resourceName = getResourceName(audit, getGarmentTypeLabel);
   
   // Construir título con el nombre del recurso si está disponible
   let title = '';
@@ -196,6 +206,8 @@ const transformAuditToActivity = (audit: OperationAudit): ActivityItem => {
  * Obtiene las últimas 5 auditorías de operaciones del usuario actual
  */
 export const useRecentActivity = () => {
+  const { getLabel: getGarmentTypeLabel } = useCatalogLabelMap('garment_type', { forceFresh: true });
+
   return useQuery({
     queryKey: ['recent-activity'],
     queryFn: async (): Promise<ActivityItem[]> => {
@@ -211,7 +223,7 @@ export const useRecentActivity = () => {
         const audits = data.data || [];
         
         // Transformar las auditorías en items de actividad
-        return audits.map(transformAuditToActivity);
+        return audits.map(audit => transformAuditToActivity(audit, getGarmentTypeLabel));
       } catch (error: any) {
         // Solo mostrar error en consola si NO es un error de red
         // Los errores de red (Network Error) son normales cuando se pierde conexión
