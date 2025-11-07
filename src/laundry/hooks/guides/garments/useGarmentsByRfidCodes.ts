@@ -24,19 +24,6 @@ export const useGarmentsByRfidCodes = (rfidCodes: string[], enabled = true) => {
         rfid_codes: normalizedRfidCodes  // Backend espera rfid_codes con guión bajo
       });
       
-      // Debug: Log de la respuesta
-      console.log('📦 useGarmentsByRfidCodes - Respuesta del backend:', {
-        normalizedRfidCodes,
-        responseStatus: response.status,
-        responseData: response.data,
-        garmentsCount: response.data?.data?.length || 0,
-        sampleGarments: response.data?.data?.slice(0, 2)?.map((g: any) => ({
-          id: g.id,
-          rfid_code: g.rfid_code,
-          description: g.description,
-        })),
-      });
-      
       return response.data;
     },
     staleTime: 0,

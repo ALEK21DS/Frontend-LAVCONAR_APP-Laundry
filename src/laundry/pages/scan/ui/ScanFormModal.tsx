@@ -1,15 +1,19 @@
 import React from 'react';
-import { View, Modal } from 'react-native';
+import { View, Modal, TouchableOpacity, Text } from 'react-native';
 import { ScanForm } from './ScanForm';
 import { useGetRfidScanByGuide } from '@/laundry/hooks/guides/rfid-scan';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 interface ScanFormModalProps {
   visible: boolean;
-  guideId: string;
-  rfidScanId: string;
+  guideId?: string;
+  rfidScanId?: string;
   guideToEdit?: any;
+  guideData?: any;
   scannedTags: string[];
-  processType?: string;
+  initialScanType?: string;
+  deferRfidScanUpdate?: boolean;
+  unregisteredCodes?: string[];
   onSuccess: (rfidScanUpdateData?: any) => void;
   onCancel: () => void;
 }
@@ -19,13 +23,25 @@ export const ScanFormModal: React.FC<ScanFormModalProps> = ({
   guideId,
   rfidScanId,
   guideToEdit,
+  guideData,
   scannedTags,
-  processType,
+  initialScanType,
+  deferRfidScanUpdate = false,
+  unregisteredCodes,
   onSuccess,
   onCancel,
 }) => {
   // Obtener el RFID scan completo para pasarlo al ScanForm
-  const { rfidScan: fullRfidScan } = useGetRfidScanByGuide(guideId, visible);
+  const { rfidScan: fullRfidScan } = useGetRfidScanByGuide(guideId || '', visible && !!guideId);
+  const editContext = React.useMemo(() => {
+    if (guideId && rfidScanId) {
+      return { guideId, rfidScanId };
+    }
+    if (guideId) {
+      return { guideId };
+    }
+    return undefined;
+  }, [guideId, rfidScanId]);
 
   return (
     <Modal
@@ -36,26 +52,28 @@ export const ScanFormModal: React.FC<ScanFormModalProps> = ({
     >
       <View className="flex-1 bg-black/40" />
       <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl" style={{ elevation: 8 }}>
+        <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-200">
+          <Text className="text-lg font-semibold text-gray-900">Escaneo RFID</Text>
+          <TouchableOpacity onPress={onCancel}>
+            <Icon name="close" size={22} color="#111827" />
+          </TouchableOpacity>
+        </View>
+        <View className="flex-1">
         <ScanForm
-          guideData={{ id: guideId }}
+          guideData={guideData || guideToEdit || { id: guideId }}
           scannedTags={scannedTags}
-          onSubmit={(data) => {
-            // Pasar los datos del RFID scan actualizado al callback
-            onSuccess(data.rfidScanUpdateData);
-          }}
+          onSubmit={onSuccess}
           onCancel={onCancel}
-          editContext={{
-            guideId: guideId,
-            rfidScanId: rfidScanId,
-          }}
+          editContext={editContext}
           initialRfidScan={{
-            // Ahora scan_type es el mismo que el proceso (1:1 con el catálogo)
-            scan_type: processType || 'COLLECTED',
+            scan_type: initialScanType || 'COLLECTED',
           }}
           initialRfidScanFull={fullRfidScan}
           initialGuide={guideToEdit}
-          deferRfidScanUpdate={true} // NO actualizar el RFID scan inmediatamente, se hará al enviar el form de proceso
+          deferRfidScanUpdate={deferRfidScanUpdate}
+          unregisteredCodes={unregisteredCodes}
         />
+        </View>
       </View>
     </Modal>
   );

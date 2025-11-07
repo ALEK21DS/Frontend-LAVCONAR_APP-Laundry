@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Alert, Acti
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Card } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { useGuides, useCreateGuide, useUpdateGuideStatus, useScanQr } from '@/laundry/hooks/guides';
+import { useGuides, useCreateGuide, useUpdateGuideStatus, useScanQr, useUpdateGuide } from '@/laundry/hooks/guides';
 import { useClients } from '@/laundry/hooks/clients';
 import { useInvalidateAuthorization } from '@/laundry/hooks/authorizations';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -26,6 +26,7 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   // Hooks modulares
   const { guides, isLoading, refetch, total, totalPages, currentPage } = useGuides({ page, limit });
   const { createGuideAsync, isCreating } = useCreateGuide();
+  const { updateGuideAsync } = useUpdateGuide();
   const { updateGuideStatusAsync, isUpdating } = useUpdateGuideStatus();
   const { clients } = useClients({ limit: 50 });
   const { invalidateAuthorizationAsync } = useInvalidateAuthorization();
@@ -485,7 +486,7 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
                 startScanning();
               }
             }}
-            onSubmit={async () => {
+            onSubmit={async (result) => {
               // Si estaba editando, invalidar la autorización
               if (editingId && selectedGuide) {
                 try {

@@ -45,7 +45,6 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
   const { getLabel: getGuideStatusLabel } = useCatalogLabelMap('guide_status', { forceFresh: true, fallbackLabel: '—' });
   const { getLabel: getGeneralConditionLabel } = useCatalogLabelMap('general_condition', { forceFresh: true, fallbackLabel: '—' });
   const { getLabel: getServicePriorityLabel } = useCatalogLabelMap('service_priority', { forceFresh: true, fallbackLabel: '—' });
-  const { getLabel: getWashingTypeLabel } = useCatalogLabelMap('washing_type', { forceFresh: true, fallbackLabel: '—' });
   const { getLabel: getRequestedServiceLabel } = useCatalogLabelMap('requested_service', { forceFresh: true, fallbackLabel: '—' });
 
   // Efecto para monitorear el estado de autorización
@@ -217,20 +216,12 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
               </View>
                   </View>
 
-            <View className="flex-row -mx-2 mb-3">
-              <View className="w-1/2 px-2">
-                <Text className="text-xs text-gray-500 mb-1">Prioridad del Servicio</Text>
-                <View className="px-3 py-1 rounded-full self-start bg-gray-100">
-                  <Text className="text-sm text-gray-800">{getServicePriorityLabel(guide.service_priority, guide.service_priority_label || '—')}</Text>
-                </View>
+            <View className="mb-3">
+              <Text className="text-xs text-gray-500 mb-1">Prioridad del Servicio</Text>
+              <View className="px-3 py-1 rounded-full self-start bg-gray-100">
+                <Text className="text-sm text-gray-800">{getServicePriorityLabel(guide.service_priority, guide.service_priority_label || '—')}</Text>
               </View>
-              <View className="w-1/2 px-2">
-                <Text className="text-xs text-gray-500 mb-1">Tipo de Lavado</Text>
-                <View className="px-3 py-1 rounded-full self-start bg-gray-100">
-                  <Text className="text-sm text-gray-800">{getWashingTypeLabel(guide.washing_type, guide.washing_type_label || '—')}</Text>
-                </View>
-              </View>
-                </View>
+            </View>
 
             <View>
               <Text className="text-xs text-gray-500 mb-2">Servicios Solicitados</Text>

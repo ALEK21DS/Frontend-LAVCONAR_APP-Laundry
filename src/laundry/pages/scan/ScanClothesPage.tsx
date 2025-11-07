@@ -13,7 +13,7 @@ import { GarmentForm } from '@/laundry/pages/garments/ui/GarmentForm';
 import { ScanFormModal } from '@/laundry/pages/scan/ui/ScanFormModal';
 import { useClients } from '@/laundry/hooks/clients';
 import { useCatalogValuesByType } from '@/laundry/hooks';
-import { useGarments, useCreateGarment, useUpdateGarment, useGuides, useGarmentsByRfidCodes } from '@/laundry/hooks/guides';
+import { useGarments, useCreateGarment, useUpdateGarment, useGuides, useGarmentsByRfidCodes, useCreateGuide } from '@/laundry/hooks/guides';
 import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
 import { GuideSelectionModal } from '@/laundry/components/GuideSelectionModal';
 import { garmentsApi } from '@/laundry/api/garments/garments.api';
@@ -47,6 +47,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   // Hooks modulares
   const { createGarmentAsync, isCreating } = useCreateGarment();
   const { updateGarmentAsync, isUpdating } = useUpdateGarment();
+  const { createGuideAsync } = useCreateGuide();
   const seenSetRef = useRef<Set<string>>(new Set());
   const isScanningRef = useRef<boolean>(false);
   const scannedTagsCountRef = useRef<number>(0);
@@ -58,7 +59,35 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   }, [scannedTags]);
   const [guideModalOpen, setGuideModalOpen] = useState(false);
   const [garmentModalOpen, setGarmentModalOpen] = useState(false);
-  const [scanFormModalOpen, setScanFormModalOpen] = useState(false);
+  type ScanFormContext = {
+    origin: 'guide' | 'process';
+    guideId?: string;
+    guide?: any;
+    guideData?: any;
+    draftValues?: any;
+    rfidScanId?: string;
+    initialScanType?: string;
+    processType?: string;
+    scannedTags: string[];
+    deferRfidScanUpdate?: boolean;
+    unregisteredCodes?: string[];
+  };
+  const [scanFormContext, setScanFormContext] = useState<ScanFormContext | null>(null);
+  const [pendingGuideEdit, setPendingGuideEdit] = useState<any | undefined>(undefined);
+  const [guideDraftData, setGuideDraftData] = useState<any | undefined>(undefined);
+  const [guideDraftValues, setGuideDraftValues] = useState<any | undefined>(undefined);
+
+  useEffect(() => {
+    if (pendingGuideEdit?.client_id) {
+      setSelectedClientId(pendingGuideEdit.client_id);
+    }
+  }, [pendingGuideEdit?.client_id]);
+
+  useEffect(() => {
+    if (guideDraftData?.client_id) {
+      setSelectedClientId(guideDraftData.client_id);
+    }
+  }, [guideDraftData?.client_id]);
   // Al entrar a esta pantalla o cuando cambien los params, asegurarnos de que no haya modales abiertos
   useEffect(() => {
     setGuideModalOpen(false);
@@ -214,31 +243,18 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           description: getGarmentByRfid(t.epc)?.description,
         } : null,
       }));
-      
-      console.log('🔍 Verificando prendas:', {
-        mode,
-        serviceType,
-        shouldCheckGarments,
-        rfidCodesCount: rfidCodes.length,
-        rfidCodes: rfidCodes.slice(0, 3), // Primeros 3 para no saturar
-        isLoadingGarments,
-        garmentsError: garmentsError?.message,
-        garmentsFound: garmentsByRfid.size,
-        garmentsDataLength: garmentsData?.data?.length || 0,
-        garmentsDataSample: garmentsData?.data?.slice(0, 2)?.map((g: any) => ({
-          id: g.id,
-          rfid_code: g.rfid_code,
-          description: g.description,
-          garment_type: g.garment_type,
-        })),
-        scannedTagsSample: sampleTags,
-      });
     }
   }, [shouldCheckGarments, rfidCodes.length, isLoadingGarments, garmentsError, garmentsByRfid.size, mode, serviceType, garmentsData, scannedTags, getGarmentByRfid]);
   
   // Contar prendas no registradas (usando normalización)
   const unregisteredCount = React.useMemo(() => {
     return scannedTags.filter(tag => !getGarmentByRfid(tag.epc)).length;
+  }, [scannedTags, getGarmentByRfid]);
+
+  const unregisteredRfids = React.useMemo(() => {
+    return scannedTags
+      .filter(tag => !getGarmentByRfid(tag.epc))
+      .map(tag => tag.epc);
   }, [scannedTags, getGarmentByRfid]);
 
   // Peso total de prendas obtenidas del backend (para industrial y procesos)
@@ -302,22 +318,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       }
     });
 
-    const result = Array.from(grouped.values());
-    
-    // Log de depuración para modo guide-industrial
-    if (mode === 'guide' && serviceType === 'industrial' && scannedTags.length > 0) {
-      console.log('📊 Agrupación de prendas (guide-industrial):', {
-        totalTags: scannedTags.length,
-        groupedCount: result.length,
-        groups: result.map(g => ({
-          type: g.garmentType,
-          count: g.count,
-          tagsCount: g.tags.length
-        }))
-      });
-    }
-    
-    return result;
+    return Array.from(grouped.values());
   }, [scannedTags, getGarmentByRfid, serviceType, mode]);
 
   // Calcular peso total de las prendas registradas
@@ -670,6 +671,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         await handleRegisterGarment();
       } else {
         // Flujo industrial: abrir formulario de guía
+        setPendingGuideEdit(undefined);
         setGuideModalOpen(true);
       }
     } else if (mode === 'process') {
@@ -679,8 +681,16 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       
       // Procesos con escaneo opcional u obligatorio: abrir ScanForm para actualizar RFID scan
       const processesWithScan = ['WASHING', 'DRYING', 'IRONING', 'FOLDING', 'IN_PROCESS', 'PACKAGING', 'SHIPPING', 'LOADING', 'DELIVERY'];
-      if (processesWithScan.includes(processType || '') && rfidScanId) {
-        setScanFormModalOpen(true);
+      if (processesWithScan.includes(processType || '') && rfidScanId && guideId) {
+      setScanFormContext({
+        origin: 'process',
+        guideId,
+        rfidScanId,
+        processType,
+        scannedTags: scannedTags.map(tag => tag.epc),
+        deferRfidScanUpdate: true,
+        unregisteredCodes: unregisteredRfids,
+      });
       } else if (processType === 'PACKAGING' || processType === 'LOADING' || processType === 'DELIVERY') {
         // Para EMPAQUE, CARGA y ENTREGA (sin rfidScanId), ir a la página de validación
         navigation.navigate('GarmentValidation', {
@@ -864,6 +874,9 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     scannedTagsCountRef.current = 0; // Resetear el contador
     setShowActionButtons(false);
     setRegisteredGarments([]); // Limpiar prendas registradas en servicio personal
+    setPendingGuideEdit(undefined);
+    setGuideDraftData(undefined);
+    setGuideDraftValues(undefined);
   }, [clearScannedTags]);
 
   // Función para manejar la edición de prenda existente
@@ -1065,6 +1078,103 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         </View>
       </Card>
     );
+  };
+
+  const handleGuideFormCancel = () => {
+    setGuideModalOpen(false);
+  };
+
+  const handleGuideFormSubmit = (result?: { guideData: any; guide?: any; draftValues: any }) => {
+    if (!result?.guideData) {
+      setGuideModalOpen(false);
+      return;
+    }
+
+    setGuideDraftData(result.guideData);
+    setGuideDraftValues(result.draftValues);
+    setPendingGuideEdit(result.guide);
+    if (result.guideData.client_id) {
+      setSelectedClientId(result.guideData.client_id);
+    }
+    setGuideModalOpen(false);
+
+    const guideServiceType = (result.guideData.service_type || '').toUpperCase();
+
+    if (guideServiceType === 'INDUSTRIAL') {
+      setScanFormContext({
+        origin: 'guide',
+        guideId: result.guide?.id,
+        guide: result.guide,
+        guideData: result.guideData,
+        draftValues: result.draftValues,
+        scannedTags: scannedTags.map(tag => tag.epc),
+        initialScanType: 'COLLECTED',
+        unregisteredCodes: unregisteredRfids,
+      });
+      return;
+    }
+
+    (async () => {
+      try {
+        await createGuideAsync(result.guideData);
+        clearAllScannedData();
+        Alert.alert('Guía creada', 'La guía se registró correctamente.');
+      } catch (error: any) {
+        Alert.alert('Error', error?.response?.data?.message || error?.message || 'No se pudo crear la guía. Intenta nuevamente.');
+        setGuideModalOpen(true);
+      }
+    })();
+  };
+
+  const handleScanFormSuccess = async (context: ScanFormContext, result?: any) => {
+    if (context.origin === 'process') {
+      const updatePayload = result?.rfidScanUpdateData || result;
+      if (updatePayload) {
+        try {
+          await AsyncStorage.setItem('pendingRfidScanUpdate', JSON.stringify(updatePayload));
+        } catch (error) {
+          console.error('Error al guardar datos del RFID scan:', error);
+        }
+      }
+      setScanFormContext(null);
+      clearAllScannedData();
+      navigation.navigate('Processes');
+      return;
+    }
+
+    // Flujo de guía
+    const guideNumber = result?.createdGuide?.guide_number || context.guide?.guide_number;
+    setScanFormContext(null);
+    setPendingGuideEdit(undefined);
+    setGuideDraftData(undefined);
+    setGuideDraftValues(undefined);
+    clearAllScannedData();
+    Alert.alert(
+      'Registro completado',
+      guideNumber
+        ? `La guía ${guideNumber} y el escaneo RFID se registraron correctamente.`
+        : 'La guía y el escaneo RFID se registraron correctamente.',
+    );
+  };
+
+  const handleScanFormCancel = (context: ScanFormContext) => {
+    setScanFormContext(null);
+
+    if (context.origin === 'guide') {
+      setPendingGuideEdit(context.guide);
+      if (context.guide?.client_id) {
+        setSelectedClientId(context.guide.client_id);
+      } else if (context.guideData?.client_id) {
+        setSelectedClientId(context.guideData.client_id);
+      }
+      if (context.guideData) {
+        setGuideDraftData(context.guideData);
+      }
+      if (context.draftValues) {
+        setGuideDraftValues(context.draftValues);
+      }
+      setGuideModalOpen(true);
+    }
   };
 
   return (
@@ -1347,22 +1457,24 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             guideItems={scannedTags.map(t => ({ tagEPC: t.epc, proceso: '' }))}
             onRemoveItem={() => {}}
             onScan={() => {}}
-            onSubmit={handleCloseGuideModal}
-            onCancel={handleCloseGuideModal}
+            onSubmit={handleGuideFormSubmit}
+            onCancel={handleGuideFormCancel}
             showScanButton={false}
-            onNavigate={(route: string, params?: any) => {
-              // @ts-ignore
-              navigation.navigate(route, params);
-            }}
-            initialServiceType={serviceType === 'industrial' ? 'INDUSTRIAL' : 'PERSONAL'}
+            initialServiceType={
+              pendingGuideEdit?.service_type ||
+              (serviceType === 'industrial' ? 'INDUSTRIAL' : 'PERSONAL')
+            }
             initialTotalWeight={
-              serviceType === 'personal'
-                ? calculateTotalWeight()
-                : Number(totalWeightFromScannedGarments.toFixed(2))
+              pendingGuideEdit?.total_weight ?? (
+                serviceType === 'personal'
+                  ? calculateTotalWeight()
+                  : Number(totalWeightFromScannedGarments.toFixed(2))
+              )
             }
             unregisteredCount={serviceType === 'industrial' ? unregisteredCount : 0}
             // Indicar al formulario que estamos editando cuando corresponda y pasar guía completa si viene
-            guideToEdit={isEditMode ? (passedGuide || { id: route?.params?.guideId }) : undefined}
+            guideToEdit={pendingGuideEdit || (isEditMode ? (passedGuide || { id: route?.params?.guideId }) : undefined)}
+            draftValues={guideDraftValues}
           />
         </View>
       </Modal>
@@ -1484,32 +1596,20 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         serviceType={serviceType}
       />
 
-      {/* Modal de ScanForm para actualizar RFID scan en procesos */}
-      {scanFormModalOpen && route?.params?.rfidScanId && route?.params?.guideId && (
+      {/* Modal de ScanForm para actualizar RFID scan */}
+      {scanFormContext && (
         <ScanFormModal
-          visible={scanFormModalOpen}
-          guideId={route.params.guideId}
-          rfidScanId={route.params.rfidScanId}
-          guideToEdit={route.params.guideToEdit}
-          scannedTags={scannedTags.map(tag => tag.epc)}
-          processType={route.params.processType}
-          onSuccess={async (rfidScanUpdateData) => {
-            setScanFormModalOpen(false);
-            clearScannedTags();
-            // Guardar los datos del RFID scan actualizado en AsyncStorage para que MainLayout los pueda leer
-            if (rfidScanUpdateData) {
-              try {
-                await AsyncStorage.setItem('pendingRfidScanUpdate', JSON.stringify(rfidScanUpdateData));
-              } catch (error) {
-                console.error('Error al guardar datos del RFID scan:', error);
-              }
-            }
-            // Navegar de vuelta a Processes - MainLayout detectará y abrirá el form automáticamente
-            navigation.navigate('Processes');
-          }}
-          onCancel={() => {
-            setScanFormModalOpen(false);
-          }}
+          visible={true}
+          guideId={scanFormContext.guideId}
+          rfidScanId={scanFormContext.rfidScanId}
+          guideToEdit={scanFormContext.guide}
+          guideData={scanFormContext.guideData}
+          scannedTags={scanFormContext.scannedTags}
+          initialScanType={scanFormContext.initialScanType || scanFormContext.processType}
+          deferRfidScanUpdate={scanFormContext.deferRfidScanUpdate}
+          unregisteredCodes={scanFormContext.unregisteredCodes}
+          onSuccess={(data) => handleScanFormSuccess(scanFormContext, data)}
+          onCancel={() => handleScanFormCancel(scanFormContext)}
         />
       )}
     </Container>

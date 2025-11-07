@@ -10,12 +10,10 @@ import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
 import { ClientForm } from '@/laundry/pages/clients/ui/ClientForm';
 import { useCreateClient } from '@/laundry/hooks/clients';
 import { useBranchOffices } from '@/laundry/hooks/branch-offices';
-import { useCreateGuide } from '@/laundry/hooks/guides';
 import { useGuideGarmentsByGuide } from '@/laundry/hooks/guides/guide-garments';
 import { useGetRfidScanByGuide } from '@/laundry/hooks/guides/rfid-scan';
 // Detalle de guía eliminado del flujo
 import { isValidDate, sanitizeNumericInput, sanitizeDecimalInput, isNonNegative, safeParseInt, safeParseFloat } from '@/helpers/validators.helper';
-import { translateEnum } from '@/helpers';
 import { useVehicles } from '@/laundry/hooks/vehicles';
 import { VehicleSelectionModal } from '@/laundry/components';
 
@@ -28,7 +26,7 @@ interface GuideFormProps {
   guideItems: GuideItem[];
   onRemoveItem: (epc: string) => void;
   onScan: () => void;
-  onSubmit: () => void;
+  onSubmit: (result: { guideData: any; guide?: any; draftValues: any }) => void;
   onCancel?: () => void;
   submitting?: boolean;
   showScanButton?: boolean;
@@ -40,6 +38,7 @@ interface GuideFormProps {
   unregisteredCount?: number;
   // Datos de la guía para modo edición
   guideToEdit?: any;
+  draftValues?: any;
 }
 
 export const GuideForm: React.FC<GuideFormProps> = ({
@@ -59,6 +58,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   initialTotalWeight = 0,
   unregisteredCount = 0,
   guideToEdit,
+  draftValues,
 }) => {
   const { user } = useAuthStore();
   const { sucursales } = useBranchOffices();
@@ -71,14 +71,14 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   const branchOfficeName = currentBranch?.name || 'Sucursal no asignada';
 
   // Estado local para campos del servicio y fechas
-  const [serviceType, setServiceType] = useState<string>(initialServiceType);
-  const [condition, setCondition] = useState<string>('REGULAR'); // Valor por defecto según Prisma
-  const [personalEmployee, setPersonalEmployee] = useState<string>('');
-  const [transportEmployee, setTransportEmployee] = useState<string>('');
-  const [packageManager, setPackageManager] = useState<string>('');
-  const [departureTime, setDepartureTime] = useState<string>('');
-  const [arrivalTime, setArrivalTime] = useState<string>('');
-  const [sealNumber, setSealNumber] = useState<string>('');
+  const [serviceType, setServiceType] = useState<string>(draftValues?.serviceType || initialServiceType);
+  const [condition, setCondition] = useState<string>(draftValues?.condition || 'REGULAR');
+  const [personalEmployee, setPersonalEmployee] = useState<string>(draftValues?.personalEmployee || '');
+  const [transportEmployee, setTransportEmployee] = useState<string>(draftValues?.transportEmployee || '');
+  const [packageManager, setPackageManager] = useState<string>(draftValues?.packageManager || '');
+  const [departureTime, setDepartureTime] = useState<string>(draftValues?.departureTime || '');
+  const [arrivalTime, setArrivalTime] = useState<string>(draftValues?.arrivalTime || '');
+  const [sealNumber, setSealNumber] = useState<string>(draftValues?.sealNumber || '');
   // Formatear fecha actual a dd/mm/yyyy
   const formatDateToDisplay = (date: Date): string => {
     const day = String(date.getDate()).padStart(2, '0');
@@ -86,14 +86,16 @@ export const GuideForm: React.FC<GuideFormProps> = ({
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
   };
-  const [collectionDate, setCollectionDate] = useState<string>(formatDateToDisplay(new Date()));
-  const [deliveryDate, setDeliveryDate] = useState<string>(formatDateToDisplay(new Date()));
-  const [totalWeight, setTotalWeight] = useState<string>(initialTotalWeight > 0 ? initialTotalWeight.toFixed(2) : '');
+  const [collectionDate, setCollectionDate] = useState<string>(draftValues?.collectionDate || formatDateToDisplay(new Date()));
+  const [deliveryDate, setDeliveryDate] = useState<string>(draftValues?.deliveryDate || formatDateToDisplay(new Date()));
+  const [totalWeight, setTotalWeight] = useState<string>(
+    draftValues?.totalWeight ?? (initialTotalWeight > 0 ? initialTotalWeight.toFixed(2) : '')
+  );
   // Estado inicial según tipo de servicio
   const getInitialStatus = () => {
     return initialServiceType === 'PERSONAL' ? GUIDE_STATUS.SENT : GUIDE_STATUS.COLLECTED;
   };
-  const [status, setStatus] = useState<string>(getInitialStatus());
+  const [status, setStatus] = useState<string>(draftValues?.status || getInitialStatus());
   // Catálogos dinámicos (frescos) para condiciones, estados y tipos de servicio
   const { data: generalConditionCatalog } = useCatalogValuesByType('general_condition', true, { forceFresh: true });
   const { data: guideStatusCatalog } = useCatalogValuesByType('guide_status', true, { forceFresh: true });
@@ -133,29 +135,28 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       .sort((a,b) => (a.display_order||0) - (b.display_order||0))
       .map(v => ({ label: v.label, value: v.code }));
   }, [washingTypeCatalog]);
-  const [notes, setNotes] = useState<string>('');
-  const [supplierGuideNumber, setSupplierGuideNumber] = useState<string>('');
-  const [requestedServices, setRequestedServices] = useState<string[]>([]);
+  const [notes, setNotes] = useState<string>(draftValues?.notes || '');
+  const [supplierGuideNumber, setSupplierGuideNumber] = useState<string>(draftValues?.supplierGuideNumber || '');
+  const [requestedServices, setRequestedServices] = useState<string[]>(draftValues?.requestedServices || []);
   const [showRequestedServices, setShowRequestedServices] = useState<boolean>(false);
   const [clientModalOpen, setClientModalOpen] = useState(false);
   // Detalle de guía eliminado del flujo
 
   // Nuevos campos basados en las imágenes y schema
-  const [servicePriority, setServicePriority] = useState<string>('NORMAL');
-  const [washingType, setWashingType] = useState<string>('');
+  const [servicePriority, setServicePriority] = useState<string>(draftValues?.servicePriority || 'NORMAL');
+  const [washingType, setWashingType] = useState<string>(draftValues?.washingType || '');
   
   // Personal involucrado
-  const [deliveredBy, setDeliveredBy] = useState<string>('');
+  const [deliveredBy, setDeliveredBy] = useState<string>(draftValues?.deliveredBy || '');
   // Campos adicionales de transporte removidos del UI actual
   
   // Gestión de paquetes
-  const [totalBundlesReceived, setTotalBundlesReceived] = useState<string>('');
+  const [totalBundlesReceived, setTotalBundlesReceived] = useState<string>(draftValues?.totalBundlesReceived || '');
   // Discrepancia/esperados removidos del UI actual
-  const [vehiclePlate, setVehiclePlate] = useState<string>('');
+  const [vehiclePlate, setVehiclePlate] = useState<string>(draftValues?.vehiclePlate || '');
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
   const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
   const { createClientAsync, isCreating } = useCreateClient();
-  const { createGuideAsync, isCreating: isCreatingGuide } = useCreateGuide();
   
   // Obtener lista de vehículos (solo para servicio industrial)
   const { vehicles, isLoading: isLoadingVehicles } = useVehicles({ 
@@ -193,6 +194,32 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   const totalGarments = useMemo(() => {
     return guideToEdit ? existingRfids.length : guideItems.length;
   }, [guideToEdit, existingRfids.length, guideItems.length]);
+
+  // Cargar borrador cuando no estamos en modo edición
+  useEffect(() => {
+    if (!guideToEdit && draftValues) {
+      if (draftValues.serviceType) setServiceType(draftValues.serviceType);
+      if (draftValues.condition) setCondition(draftValues.condition);
+      if (draftValues.collectionDate) setCollectionDate(draftValues.collectionDate);
+      if (draftValues.deliveryDate) setDeliveryDate(draftValues.deliveryDate);
+      if (draftValues.totalWeight !== undefined) setTotalWeight(draftValues.totalWeight);
+      if (draftValues.status) setStatus(draftValues.status);
+      if (draftValues.notes !== undefined) setNotes(draftValues.notes);
+      if (draftValues.sealNumber !== undefined) setSealNumber(draftValues.sealNumber);
+      if (draftValues.servicePriority) setServicePriority(draftValues.servicePriority);
+      if (draftValues.washingType) setWashingType(draftValues.washingType);
+      if (draftValues.deliveredBy) setDeliveredBy(draftValues.deliveredBy);
+      if (draftValues.personalEmployee) setPersonalEmployee(draftValues.personalEmployee);
+      if (draftValues.transportEmployee) setTransportEmployee(draftValues.transportEmployee);
+      if (draftValues.packageManager) setPackageManager(draftValues.packageManager);
+      if (draftValues.departureTime) setDepartureTime(draftValues.departureTime);
+      if (draftValues.arrivalTime) setArrivalTime(draftValues.arrivalTime);
+      if (draftValues.totalBundlesReceived !== undefined) setTotalBundlesReceived(draftValues.totalBundlesReceived);
+      if (draftValues.vehiclePlate) setVehiclePlate(draftValues.vehiclePlate);
+      if (Array.isArray(draftValues.requestedServices)) setRequestedServices(draftValues.requestedServices);
+      if (draftValues.supplierGuideNumber !== undefined) setSupplierGuideNumber(draftValues.supplierGuideNumber);
+    }
+  }, [draftValues, guideToEdit]);
 
   // Cargar datos de la guía en modo edición
   useEffect(() => {
@@ -755,30 +782,39 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               total_bundles_received: safeParseInt(totalBundlesReceivedClean),
             delivered_by: serviceType === 'INDUSTRIAL' ? (deliveredBy || undefined) : (personalEmployee || undefined),
             vehicle_plate: vehiclePlate || undefined,
+            precinct_number: sealNumber || undefined,
           } as any;
 
-          try {
-            const created = await createGuideAsync(guideData);
-            // Cerrar modal superior y navegar a escaneo RFID de la guía creada
-            onSubmit();
-            if (onNavigate && created?.id) {
-              const rfids = guideToEdit
-                ? existingRfids
-                : guideItems.map(item => item.tagEPC);
-              onNavigate('ScanClothes', {
-                mode: 'guide',
-                serviceType: (serviceType === 'PERSONAL' ? 'personal' : 'industrial'),
-                guideId: created.id,
-                initialRfids: rfids,
-                guideToEdit: created,
-                isEditMode: true,
-              });
-            }
-          } catch (e: any) {
-            Alert.alert('Error', e?.message || 'No se pudo crear la guía');
-          }
+          const draftValuesPayload = {
+            serviceType,
+            condition,
+            collectionDate,
+            deliveryDate,
+            totalWeight,
+            status,
+            notes,
+            sealNumber,
+            servicePriority,
+            washingType,
+            deliveredBy,
+            personalEmployee,
+            transportEmployee,
+            packageManager,
+            departureTime,
+            arrivalTime,
+            totalBundlesReceived,
+            vehiclePlate,
+            requestedServices,
+            supplierGuideNumber,
+          };
+
+          onSubmit({
+            guideData,
+            guide: guideToEdit,
+            draftValues: draftValuesPayload,
+          });
         }}
-        isLoading={isCreatingGuide || !!submitting}
+        isLoading={!!submitting}
         fullWidth
         size="md"
         disabled={
