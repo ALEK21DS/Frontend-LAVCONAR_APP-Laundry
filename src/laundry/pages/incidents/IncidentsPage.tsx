@@ -71,22 +71,21 @@ export const IncidentsPage: React.FC<IncidentsPageProps> = ({ navigation }) => {
     setDetailsOpen(true);
   };
 
-  const openEdit = () => {
-    if (selectedIncident) {
-      setEditingId(selectedIncident.id);
-      setInitialValues({
-        guide_id: selectedIncident.guide_id,
-        guide_number: selectedIncident.guide?.guide_number || selectedIncident.guide_number || '',
-        rfid_code: selectedIncident.rfid_code || '',
-        incident_type: selectedIncident.incident_type,
-        description: selectedIncident.description,
-        responsible: selectedIncident.responsible || '',
-        action_taken: selectedIncident.action_taken || '',
-        compensation_amount: selectedIncident.compensation_amount || 0,
-        status: selectedIncident.status || 'OPEN',
-      });
+  const openEdit = (incident?: any) => {
+    const target = incident || selectedIncident;
+    if (target) {
+      setEditingId(target.id);
+      setSelectedIncident(target);
+      setInitialValues(target);
       setFormOpen(true);
     }
+  };
+
+  const handleDeleteSuccess = () => {
+    Alert.alert('Incidente eliminado', 'El incidente fue eliminado correctamente');
+    setSelectedIncident(null);
+    setDetailsOpen(false);
+    refetch();
   };
 
   const handleSubmit = async (data: any) => {
@@ -287,7 +286,8 @@ export const IncidentsPage: React.FC<IncidentsPageProps> = ({ navigation }) => {
         visible={detailsOpen}
         onClose={() => setDetailsOpen(false)}
         incident={selectedIncident}
-        onEdit={openEdit}
+        onEdit={(incident) => openEdit(incident)}
+        onDelete={handleDeleteSuccess}
       />
 
       {/* Modal de Formulario */}

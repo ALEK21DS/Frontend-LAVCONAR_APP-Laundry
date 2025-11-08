@@ -6,8 +6,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { 
   useClients, 
   useCreateClient, 
-  useUpdateClient, 
-  useDeleteClient 
+  useUpdateClient 
 } from '@/laundry/hooks/clients';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -27,7 +26,6 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
   const { clients, isLoading, refetch, total, totalPages, currentPage } = useClients({ page, limit });
   const { createClientAsync, isCreating } = useCreateClient();
   const { updateClientAsync, isUpdating } = useUpdateClient();
-  const { deleteClient, isDeleting } = useDeleteClient();
   
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
@@ -196,19 +194,11 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
     );
   };
 
-  const handleDelete = () => {
-    if (!selectedClient?.id) return;
-    deleteClient(selectedClient.id, {
-      onSuccess: () => {
-        Alert.alert('Cliente eliminado', 'El cliente fue eliminado correctamente');
-        setSelectedClient(null);
-        setDetailsOpen(false);
-        refetch();
-      },
-      onError: (error: any) => {
-        Alert.alert('Error', error?.message || 'No se pudo eliminar el cliente');
-      }
-    });
+  const handleDeleteSuccess = () => {
+    Alert.alert('Cliente eliminado', 'El cliente fue eliminado correctamente');
+    setSelectedClient(null);
+    setDetailsOpen(false);
+    refetch();
   };
 
   return (
@@ -340,7 +330,7 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
         onClose={() => setDetailsOpen(false)}
         client={selectedClient}
         onEdit={openEdit}
-        onDelete={handleDelete}
+        onDelete={handleDeleteSuccess}
       />
 
       {/* Modal de Formulario */}

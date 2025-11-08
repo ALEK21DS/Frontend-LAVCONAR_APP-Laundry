@@ -10,7 +10,7 @@ export const useDeleteGuide = () => {
 
   const mutation = useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      await guidesApi.delete(`/${id}`);
+      await guidesApi.delete(`/delete-guide/${id}`);
     },
     onSuccess: (_, deletedId) => {
       // Invalidar todas las queries de guías

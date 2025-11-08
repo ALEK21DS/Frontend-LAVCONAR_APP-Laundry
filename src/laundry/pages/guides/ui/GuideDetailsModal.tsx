@@ -5,8 +5,9 @@ import { Button, Card } from '@/components/common';
 import { GUIDE_STATUS_LABELS, GUIDE_STATUS_COLORS } from '@/constants/processes';
 import { formatDateTime } from '@/helpers/formatters.helper';
 import { usePrintGuide } from '@/laundry/hooks/guides';
-import { useCreateAuthorizationRequest, useGetAuthorizationById, useInvalidateAuthorization } from '@/laundry/hooks/authorizations';
+import { useCreateAuthorizationRequest, useGetAuthorizationById } from '@/laundry/hooks/authorizations';
 import { useCatalogLabelMap } from '@/laundry/hooks';
+import { useDeleteGuide } from '@/laundry/hooks/guides/guide/useDeleteGuide';
 
 interface GuideDetailsModalProps {
   visible: boolean;
@@ -21,10 +22,12 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
   guide,
   onEdit,
 }) => {
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalVisible, setAuthModalVisible] = useState(false);
+  const [authAction, setAuthAction] = useState<'EDIT' | 'DELETE' | null>(null);
   const [description, setDescription] = useState('');
   const [checkingAuth, setCheckingAuth] = useState(false);
   const [currentRequestId, setCurrentRequestId] = useState<string>('');
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   
   // Hook para exportar PDF
   const { downloadGuidePDF, isPrinting } = usePrintGuide();
@@ -32,8 +35,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
   // Hook para crear solicitud de autorización
   const { createAuthorizationRequestAsync, isCreating } = useCreateAuthorizationRequest();
   
-  // Hook para invalidar autorizaciones existentes
-  const { invalidateAuthorizationAsync } = useInvalidateAuthorization();
+  const { deleteGuideAsync, isDeleting } = useDeleteGuide();
   
   // Hook para verificar el estado de la solicitud específica (solo se activa cuando checkingAuth es true)
   // El hook hace polling automático cada 3 segundos
@@ -51,42 +53,67 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
   useEffect(() => {
     if (checkingAuth && authStatus) {
       if (authStatus === 'APPROVED') {
-        // Autorización aprobada - abrir formulario directamente
+        const action = authAction;
         setCheckingAuth(false);
         setDescription('');
         setCurrentRequestId('');
-        onEdit();
-        onClose();
+        setAuthAction(null);
+        setAuthModalVisible(false);
+
+        if (action === 'EDIT') {
+          onClose();
+          onEdit();
+        } else if (action === 'DELETE') {
+          setDeleteConfirmVisible(true);
+        }
       } else if (authStatus === 'REJECTED') {
         // Autorización rechazada
         Alert.alert(
           'Solicitud Rechazada', 
-          'El superadmin ha rechazado tu solicitud de edición.'
+          authAction === 'DELETE'
+            ? 'El superadmin ha rechazado tu solicitud de eliminación.'
+            : 'El superadmin ha rechazado tu solicitud de edición.'
         );
         setCheckingAuth(false);
         setDescription('');
         setCurrentRequestId('');
+        setAuthAction(null);
+        setAuthModalVisible(false);
       }
     }
-  }, [checkingAuth, authStatus]);
+  }, [checkingAuth, authStatus, authAction, onEdit, onClose]);
 
   // Resetear estados cuando el modal se cierra
   useEffect(() => {
     if (!visible) {
-      setShowAuthModal(false);
+      setAuthModalVisible(false);
       setDescription('');
       setCheckingAuth(false);
       setCurrentRequestId('');
+      setAuthAction(null);
+      setDeleteConfirmVisible(false);
     }
   }, [visible]);
 
   if (!guide) return null;
 
   const handleEditRequest = () => {
-    setShowAuthModal(true);
+    setAuthAction('EDIT');
+    setDescription('');
+    setAuthModalVisible(true);
+  };
+
+  const handleDeleteRequest = () => {
+    setAuthAction('DELETE');
+    setDescription('');
+    setAuthModalVisible(true);
   };
 
   const handleSubmitRequest = async () => {
+    if (!authAction) {
+      return;
+    }
+
     if (!description.trim()) {
       Alert.alert('Error', 'Por favor ingresa una razón para la solicitud');
       return;
@@ -97,13 +124,13 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
       const authRequest = await createAuthorizationRequestAsync({
         entity_type: 'guides',
         entity_id: guide.id,
-        action_type: 'UPDATE',
+        action_type: authAction === 'DELETE' ? 'DELETE' : 'UPDATE',
         reason: description,
       });
       
       // Guardar el ID de la solicitud para verificar específicamente esta autorización
       setCurrentRequestId(authRequest.id);
-      setShowAuthModal(false);
+      setAuthModalVisible(false);
       setCheckingAuth(true);
     } catch (error: any) {
       const errorMessage = error.message || 'No se pudo enviar la solicitud';
@@ -126,6 +153,18 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
 
   const getStatusLabel = (status: string) => {
     return GUIDE_STATUS_LABELS[status as keyof typeof GUIDE_STATUS_LABELS] || status;
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      await deleteGuideAsync(guide.id);
+      setDeleteConfirmVisible(false);
+      Alert.alert('Guía eliminada', 'La guía se eliminó correctamente.');
+      onClose();
+    } catch (error: any) {
+      const backendMessage = error?.response?.data?.message;
+      Alert.alert('Error', backendMessage || error?.message || 'No se pudo eliminar la guía');
+    }
   };
 
   return (
@@ -300,22 +339,28 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
 
           {/* Actions */}
           <View className="p-4 border-t border-gray-200 bg-white">
-            <Button
-              title="Editar Guía"
-            onPress={() => {
-              onClose();
-              onEdit();
-            }}
-              variant="primary"
-              icon={<IonIcon name="pencil-outline" size={18} color="white" />}
-              fullWidth
-            />
+            <View className="flex-row">
+              <Button
+                title="Eliminar Guía"
+                variant="danger"
+                icon={<IonIcon name="trash-outline" size={18} color="white" />}
+                onPress={handleDeleteRequest}
+                className="flex-1 mr-3"
+              />
+              <Button
+                title="Editar Guía"
+                variant="primary"
+                icon={<IonIcon name="pencil-outline" size={18} color="white" />}
+                onPress={handleEditRequest}
+                className="flex-1"
+              />
+            </View>
           </View>
         </View>
       </Modal>
 
       {/* Modal de Autorización */}
-      <Modal transparent visible={showAuthModal} animationType="fade" onRequestClose={() => setShowAuthModal(false)}>
+      <Modal transparent visible={authModalVisible} animationType="fade" onRequestClose={() => setAuthModalVisible(false)}>
         <View className="flex-1 items-center justify-center bg-black/50 p-4">
           <View className="w-full max-w-sm bg-white rounded-xl p-6 shadow-xl">
             <View className="flex-row items-center justify-center mb-4">
@@ -324,7 +369,9 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
             </View>
 
             <Text className="text-base text-gray-700 text-center mb-6">
-              Se necesita autorización del SuperAdmin para editar esta guía.
+              {authAction === 'DELETE'
+                ? 'Se necesita autorización del SuperAdmin para eliminar esta guía.'
+                : 'Se necesita autorización del SuperAdmin para editar esta guía.'}
             </Text>
 
             <View className="mb-4">
@@ -344,7 +391,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
               <Button
                 title="Cancelar"
                 variant="outline"
-                onPress={() => setShowAuthModal(false)}
+                onPress={() => setAuthModalVisible(false)}
                 disabled={isCreating}
                 className="flex-1 mr-2"
               />
@@ -379,6 +426,70 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
             <Text className="text-sm text-gray-500 text-center">
               Verificando autorización...
             </Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Confirmación de Eliminación */}
+      <Modal transparent visible={deleteConfirmVisible} animationType="fade" onRequestClose={() => setDeleteConfirmVisible(false)}>
+        <View className="flex-1 items-center justify-center bg-black/50 p-4">
+          <View className="w-full max-w-md bg-white rounded-2xl p-6 shadow-2xl">
+            <View className="flex-row items-center mb-4">
+              <View className="w-12 h-12 rounded-full bg-red-100 items-center justify-center mr-3">
+                <IonIcon name="warning-outline" size={26} color="#DC2626" />
+              </View>
+              <View>
+                <Text className="text-2xl font-bold text-gray-900">Confirmar eliminación</Text>
+                <Text className="text-sm text-gray-600 mt-1">Revisa los datos antes de eliminar la guía</Text>
+              </View>
+            </View>
+
+            <View className="bg-gray-50 rounded-xl p-4 mb-4">
+              <Text className="text-xs text-gray-500 uppercase mb-1">Guía</Text>
+              <Text className="text-lg font-semibold text-gray-900">{guide?.guide_number || 'Sin número'}</Text>
+              <View className="flex-row mt-3">
+                <View className="flex-1 mr-2">
+                  <Text className="text-xs text-gray-500 uppercase">Cliente</Text>
+                  <Text className="text-sm text-gray-800 mt-1">{guide?.client_name || '—'}</Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-xs text-gray-500 uppercase">Sucursal</Text>
+                  <Text className="text-sm text-gray-800 mt-1">{guide?.branch_office_name || '—'}</Text>
+                </View>
+              </View>
+              <View className="flex-row mt-3">
+                <View className="flex-1 mr-2">
+                  <Text className="text-xs text-gray-500 uppercase">Estado</Text>
+                  <Text className="text-sm text-gray-800 mt-1">{getGuideStatusLabel(guide?.status, guide?.status_label || '—')}</Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-xs text-gray-500 uppercase">Prendas</Text>
+                  <Text className="text-sm text-gray-800 mt-1">{guide?.total_garments ?? 0}</Text>
+                </View>
+              </View>
+            </View>
+
+            <Text className="text-sm text-gray-600 mb-6">
+              Esta acción no se puede deshacer. Todas las prendas asociadas y registros de escaneo permanecerán, pero la guía dejará de estar disponible.
+            </Text>
+
+            <View className="flex-row">
+              <Button
+                title="Cancelar"
+                variant="outline"
+                onPress={() => setDeleteConfirmVisible(false)}
+                className="flex-1 mr-3"
+                disabled={isDeleting}
+              />
+              <Button
+                title="Eliminar definitivamente"
+                variant="danger"
+                icon={<IonIcon name="trash-outline" size={18} color="white" />}
+                onPress={handleDeleteConfirm}
+                className="flex-1"
+                isLoading={isDeleting}
+              />
+            </View>
           </View>
         </View>
       </Modal>

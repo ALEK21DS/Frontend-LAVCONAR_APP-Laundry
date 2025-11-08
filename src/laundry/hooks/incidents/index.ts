@@ -4,4 +4,5 @@
 export * from './useIncidents';
 export * from './useCreateIncident';
 export * from './useUpdateIncident';
+export * from './useDeleteIncident';
 

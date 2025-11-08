@@ -8,4 +8,5 @@ export { useWashingProcess } from './useWashingProcess';
 export { useCreateWashingProcess } from './useCreateWashingProcess';
 export { useUpdateWashingProcess } from './useUpdateWashingProcess';
 export { useWashingProcessByGuide } from './useWashingProcessByGuide';
+export { useDeleteWashingProcess } from './useDeleteWashingProcess';
 
