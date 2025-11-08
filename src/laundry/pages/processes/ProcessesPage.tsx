@@ -9,6 +9,7 @@ import { ProcessForm } from './ui/ProcessForm';
 import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
 import { useWashingProcesses } from '@/laundry/hooks/washing-processes';
 import { useCatalogLabelMap } from '@/laundry/hooks';
+import { ProcessDetailsModal } from './ui/ProcessDetailsModal';
 
 type ProcessesPageProps = { navigation: NativeStackNavigationProp<any> };
 
@@ -19,6 +20,8 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
   const [processTypeModalOpen, setProcessTypeModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [selectedProcess, setSelectedProcess] = useState<any | null>(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const limit = 10;
 
   // Debounce de búsqueda
@@ -54,10 +57,6 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
 
   const openCreate = () => { setProcessTypeModalOpen(true); };
 
-  const openProcessTypeModal = () => {
-    setProcessTypeModalOpen(true);
-  };
-
   const handleProcessTypeSelect = (processType: string) => {
     setProcessTypeModalOpen(false);
     // Navegar al escáner con el tipo de proceso seleccionado
@@ -65,6 +64,11 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
       mode: 'process',
       processType: processType
     });
+  };
+
+  const handleOpenDetails = (process: any) => {
+    setSelectedProcess(process);
+    setDetailsModalOpen(true);
   };
 
   return (
@@ -115,7 +119,7 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
                   <View key={p.id} className="w-full px-1 mb-2">
                     <TouchableOpacity
                       activeOpacity={0.7}
-                      onPress={openProcessTypeModal}
+                      onPress={() => handleOpenDetails(p)}
                     >
                       <Card padding="md" variant="default">
                         <View className="flex-row items-center">
@@ -249,6 +253,15 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
           />
         </View>
       </Modal>
+
+      <ProcessDetailsModal
+        visible={detailsModalOpen}
+        process={selectedProcess}
+        onClose={() => {
+          setDetailsModalOpen(false);
+          setSelectedProcess(null);
+        }}
+      />
     </MainLayout>
   );
 };

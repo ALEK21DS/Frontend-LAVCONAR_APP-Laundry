@@ -369,26 +369,26 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         return null; // No existe
       } catch (error: any) {
         // Si falla, intentar con el endpoint anterior como fallback
-        const response = await garmentsApi.get<any>('/get-all-garments', {
-          params: { 
-            search: rfidCode,
-            limit: 100
-          }
+      const response = await garmentsApi.get<any>('/get-all-garments', {
+        params: { 
+          search: rfidCode,
+          limit: 100
+        }
+      });
+      
+      const garments = response.data?.data || [];
+      
+      if (garments.length > 0) {
+        const normalizedScanned = rfidCode.trim().toUpperCase();
+        const foundGarment = garments.find((g: any) => {
+            const normalizedFound = (g.rfid_code || '').trim().toUpperCase();
+          return normalizedFound === normalizedScanned;
         });
         
-        const garments = response.data?.data || [];
-        
-        if (garments.length > 0) {
-          const normalizedScanned = rfidCode.trim().toUpperCase();
-          const foundGarment = garments.find((g: any) => {
-            const normalizedFound = (g.rfid_code || '').trim().toUpperCase();
-            return normalizedFound === normalizedScanned;
-          });
-          
-          if (foundGarment) {
+        if (foundGarment) {
             return foundGarment;
-          }
         }
+      }
         return null;
       }
     } catch (error: any) {
