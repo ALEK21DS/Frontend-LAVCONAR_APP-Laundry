@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { rfidScansApi } from '@/laundry/api/guides/rfid-scans.api';
+import { guidesApi } from '@/laundry/api/guides/guides.api';
 import { UpdateRfidScanDto, RfidScan } from '@/laundry/interfaces/guides/rfid-scan.interface';
 import { ApiResponse } from '@/interfaces/base.response';
 
@@ -11,7 +11,7 @@ export const useUpdateRfidScan = () => {
 
   const mutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateRfidScanDto }) => {
-      const response = await rfidScansApi.patch<ApiResponse<RfidScan>>(`/update-rfid-scan/${id}`, data);
+      const response = await guidesApi.patch<ApiResponse<RfidScan>>(`/update-rfid-scan/${id}`, data);
       return response.data;
     },
     onSuccess: (response) => {

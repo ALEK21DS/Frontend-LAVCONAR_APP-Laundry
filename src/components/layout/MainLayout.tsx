@@ -77,7 +77,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
   );
   
   const { updateRfidScanAsync } = useUpdateRfidScan();
-  
+
   // Mapear el tipo de proceso al scan_type NUEVO (para actualizar)
   // Ahora los scan_type son los mismos nombres del catálogo
   const getNewScanTypeFromProcess = (processType: string): string => {
@@ -125,12 +125,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
   };
   
   const targetServiceType = selectedServiceType ? serviceTypeMap[selectedServiceType] : undefined;
-
+  
   // Obtener guías filtradas por tipo de servicio
   const { guides: filteredGuides, isLoading: isLoadingGuides } = useGuides({
     page: 1,
     limit: 50, // Máximo permitido por el backend
     service_type: targetServiceType,
+    branch_office_id: branchOfficeId || undefined,
     enabled: !!targetServiceType, // Solo ejecutar cuando hay servicio seleccionado
   });
 
@@ -145,10 +146,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
   // Obtener RFID scans filtrados por guide_ids de las guías filtradas
   // IMPORTANTE: Si no hay guide_ids, pasar array vacío para que el hook devuelva array vacío
   const { rfidScans, isLoading: isLoadingScans, total } = useGetAllRfidScans({
+    page: 1,
     limit: 50,
     guide_id: filteredGuideIds.length > 0 ? filteredGuideIds : [],
+    branch_office_id: branchOfficeId || undefined,
   });
-
 
   // Si no hay servicio seleccionado, no mostrar RFID scans
   const finalRfidScans = !targetServiceType ? [] : rfidScans;
@@ -183,7 +185,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
     // Procesos con escaneo obligatorio: abrir escáner directamente
     if (processesWithRequiredScan.includes(selectedProcessType) && !isBackward) {
       setGuideSelectionModalOpen(false);
-      setSelectedRfidScan(rfidScan);
+    setSelectedRfidScan(rfidScan);
       setSelectedGuideForProcess({
         id: rfidScan.guide_id,
         guide_number: rfidScan.guide?.guide_number || rfidScan.guide_number || 'Sin número',
@@ -478,15 +480,16 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
           rfidScanUpdateData={selectedGuideForProcess.rfidScanUpdateData} // Datos del RFID scan actualizado desde ScanForm
           onSuccess={() => {
             setWashingProcessFormOpen(false);
+            setGuideSelectionModalOpen(false);
             setSelectedGuideForProcess(null);
-            setGuideSelectionModalOpen(true);
+            setSelectedProcessType('');
           }}
           onCancel={() => {
             setWashingProcessFormOpen(false);
             setSelectedGuideForProcess(null);
             setGuideSelectionModalOpen(true);
           }}
-        />
+      />
       )}
     </Container>
   );

@@ -21,19 +21,21 @@ interface UseGuidesParams {
   search?: string;
   status?: string;
   service_type?: 'INDUSTRIAL' | 'PERSONAL';
+  branch_office_id?: string;
   enabled?: boolean;
 }
 
 /**
  * Hook para obtener la lista paginada de guías
  */
-export const useGuides = ({ 
-  page = 1, 
-  limit = 10, 
-  search, 
+export const useGuides = ({
+  page = 1,
+  limit = 10,
+  search,
   status,
   service_type,
-  enabled = true 
+  branch_office_id,
+  enabled = true
 }: UseGuidesParams = {}) => {
   const {
     data,
@@ -41,7 +43,7 @@ export const useGuides = ({
     error,
     refetch,
   } = useQuery({
-    queryKey: ['guides', { page, limit, search, status, service_type }],
+    queryKey: ['guides', { page, limit, search, status, service_type, branch_office_id }],
     queryFn: async (): Promise<BackendResponse> => {
       const params: any = {
         page,
@@ -55,6 +57,10 @@ export const useGuides = ({
       // Solo enviar service_type si tiene un valor válido
       if (service_type) {
         params.service_type = service_type;
+      }
+
+      if (branch_office_id) {
+        params.branch_office_id = branch_office_id;
       }
       
       try {
@@ -92,7 +98,11 @@ export const useGuides = ({
         throw error;
       }
     },
-    staleTime: 1000 * 60 * 5, // 5 minutos
+    staleTime: 0,
+    gcTime: 1000,
+    refetchOnMount: 'always',
+    refetchOnReconnect: 'always',
+    refetchOnWindowFocus: true,
     retry: false,
     enabled,
   });
@@ -112,4 +122,3 @@ export const useGuides = ({
     refetch,
   };
 };
-

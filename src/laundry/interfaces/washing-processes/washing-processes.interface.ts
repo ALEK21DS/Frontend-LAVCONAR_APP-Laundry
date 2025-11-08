@@ -67,7 +67,7 @@ export interface CreateWashingProcessDto {
   guide_id: string;
   branch_offices_id?: string;
   machine_code?: string;
-  process_type: string;
+  process_type?: string;
   start_time: string;
   load_weight?: number;
   garment_quantity?: number;

@@ -58,7 +58,12 @@ export const ScanForm: React.FC<ScanFormProps> = ({
   const branchOfficeName = currentBranch?.name || 'Sucursal no asignada';
 
   // Número de guía para mostrar en cabecera
-  const guideNumber = initialGuide?.guide_number || guideData?.guide_number || '';
+  const initialGuideNumber = initialGuide?.guide_number || guideData?.guide_number || '';
+  const [guideNumber, setGuideNumber] = useState(initialGuideNumber);
+
+  useEffect(() => {
+    setGuideNumber(initialGuideNumber);
+  }, [initialGuideNumber]);
 
   // Calcular códigos inesperados (tags nuevos no presentes en el escaneo anterior)
   const initialCodes: string[] = useMemo(() => {
@@ -161,11 +166,14 @@ export const ScanForm: React.FC<ScanFormProps> = ({
         }
       } else {
         createdGuide = await createGuideAsync(guideData);
+        if (createdGuide?.guide_number) {
+          setGuideNumber(createdGuide.guide_number);
+        }
       }
 
       if (!createdGuide?.id) {
         throw new Error('No se pudo obtener el identificador de la guía.');
-      }
+        }
 
       // ========== PASO 2: CREAR/ACTUALIZAR ESCANEO RFID ==========
           // NOTA: user_id NO se envía, el backend lo obtiene del token JWT
@@ -290,15 +298,15 @@ export const ScanForm: React.FC<ScanFormProps> = ({
         <View className="p-4">
           {/* Guía */}
           {guideNumber ? (
-            <View className="mb-4">
-              <Input
+          <View className="mb-4">
+            <Input
                 label="Guía"
                 value={guideNumber}
-                editable={false}
-                className="bg-gray-50"
+              editable={false}
+              className="bg-gray-50"
                 icon="document-text-outline"
-              />
-            </View>
+            />
+          </View>
           ) : null}
 
           {/* Tipo de Escaneo */}

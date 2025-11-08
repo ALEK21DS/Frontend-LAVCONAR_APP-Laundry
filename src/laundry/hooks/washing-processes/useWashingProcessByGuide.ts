@@ -1,47 +1,82 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { washingProcessesApi } from '@/laundry/api/washing-processes/washing-processes.api';
 import { WashingProcess } from '@/laundry/interfaces/washing-processes/washing-processes.interface';
 import { ApiResponse } from '@/interfaces/base.response';
 
 /**
- * Hook para obtener un proceso de lavado por guide_id y status
+ * Hook para obtener todos los procesos de una guía y construir un índice por estado
  */
 export const useWashingProcessByGuide = (
   guideId: string | undefined,
-  status: string | undefined,
-  enabled: boolean = true
+  enabled: boolean = true,
 ) => {
-  return useQuery({
-    queryKey: ['washing-process-by-guide', guideId, status],
-    queryFn: async (): Promise<WashingProcess | null> => {
-      if (!guideId || !status) return null;
+  const query = useQuery({
+    queryKey: ['washing-process-by-guide', guideId],
+    queryFn: async (): Promise<WashingProcess[]> => {
+      if (!guideId) return [];
 
-      try {
-        const { data } = await washingProcessesApi.get<ApiResponse<WashingProcess[]>>(
-          '/get-all-washing-processes',
-          {
-            params: {
-              page: 1,
-              limit: 100,
-              process_status: status,
-            },
-          }
-        );
-
-        // Buscar el proceso que coincida con guide_id y status
-        const process = data.data?.find((p) => p.guide_id === guideId && p.status === status);
-        return process || null;
-      } catch (error: any) {
-        // Si no se encuentra, devolver null en lugar de lanzar error
-        if (error?.response?.status === 404) {
-          return null;
+      const { data } = await washingProcessesApi.get<ApiResponse<WashingProcess[]>>(
+        '/get-all-washing-processes',
+        {
+          params: {
+            page: 1,
+            limit: 50,
+            guide_id: guideId,
+          },
         }
-        throw error;
-      }
+      );
+
+      return (data.data || []).filter((process) => process.guide_id === guideId);
     },
-    enabled: enabled && !!guideId && !!status,
-    staleTime: 1000 * 60 * 5, // 5 minutos
+    enabled: enabled && !!guideId,
+    staleTime: 1000 * 60 * 5,
     retry: false,
   });
+
+  const processes = query.data ?? [];
+
+  const processByStatus = useMemo(() => {
+    return processes.reduce<Record<string, WashingProcess>>((acc, process) => {
+      const key = process.status || process.process_type;
+      if (!key) {
+        return acc;
+      }
+
+      const currentUpdatedAt = process.updated_at
+        ? new Date(process.updated_at as any).getTime()
+        : 0;
+
+      const existing = acc[key];
+      const existingUpdatedAt = existing?.updated_at
+        ? new Date(existing.updated_at as any).getTime()
+        : -Infinity;
+
+      if (!existing || currentUpdatedAt >= existingUpdatedAt) {
+        acc[key] = process;
+      }
+
+      return acc;
+    }, {});
+  }, [processes]);
+
+  const latestProcess = useMemo(() => {
+    return processes
+      .slice()
+      .sort((a, b) => {
+        const aDate = a.updated_at ? new Date(a.updated_at as any).getTime() : 0;
+        const bDate = b.updated_at ? new Date(b.updated_at as any).getTime() : 0;
+        return bDate - aDate;
+      })[0] || null;
+  }, [processes]);
+
+  return {
+    processes,
+    processByStatus,
+    latestProcess,
+    isLoading: query.isLoading,
+    error: query.error,
+    refetch: query.refetch,
+  };
 };
 

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Alert, TextInput, Modal, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Alert, TextInput, Modal, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Button, Input, Dropdown } from '@/components/common';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from '@/auth/store/auth.store';
@@ -9,6 +9,7 @@ import { useCreateWashingProcess, useUpdateWashingProcess, useWashingProcessByGu
 import { useUpdateRfidScan } from '@/laundry/hooks/guides/rfid-scan';
 import { safeParseFloat, safeParseInt } from '@/helpers/validators.helper';
 import { MachineSelectionModal } from '@/laundry/components';
+import { guidesApi } from '@/laundry/api/guides/guides.api';
 
 interface WashingProcessFormProps {
   visible: boolean;
@@ -25,6 +26,35 @@ interface WashingProcessFormProps {
   onCancel: () => void;
   initialProcess?: any;
 }
+
+const padNumber = (value: number) => value.toString().padStart(2, '0');
+
+const formatDateForInput = (value?: string | Date | null) => {
+  if (!value) return '';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = padNumber(date.getMonth() + 1);
+  const day = padNumber(date.getDate());
+  const hours = padNumber(date.getHours());
+  const minutes = padNumber(date.getMinutes());
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+};
+
+const normalizeDateInput = (value?: string) => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const normalized = trimmed.replace(' ', 'T');
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString();
+};
+
+const toStringOrEmpty = (value?: number | null) =>
+  value !== undefined && value !== null && !Number.isNaN(value)
+    ? String(value)
+    : '';
 
 export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
   visible,
@@ -47,7 +77,30 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
   const { updateRfidScanAsync } = useUpdateRfidScan();
 
   // Buscar proceso existente por tipo
-  const { data: existingProcess } = useWashingProcessByGuide(guideId, processType, true);
+  const {
+    processByStatus,
+    latestProcess,
+    isLoading: isLoadingProcess,
+    error: processError,
+    refetch: refetchProcess,
+  } = useWashingProcessByGuide(guideId, visible);
+
+  const existingProcess = useMemo(() => {
+    if (!processType) return null;
+    return processByStatus?.[processType] ?? null;
+  }, [processByStatus, processType]);
+
+  const sourceProcess = useMemo(() => {
+    if (existingProcess) return existingProcess;
+    if (latestProcess) return latestProcess;
+    return null;
+  }, [existingProcess, latestProcess]);
+
+  useEffect(() => {
+    if (visible) {
+      refetchProcess();
+    }
+  }, [visible, refetchProcess]);
 
   // Catálogos
   const { data: specialTreatmentCatalog } = useCatalogValuesByType('special_treatment', true, { forceFresh: true });
@@ -63,16 +116,17 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
   );
 
   // Estado del formulario
+  const nowFormatted = formatDateForInput(new Date());
   const [formData, setFormData] = useState({
     machine_code: initialProcess?.machine_code || '',
-    start_time: initialProcess?.start_time 
-      ? new Date(initialProcess.start_time).toISOString().slice(0, 16)
-      : new Date().toISOString().slice(0, 16),
-    end_time: initialProcess?.end_time 
-      ? new Date(initialProcess.end_time).toISOString().slice(0, 16)
-      : '',
-    load_weight: initialProcess?.load_weight?.toString() || '',
-    garment_quantity: initialProcess?.garment_quantity?.toString() || '',
+    start_time: initialProcess?.start_time
+      ? formatDateForInput(initialProcess.start_time)
+      : nowFormatted,
+    end_time: initialProcess?.end_time
+      ? formatDateForInput(initialProcess.end_time)
+      : nowFormatted,
+    load_weight: toStringOrEmpty(initialProcess?.load_weight),
+    garment_quantity: toStringOrEmpty(initialProcess?.garment_quantity),
     special_treatment: initialProcess?.special_treatment || '',
     wash_temperature: initialProcess?.wash_temperature || '',
     detergent_type: initialProcess?.detergent_type || '',
@@ -83,6 +137,40 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [machineModalOpen, setMachineModalOpen] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
+  const [guideDetails, setGuideDetails] = useState<any | null>(null);
+  const [isLoadingGuideDetails, setIsLoadingGuideDetails] = useState(false);
+
+  const renderBooleanToggle = (
+    label: string,
+    value: boolean,
+    onChange: (nextValue: boolean) => void
+  ) => (
+    <View className="mb-4">
+      <Text className="text-sm font-medium text-gray-700 mb-2">{label}</Text>
+      <View className="flex-row bg-gray-100 rounded-xl p-1">
+        {[
+          { label: 'Sí', val: true },
+          { label: 'No', val: false },
+        ].map(option => {
+          const isActive = value === option.val;
+          const activeBg = option.val ? 'bg-purple-500' : 'bg-gray-200';
+          const activeTextColor = option.val ? 'text-white' : 'text-gray-900';
+          return (
+            <TouchableOpacity
+              key={option.label}
+              activeOpacity={0.85}
+              onPress={() => onChange(option.val)}
+              className={`flex-1 py-2 rounded-lg items-center ${isActive ? `${activeBg} shadow-sm` : ''}`}
+            >
+              <Text className={`text-sm font-semibold ${isActive ? activeTextColor : 'text-gray-700'}`}>
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
 
   // Opciones de catálogos
   const specialTreatmentOptions = useMemo(() => {
@@ -100,6 +188,38 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
     ];
   }, [specialTreatmentCatalog]);
 
+  useEffect(() => {
+    if (!visible || !guideId) return;
+
+    let isMounted = true;
+    const fetchGuideDetails = async () => {
+      try {
+        setIsLoadingGuideDetails(true);
+        const { data } = await guidesApi.get(`/get-guide/${guideId}`);
+        if (isMounted) {
+          setGuideDetails(data.data || null);
+        }
+      } catch (error: any) {
+        if (__DEV__) {
+          console.warn('No se pudo obtener detalles de la guía:', error?.message || error);
+        }
+        if (isMounted) {
+          setGuideDetails(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingGuideDetails(false);
+        }
+      }
+    };
+
+    fetchGuideDetails();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [visible, guideId]);
+
   const washTemperatureOptions = useMemo(() => {
     const catalogOptions = (washTemperatureCatalog?.data || [])
       .filter(v => v.is_active)
@@ -114,11 +234,58 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
     ];
   }, [washTemperatureCatalog]);
 
-  // Obtener máquina seleccionada por código
-  const selectedMachineByCode = useMemo(() => {
-    if (!formData.machine_code || !machines || !Array.isArray(machines)) return null;
-    return machines.find((m: Machine) => m.code === formData.machine_code) || null;
-  }, [formData.machine_code, machines]);
+  useEffect(() => {
+    if (!visible) return;
+
+    if (sourceProcess) {
+      setFormData({
+        machine_code: sourceProcess.machine_code || '',
+        start_time: formatDateForInput(sourceProcess.start_time),
+        end_time:
+          formatDateForInput(sourceProcess.end_time) ||
+          formatDateForInput(sourceProcess.start_time),
+        load_weight: toStringOrEmpty(sourceProcess.load_weight),
+        garment_quantity: toStringOrEmpty(sourceProcess.garment_quantity),
+        special_treatment: sourceProcess.special_treatment || '',
+        wash_temperature: sourceProcess.wash_temperature || '',
+        detergent_type: sourceProcess.detergent_type || '',
+        softener_used: sourceProcess.softener_used ?? false,
+        bleach_used: sourceProcess.bleach_used ?? false,
+      });
+    } else {
+      const current = formatDateForInput(new Date());
+      setFormData({
+        machine_code: '',
+        start_time: current,
+        end_time: current,
+        load_weight: '',
+        garment_quantity: '',
+        special_treatment: '',
+        wash_temperature: '',
+        detergent_type: '',
+        softener_used: false,
+        bleach_used: false,
+      });
+    }
+  }, [sourceProcess, visible]);
+
+  useEffect(() => {
+    if (!visible || existingProcess || latestProcess) return;
+
+    const quantityFromScan = rfidScanUpdateData?.data?.scanned_quantity ?? rfidScan?.scanned_quantity;
+
+    setFormData(prev => ({
+      ...prev,
+      load_weight:
+        prev.load_weight ||
+        (rfidScanUpdateData?.data?.load_weight !== undefined
+          ? toStringOrEmpty(rfidScanUpdateData.data.load_weight)
+          : ''),
+      garment_quantity:
+        prev.garment_quantity ||
+        (quantityFromScan !== undefined ? String(quantityFromScan) : ''),
+    }));
+  }, [visible, existingProcess, rfidScan, rfidScanUpdateData]);
 
   // Filtrar máquinas activas (is_active y status_machine === 'ACTIVE')
   const availableMachines = useMemo(() => {
@@ -126,11 +293,37 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
     return machines.filter((m: Machine) => m.is_active && m.status_machine === 'ACTIVE');
   }, [machines]);
 
+  // Obtener máquina seleccionada por código
+  const selectedMachineByCode = useMemo(() => {
+    if (!formData.machine_code && sourceProcess?.machine_code) {
+      return availableMachines.find((m: Machine) => m.code === sourceProcess.machine_code) || null;
+    }
+    if (!formData.machine_code) return null;
+    return availableMachines.find((m: Machine) => m.code === formData.machine_code) || null;
+  }, [formData.machine_code, availableMachines, sourceProcess]);
+
+  useEffect(() => {
+    if (formData.machine_code && availableMachines.length > 0) {
+      const machine = availableMachines.find((m: Machine) => m.code === formData.machine_code);
+      setSelectedMachine(machine || null);
+    } else if (!formData.machine_code) {
+      setSelectedMachine(null);
+    }
+  }, [formData.machine_code, availableMachines]);
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.start_time) {
-      newErrors.start_time = 'La fecha de inicio es requerida';
+    const normalizedStart = normalizeDateInput(formData.start_time);
+    if (!normalizedStart) {
+      newErrors.start_time = 'La fecha de inicio es requerida (formato AAAA-MM-DD HH:mm)';
+    }
+
+    if (formData.end_time) {
+      const normalizedEnd = normalizeDateInput(formData.end_time);
+      if (!normalizedEnd) {
+        newErrors.end_time = 'La fecha de fin debe tener el formato AAAA-MM-DD HH:mm';
+      }
     }
 
     if (formData.load_weight) {
@@ -157,15 +350,24 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
     }
 
     try {
-      const processData = {
+      const startTimeIso = normalizeDateInput(formData.start_time);
+      const endTimeIso = normalizeDateInput(formData.end_time);
+
+      if (!startTimeIso) {
+        throw new Error('La fecha de inicio no tiene un formato válido. Usa AAAA-MM-DD HH:mm');
+      }
+
+      const loadWeight = formData.load_weight ? safeParseFloat(formData.load_weight) : undefined;
+      const garmentQty = formData.garment_quantity ? safeParseInt(formData.garment_quantity) : undefined;
+
+      const baseProcessData = {
         guide_id: guideId,
         branch_offices_id: branchOfficeId,
         machine_code: formData.machine_code || undefined,
-        process_type: processType,
-        start_time: new Date(formData.start_time).toISOString(),
-        end_time: formData.end_time ? new Date(formData.end_time).toISOString() : undefined,
-        load_weight: formData.load_weight ? safeParseFloat(formData.load_weight) : undefined,
-        garment_quantity: formData.garment_quantity ? safeParseInt(formData.garment_quantity) : undefined,
+        start_time: startTimeIso,
+        end_time: endTimeIso,
+        load_weight: loadWeight,
+        garment_quantity: garmentQty,
         special_treatment: formData.special_treatment || undefined,
         wash_temperature: formData.wash_temperature || undefined,
         detergent_type: formData.detergent_type || undefined,
@@ -174,11 +376,12 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
         status: processType,
       };
 
-      // Si existe un proceso, actualizar; si no, crear
-      if (existingProcess?.id) {
-        await updateWashingProcessAsync({ id: existingProcess.id, data: processData });
+      const processToUpdateId = existingProcess?.id || latestProcess?.id;
+
+      if (processToUpdateId) {
+        await updateWashingProcessAsync({ id: processToUpdateId, data: baseProcessData });
       } else {
-        await createWashingProcessAsync(processData);
+        await createWashingProcessAsync(baseProcessData);
       }
 
       // Actualizar el RFID scan si hay datos pendientes
@@ -220,7 +423,11 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
       Alert.alert('Éxito', 'Proceso guardado correctamente');
       onSuccess();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'No se pudo guardar el proceso');
+      const backendMessage = error?.response?.data?.message;
+      const detailedMessage = Array.isArray(error?.response?.data?.errors)
+        ? error.response.data.errors.join('\n')
+        : undefined;
+      Alert.alert('Error', backendMessage || detailedMessage || error.message || 'No se pudo guardar el proceso');
     }
   };
 
@@ -252,7 +459,9 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
                    processType === 'DELIVERY' ? 'Proceso de Entrega' :
                    'Proceso'}
                 </Text>
-                <Text className="text-sm text-gray-600 mt-1">Complete los datos del proceso</Text>
+                <Text className="text-sm text-gray-600 mt-1">
+                  Complete los datos del proceso. Estado objetivo: {processType}
+                </Text>
               </View>
               <TouchableOpacity
                 onPress={onCancel}
@@ -264,6 +473,25 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
 
             <ScrollView className="flex-1" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <View className="p-4">
+                {isLoadingProcess || isLoadingGuideDetails ? (
+                  <View className="py-12 items-center justify-center">
+                    <ActivityIndicator size="large" color="#8EB021" />
+                    <Text className="text-sm text-gray-500 mt-3">Cargando datos del proceso…</Text>
+                  </View>
+                ) : (
+                  <>
+          <View className="mb-4 bg-purple-50 border border-purple-200 rounded-xl p-4">
+            <View className="flex-row items-center">
+              <Icon name="information-circle-outline" size={20} color="#7C3AED" />
+              <Text className="text-sm font-semibold text-purple-800 ml-2">
+                Estado asignado
+              </Text>
+            </View>
+            <Text className="text-xs text-purple-700 mt-2">
+              Al guardar, el proceso quedará en “{processType}”. Puedes ajustar la información antes de confirmar.
+            </Text>
+          </View>
+ 
           {/* Guía */}
           <View className="mb-4">
             <Input
@@ -292,10 +520,11 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
               label="Fecha y hora de inicio *"
               value={formData.start_time}
               onChangeText={(text) => setFormData(prev => ({ ...prev, start_time: text }))}
-              placeholder="YYYY-MM-DDTHH:mm"
+              placeholder="AAAA-MM-DD HH:mm"
               icon="calendar-outline"
               error={errors.start_time}
             />
+            <Text className="text-xs text-gray-500 mt-1">Formato: AAAA-MM-DD HH:mm</Text>
           </View>
 
           {/* Fecha y hora de fin */}
@@ -304,9 +533,10 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
               label="Fecha y hora de fin"
               value={formData.end_time}
               onChangeText={(text) => setFormData(prev => ({ ...prev, end_time: text }))}
-              placeholder="YYYY-MM-DDTHH:mm"
+              placeholder="AAAA-MM-DD HH:mm"
               icon="calendar-outline"
             />
+            <Text className="text-xs text-gray-500 mt-1">Formato: AAAA-MM-DD HH:mm</Text>
           </View>
 
           {/* Máquina (solo para Lavado y Secado) */}
@@ -354,6 +584,11 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
               icon="scale-outline"
               error={errors.load_weight}
             />
+            {rfidScanUpdateData?.data?.load_weight !== undefined && !sourceProcess && (
+              <Text className="text-xs text-gray-500 mt-1">
+                Capturado desde el escaneo
+              </Text>
+            )}
           </View>
 
           {/* Cantidad de prendas */}
@@ -367,6 +602,11 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
               icon="shirt-outline"
               error={errors.garment_quantity}
             />
+            {rfidScanUpdateData?.data?.scanned_quantity !== undefined && !sourceProcess && (
+              <Text className="text-xs text-gray-500 mt-1">
+                Capturado desde el escaneo
+              </Text>
+            )}
           </View>
 
           {/* Campos específicos solo para Lavado */}
@@ -407,37 +647,13 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
                 />
               </View>
 
-              {/* Suavizante usado */}
-              <View className="mb-4">
-                <View className="flex-row items-center justify-between p-4 bg-white border border-gray-300 rounded-lg">
-                  <Text className="text-sm font-medium text-gray-700">Suavizante usado</Text>
-                  <View className="flex-row items-center">
-                    <Text className="text-sm text-gray-600 mr-2">{formData.softener_used ? 'Sí' : 'No'}</Text>
-                    <Button
-                      title={formData.softener_used ? 'Desactivar' : 'Activar'}
-                      variant={formData.softener_used ? 'outline' : 'primary'}
-                      onPress={() => setFormData(prev => ({ ...prev, softener_used: !prev.softener_used }))}
-                      className="px-4 py-2"
-                    />
-                  </View>
-                </View>
-              </View>
+              {renderBooleanToggle('Suavizante usado', formData.softener_used, (value) =>
+                setFormData(prev => ({ ...prev, softener_used: value }))
+              )}
 
-              {/* Blanqueador usado */}
-              <View className="mb-4">
-                <View className="flex-row items-center justify-between p-4 bg-white border border-gray-300 rounded-lg">
-                  <Text className="text-sm font-medium text-gray-700">Blanqueador usado</Text>
-                  <View className="flex-row items-center">
-                    <Text className="text-sm text-gray-600 mr-2">{formData.bleach_used ? 'Sí' : 'No'}</Text>
-                    <Button
-                      title={formData.bleach_used ? 'Desactivar' : 'Activar'}
-                      variant={formData.bleach_used ? 'outline' : 'primary'}
-                      onPress={() => setFormData(prev => ({ ...prev, bleach_used: !prev.bleach_used }))}
-                      className="px-4 py-2"
-                    />
-                  </View>
-                </View>
-              </View>
+              {renderBooleanToggle('Blanqueador usado', formData.bleach_used, (value) =>
+                setFormData(prev => ({ ...prev, bleach_used: value }))
+              )}
             </>
           )}
 
@@ -457,7 +673,8 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
               className="flex-1"
             />
               </View>
-              {/* Cierre del contenedor principal de contenido */}
+                  </>
+                )}
               </View>
             </ScrollView>
           </View>

@@ -49,12 +49,8 @@ export const useGetAllRfidScans = (params: GetAllRfidScansParams = {}) => {
   const query = useQuery({
     queryKey: ['rfid-scans', page, limit, scan_type, branch_office_id, guide_id],
     queryFn: async (): Promise<{ data: RfidScan[]; total: number; }> => {
-      // Si se especificó guide_id pero está vacío, devolver array vacío sin hacer la query
       if (guide_id !== undefined && guide_id.length === 0) {
-        return {
-          data: [],
-          total: 0,
-        };
+        return { data: [], total: 0 };
       }
 
       const queryParams = new URLSearchParams({
@@ -70,7 +66,6 @@ export const useGetAllRfidScans = (params: GetAllRfidScansParams = {}) => {
         queryParams.append('branch_office_id', branch_office_id);
       }
 
-      // Agregar guide_id como array (múltiples valores)
       if (guide_id && guide_id.length > 0) {
         guide_id.forEach(id => {
           queryParams.append('guide_id', id);
@@ -86,24 +81,23 @@ export const useGetAllRfidScans = (params: GetAllRfidScansParams = {}) => {
         total: data.totalData || 0,
       };
     },
-    staleTime: 1000 * 60 * 5, // 5 minutos
-    // Solo ejecutar si:
-    // 1. No se especificó guide_id (query sin filtro)
-    // 2. O se especificó guide_id y tiene elementos (query con filtro)
+    staleTime: 0,
+    gcTime: 1000,
+    refetchOnMount: 'always',
+    refetchOnReconnect: 'always',
+    refetchOnWindowFocus: true,
     enabled: guide_id === undefined || (guide_id !== undefined && guide_id.length > 0),
   });
 
-  // Si query.data es un array directamente (caché viejo), usarlo directamente
-  const rfidScans = Array.isArray(query.data) 
-    ? query.data 
+  const rfidScans = Array.isArray(query.data)
+    ? query.data
     : (query.data?.data || []);
 
   return {
-    rfidScans: rfidScans,
+    rfidScans,
     total: query.data?.total || 0,
     isLoading: query.isLoading,
     error: query.error,
     refetch: query.refetch,
   };
 };
-

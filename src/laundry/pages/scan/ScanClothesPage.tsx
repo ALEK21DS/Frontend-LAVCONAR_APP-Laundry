@@ -488,8 +488,11 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         await rfidModule.stopScan();
       } catch {}
       seenSetRef.current.clear();
-    } catch (error) {
-      console.error('Error al detener escaneo:', error);
+    } catch (error: any) {
+      const message = error?.message || String(error);
+      if (__DEV__) {
+        console.warn('Error al detener escaneo (ignorado):', message);
+      }
     } finally {
       setIsStopping(false);
     }
@@ -618,6 +621,13 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       setIsScanning(false);
     }
   }, [addScannedTag, setIsScanning, stopScanning, mode, serviceType, checkRfidInBackend, isRfidCodeAlreadyRegistered]);
+
+  const handleGoBack = useCallback(() => {
+    stopScanning();
+    if (navigation.canGoBack?.()) {
+      navigation.goBack();
+    }
+  }, [navigation, stopScanning]);
 
   useEffect(() => {
     clearScannedTags();
@@ -1180,18 +1190,14 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   return (
     <Container safe>
       <View className="flex-row items-center mb-6">
-        {!isEditMode && (
-          <Button
-            icon={<Icon name="arrow-back-outline" size={24} color="#3B82F6" />}
-            variant="ghost"
-            size="icon"
-            onPress={() => {
-              stopScanning();
-              navigation.goBack();
-            }}
-          />
-        )}
-        <Text className="text-lg font-bold text-gray-900 ml-2">
+        <TouchableOpacity
+          onPress={handleGoBack}
+          className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center"
+          activeOpacity={0.8}
+        >
+          <Icon name="arrow-back-outline" size={22} color="#111827" />
+        </TouchableOpacity>
+        <Text className="text-lg font-bold text-gray-900 ml-3">
           {isEditMode 
             ? 'EDITAR PRENDAS DE GUÍA'
             : mode === 'guide' && serviceType === 'personal' 

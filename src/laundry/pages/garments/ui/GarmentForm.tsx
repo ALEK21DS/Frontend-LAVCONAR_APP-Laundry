@@ -307,9 +307,9 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
 
         <View className="mb-4">
           <GarmentTypeDropdown
-            value={garmentType}
+          value={garmentType}
             onValueChange={setGarmentType}
-          />
+        />
         </View>
 
         <Input

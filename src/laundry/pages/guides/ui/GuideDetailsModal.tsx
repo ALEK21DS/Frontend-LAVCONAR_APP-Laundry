@@ -221,7 +221,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
               <View className="px-3 py-1 rounded-full self-start bg-gray-100">
                 <Text className="text-sm text-gray-800">{getServicePriorityLabel(guide.service_priority, guide.service_priority_label || '—')}</Text>
               </View>
-            </View>
+                </View>
 
             <View>
               <Text className="text-xs text-gray-500 mb-2">Servicios Solicitados</Text>
@@ -266,7 +266,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
                   <Text className="text-sm text-gray-800">{formatDateTime(guide.delivery_date)}</Text>
                 </View>
               )}
-            </View>
+                </View>
 
             {guide.notes && (
               <View className="mt-2">
