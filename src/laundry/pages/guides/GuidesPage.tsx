@@ -196,7 +196,11 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
         await rfidModule.stopScan();
       } catch {}
       // NO limpiamos seenSetRef aquí para mantener el historial de tags escaneados
-    } catch (error) {
+    } catch (error: any) {
+      const message = error?.message || '';
+      if (typeof message === 'string' && message.includes("isScanningRef")) {
+        return;
+      }
       console.error('Error al detener escaneo:', error);
     }
   }, []);

@@ -473,9 +473,10 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
 
   const stopScanning = useCallback(async () => {
     try {
-      setIsStopping(true);
+      if (!isScanningRef.current) return;
       setIsScanning(false);
       isScanningRef.current = false;
+      await AsyncStorage.removeItem('pendingRfidScanUpdate');
       if ((global as any).rfidSubscription) {
         (global as any).rfidSubscription.remove();
         (global as any).rfidSubscription = null;
@@ -486,17 +487,19 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       }
       try {
         await rfidModule.stopScan();
-      } catch {}
-      seenSetRef.current.clear();
-    } catch (error: any) {
-      const message = error?.message || String(error);
-      if (__DEV__) {
-        console.warn('Error al detener escaneo (ignorado):', message);
+      } catch (err) {
+        if (__DEV__) {
+          console.warn('Warning al detener escaneo (suppressible):', err);
+        }
       }
-    } finally {
-      setIsStopping(false);
+    } catch (error: any) {
+      const message = error?.message || '';
+      if (typeof message === 'string' && message.includes('isScanningRef')) {
+        return;
+      }
+      console.error('Error al detener escaneo:', error);
     }
-  }, [setIsScanning]);
+  }, []);
 
   const startScanning = useCallback(async () => {
     try {
