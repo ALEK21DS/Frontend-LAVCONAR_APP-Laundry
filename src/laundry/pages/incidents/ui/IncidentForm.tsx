@@ -566,8 +566,13 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
           rfid_code: g.rfid_code || '',
           description: g.description || '',
           color: g.color || '',
+          garment_type: g.garment_type || '',
+          garment_brand: g.garment_brand || '',
+          weight: g.weight,
         }))}
         isLoading={isLoadingGarments || isLoadingRfidScan}
+        guideId={formData.guide_id}
+        guideRfidCodes={rfidCodes}
       />
     </KeyboardAvoidingView>
   );
