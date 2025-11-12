@@ -85,23 +85,34 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({ visibl
                 <>
                   {/* Sección Resumen */}
                   <View className="bg-white border border-gray-200 rounded-3xl p-5 mb-4 shadow-sm">
+                    {/* Número de guía en línea completa */}
+                    <View className="mb-4">
+                      <Text className="text-gray-400 text-xs uppercase tracking-widest mb-2">Guía</Text>
+                      <Text 
+                        className="text-3xl font-black text-gray-900" 
+                        numberOfLines={1}
+                        style={{ 
+                          fontWeight: '900',
+                          letterSpacing: 1.5,
+                          lineHeight: 36,
+                        }}
+                      >
+                        {process.guide?.guide_number || 'Sin número'}
+                      </Text>
+                      {process.guide?.client?.name && (
+                        <Text className="text-sm text-gray-500 mt-2" numberOfLines={1}>{process.guide.client.name}</Text>
+                      )}
+                    </View>
+                    
+                    {/* Estado y Sucursal en fila */}
                     <View className="flex-row items-center justify-between">
-                      <View className="flex-1 mr-3">
-                        <Text className="text-gray-400 text-xs uppercase tracking-widest">Guía</Text>
-                        <Text className="text-2xl font-extrabold text-gray-900 mt-1">{process.guide?.guide_number || 'Sin número'}</Text>
-                        {process.guide?.client?.name && (
-                          <Text className="text-sm text-gray-500 mt-2">{process.guide.client.name}</Text>
-                        )}
+                      <View className="flex-row items-center bg-purple-100 rounded-full px-3 py-1.5">
+                        <IonIcon name="flash-outline" size={14} color="#7C3AED" />
+                        <Text className="text-xs font-semibold text-purple-700 ml-2">{statusLabel}</Text>
                       </View>
-                      <View className="items-end">
-                        <View className="flex-row items-center bg-purple-100 rounded-full px-3 py-1 mb-2">
-                          <IonIcon name="flash-outline" size={14} color="#7C3AED" />
-                          <Text className="text-xs font-semibold text-purple-700 ml-2">{statusLabel}</Text>
-                        </View>
-                        <View className="bg-gray-100 rounded-2xl px-3 py-2">
-                          <Text className="text-[10px] text-gray-400 uppercase tracking-widest">Sucursal</Text>
-                          <Text className="text-sm text-gray-700 mt-1 text-right">{process.branch_office_name || '—'}</Text>
-                        </View>
+                      <View className="bg-gray-100 rounded-2xl px-3 py-2">
+                        <Text className="text-[10px] text-gray-400 uppercase tracking-widest">Sucursal</Text>
+                        <Text className="text-sm text-gray-700 mt-1 text-right" numberOfLines={1}>{process.branch_office_name || '—'}</Text>
                       </View>
                     </View>
                     {process.machine_code && (
@@ -255,7 +266,16 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({ visibl
 
             <View className="bg-gray-50 rounded-xl p-4 mb-4">
               <Text className="text-xs text-gray-500 uppercase mb-1">Guía</Text>
-              <Text className="text-lg font-semibold text-gray-900">{process?.guide?.guide_number || 'Sin número'}</Text>
+              <Text 
+                className="text-xl font-black text-gray-900" 
+                numberOfLines={1}
+                style={{ 
+                  fontWeight: '900',
+                  letterSpacing: 1,
+                }}
+              >
+                {process?.guide?.guide_number || 'Sin número'}
+              </Text>
               <View className="flex-row mt-3">
                 <View className="flex-1 mr-2">
                   <Text className="text-xs text-gray-500 uppercase">Estado</Text>
