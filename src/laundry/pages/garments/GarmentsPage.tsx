@@ -75,14 +75,14 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
       setEditingGarment(selectedGarment);
       setInitialValues({
         rfidCode: selectedGarment.rfid_code,
-        description: selectedGarment.description,
-        color: selectedGarment.color,
-        garmentType: selectedGarment.garment_type,
-        brand: selectedGarment.brand,
-        status: selectedGarment.is_active ? 'ACTIVE' : 'INACTIVE',
-        physicalState: selectedGarment.physical_state,
-        observations: selectedGarment.observations,
-        weight: selectedGarment.weight?.toString(),
+        description: selectedGarment.description || '',
+        colors: Array.isArray(selectedGarment.color) ? selectedGarment.color : (selectedGarment.color ? [selectedGarment.color] : []),
+        garmentType: selectedGarment.garment_type || '',
+        brand: selectedGarment.garment_brand || '',
+        garmentCondition: selectedGarment.garment_condition || '',
+        physicalCondition: selectedGarment.physical_condition || '',
+        observations: selectedGarment.observations || '',
+        weight: selectedGarment.weight?.toString() || '',
       });
       setRfidCode(selectedGarment.rfid_code || '');
       setFormOpen(true);
@@ -363,13 +363,13 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
                     id: editingGarment.id,
                     data: {
                       description: data.description,
-                      color: data.color,
-                      garment_type: data.garmentType,
-                      brand: data.brand,
-                      status: data.status,
-                      physical_state: data.physicalState,
-                      observations: data.observations,
-                      weight: data.weight,
+                      color: data.colors && data.colors.length > 0 ? data.colors : undefined,
+                      garment_type: data.garmentType || undefined,
+                      garment_brand: data.brand || undefined,
+                      garment_condition: data.garmentCondition || undefined,
+                      physical_condition: data.physicalCondition || undefined,
+                      observations: data.observations || undefined,
+                      weight: data.weight ? parseFloat(String(data.weight)) : undefined,
                     }
                   });
                   console.log('✅ Prenda actualizada exitosamente');
@@ -377,6 +377,7 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
                   setEditingGarment(null);
                   setInitialValues(undefined);
                   setRfidCode('');
+                  refetch(); // Recargar la lista de prendas
                   return;
                 }
                 

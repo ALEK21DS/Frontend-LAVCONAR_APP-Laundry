@@ -136,19 +136,49 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
   const userBranchId = user?.branch_office_id || (user as any)?.sucursalId || '';
   const branchOptions = sucursales.map(s => ({ label: s.name, value: s.id }));
   const [colorInput, setColorInput] = useState('');
+  
+  // Obtener catálogo de colores para convertir códigos a labels
+  const { data: colorCatalog } = useCatalogValuesByType('color', true, { forceFresh: true });
+  
+  // Mapa de códigos del catálogo a labels
+  const colorCodeToLabel = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    if (colorCatalog?.data) {
+      colorCatalog.data.forEach(item => {
+        map[item.code] = item.label;
+      });
+    }
+    return map;
+  }, [colorCatalog]);
+  
   // Filtrar valores undefined/null y asegurar que sean strings
   // También manejar el caso donde puede venir como 'color' (singular) en initialValues
+  // Convertir códigos del catálogo a labels si es necesario
   const initialColors = React.useMemo(() => {
+    let colorArray: string[] = [];
+    
     if (Array.isArray(initialValues?.colors)) {
-      return initialValues.colors.filter((c): c is string => typeof c === 'string' && c.trim() !== '');
+      colorArray = initialValues.colors.filter((c): c is string => typeof c === 'string' && c.trim() !== '');
+    } else {
+      // Verificar si hay una propiedad 'color' (puede venir del backend como singular)
+      const colorValue = (initialValues as any)?.color;
+      if (Array.isArray(colorValue)) {
+        colorArray = colorValue.filter((c): c is string => typeof c === 'string' && c.trim() !== '');
+      } else if (colorValue && typeof colorValue === 'string' && colorValue.trim() !== '') {
+        colorArray = [colorValue];
+      }
     }
-    // Verificar si hay una propiedad 'color' (puede venir del backend como singular)
-    const colorValue = (initialValues as any)?.color;
-    if (colorValue && typeof colorValue === 'string' && colorValue.trim() !== '') {
-      return [colorValue];
-    }
-    return [];
-  }, [initialValues]);
+    
+    // Convertir códigos del catálogo a labels si es necesario
+    return colorArray.map(code => {
+      // Si el código existe en el catálogo, usar el label
+      if (colorCodeToLabel[code]) {
+        return colorCodeToLabel[code];
+      }
+      // Si no existe en el catálogo, asumir que ya es un label
+      return code;
+    });
+  }, [initialValues, colorCodeToLabel]);
   const [colors, setColors] = useState<string[]>(initialColors);
   const [garmentType, setGarmentType] = useState(initialValues?.garmentType || '');
   const [brand, setBrand] = useState(initialValues?.brand || '');
@@ -175,7 +205,8 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
   // Actualizar campos si cambian los valores iniciales
   useEffect(() => {
     if (initialValues) {
-      setColors(Array.isArray(initialValues.colors) ? initialValues.colors! : []);
+      // Usar initialColors que ya convierte códigos a labels
+      setColors(initialColors);
       setGarmentType(initialValues.garmentType || '');
       setBrand(initialValues.brand || '');
       setDescription(initialValues.description || '');
@@ -185,10 +216,21 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
       setWeight(initialValues.weight || '');
       setObservations(initialValues.observations || '');
     }
-  }, [initialValues]);
+  }, [initialValues, initialColors]);
 
   const currentBranch = sucursales.find(s => s.id === branchOfficeId);
   const branchOfficeName = currentBranch?.name || 'Sucursal no asignada';
+
+  // Mapa de labels a códigos del catálogo (inverso)
+  const colorLabelToCode = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    if (colorCatalog?.data) {
+      colorCatalog.data.forEach(item => {
+        map[item.label] = item.code;
+      });
+    }
+    return map;
+  }, [colorCatalog]);
 
   const handleSubmit = async () => {
     const newErrors: typeof errors = {};
@@ -202,10 +244,20 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
 
     setIsSubmitting(true);
     try {
+      // Convertir labels de colores de vuelta a códigos del catálogo
+      const colorCodes = colors.map(label => {
+        // Si el label existe en el mapa, usar el código
+        if (colorLabelToCode[label]) {
+          return colorLabelToCode[label];
+        }
+        // Si no existe en el mapa, asumir que ya es un código
+        return label;
+      });
+
       onSubmit({ 
         rfidCode, 
         description, 
-        colors,
+        colors: colorCodes,
         garmentType: garmentType || undefined,
         brand: brand || undefined,
         branchOfficeId: branchOfficeId || undefined,
