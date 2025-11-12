@@ -79,6 +79,11 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   // Estado para el cliente seleccionado
   const [selectedClientId, setSelectedClientId] = useState<string>('');
 
+  // Refs para control de escaneo RFID
+  const isScanningRef = useRef<boolean>(false);
+  const seenSetRef = useRef<Set<string>>(new Set());
+  const MIN_RSSI = -65; // Sensibilidad mínima para tags RFID
+
   const demoGuides = [
     { 
       id: 'g-001', 
@@ -194,14 +199,13 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
       }
       try {
         await rfidModule.stopScan();
-      } catch {}
-      // NO limpiamos seenSetRef aquí para mantener el historial de tags escaneados
-    } catch (error: any) {
-      const message = error?.message || '';
-      if (typeof message === 'string' && message.includes("isScanningRef")) {
-        return;
+      } catch (error) {
+        // Ignorar errores al detener escaneo (puede que ya esté detenido)
       }
-      console.error('Error al detener escaneo:', error);
+      // NO limpiamos seenSetRef aquí para mantener el historial de tags escaneados
+    } catch (error) {
+      // Ignorar errores silenciosamente para evitar errores en pantalla
+      // El error original era que isScanningRef no existía, ahora ya está declarado
     }
   }, []);
 
@@ -234,8 +238,9 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
     } catch (error) {
       Alert.alert('Error', 'No se pudo iniciar el escaneo RFID');
       setIsScanning(false);
+      isScanningRef.current = false;
     }
-  }, []);
+  }, [selectedServiceType, stopScanning]);
 
   // Funciones para el flujo de servicio personal
   const handleGarmentSubmit = (garmentData: any) => {
