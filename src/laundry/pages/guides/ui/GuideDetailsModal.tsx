@@ -226,12 +226,27 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
               <IonIcon name="id-card-outline" size={20} color="#8EB021" />
               <Text className="text-lg font-semibold text-gray-900 ml-2">Números de Identificación</Text>
             </View>
-            <View className="flex-row items-center justify-between">
-              <Text className="text-sm text-gray-700">Número de Precinto:</Text>
-              <View className="px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
-                <Text className="text-sm text-blue-800">{guide.precinct_number || '—'}</Text>
+            {/* Números de Precinto */}
+            {(guide.precinct_number || guide.precinct_number_2) && (
+              <View className="space-y-2">
+                {guide.precinct_number && (
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-sm text-gray-700">Número de Precinto 1:</Text>
+                    <View className="px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
+                      <Text className="text-sm text-blue-800 font-mono">{guide.precinct_number}</Text>
+                    </View>
+                  </View>
+                )}
+                {guide.precinct_number_2 && (
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-sm text-gray-700">Número de Precinto 2:</Text>
+                    <View className="px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
+                      <Text className="text-sm text-blue-800 font-mono">{guide.precinct_number_2}</Text>
+                    </View>
+                  </View>
+                )}
               </View>
-            </View>
+            )}
           </Card>
 
           {/* Información del Servicio */}

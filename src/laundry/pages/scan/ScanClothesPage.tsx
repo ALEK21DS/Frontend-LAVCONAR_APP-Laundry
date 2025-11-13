@@ -1111,32 +1111,22 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     }
     setGuideModalOpen(false);
 
-    const guideServiceType = (result.guideData.service_type || '').toUpperCase();
+    // Para ambos servicios (INDUSTRIAL y PERSONAL), abrir ScanForm
+    // En ScanForm se crea primero la guía y luego el escaneo RFID
+    const scannedRfidCodes = serviceType === 'personal' 
+      ? registeredGarments.map(g => g.rfidCode)
+      : scannedTags.map(tag => tag.epc);
 
-    if (guideServiceType === 'INDUSTRIAL') {
-      setScanFormContext({
-        origin: 'guide',
-        guideId: result.guide?.id,
-        guide: result.guide,
-        guideData: result.guideData,
-        draftValues: result.draftValues,
-        scannedTags: scannedTags.map(tag => tag.epc),
-        initialScanType: 'COLLECTED',
-        unregisteredCodes: unregisteredRfids,
-      });
-      return;
-    }
-
-    (async () => {
-      try {
-        await createGuideAsync(result.guideData);
-        clearAllScannedData();
-        Alert.alert('Guía creada', 'La guía se registró correctamente.');
-      } catch (error: any) {
-        Alert.alert('Error', error?.response?.data?.message || error?.message || 'No se pudo crear la guía. Intenta nuevamente.');
-        setGuideModalOpen(true);
-      }
-    })();
+    setScanFormContext({
+      origin: 'guide',
+      guideId: result.guide?.id,
+      guide: result.guide,
+      guideData: result.guideData,
+      draftValues: result.draftValues,
+      scannedTags: scannedRfidCodes,
+      initialScanType: 'COLLECTED',
+      unregisteredCodes: unregisteredRfids,
+    });
   };
 
   const handleScanFormSuccess = async (context: ScanFormContext, result?: any) => {
