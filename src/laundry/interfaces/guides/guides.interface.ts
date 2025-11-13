@@ -23,8 +23,13 @@ export interface Guide {
   status: 'COLLECTED' | 'IN_TRANSIT' | 'RECEIVED' | 'IN_PROCESS' | 'COMPLETED' | 'DELIVERED';
   status_label?: string;
   notes?: string;
+  precinct_number?: string;
+  precinct_number_2?: string;
+  requested_services?: string[];
   requested_services_labels?: Record<string, string>;
+  service_priority?: string;
   service_priority_label?: string;
+  washing_type?: string;
   washing_type_label?: string;
   items: GuideItem[];
   is_active: boolean;

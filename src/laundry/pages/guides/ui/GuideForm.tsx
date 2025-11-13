@@ -78,7 +78,8 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   const [packageManager, setPackageManager] = useState<string>(draftValues?.packageManager || '');
   const [departureTime, setDepartureTime] = useState<string>(draftValues?.departureTime || '');
   const [arrivalTime, setArrivalTime] = useState<string>(draftValues?.arrivalTime || '');
-  const [sealNumber, setSealNumber] = useState<string>(draftValues?.sealNumber || '');
+  const [sealNumber1, setSealNumber1] = useState<string>(draftValues?.sealNumber1 || '');
+  const [sealNumber2, setSealNumber2] = useState<string>(draftValues?.sealNumber2 || '');
   // Formatear fecha actual a dd/mm/yyyy
   const formatDateToDisplay = (date: Date): string => {
     const day = String(date.getDate()).padStart(2, '0');
@@ -218,6 +219,8 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       if (draftValues.vehiclePlate) setVehiclePlate(draftValues.vehiclePlate);
       if (Array.isArray(draftValues.requestedServices)) setRequestedServices(draftValues.requestedServices);
       if (draftValues.supplierGuideNumber !== undefined) setSupplierGuideNumber(draftValues.supplierGuideNumber);
+      if (draftValues.sealNumber1 !== undefined) setSealNumber1(draftValues.sealNumber1);
+      if (draftValues.sealNumber2 !== undefined) setSealNumber2(draftValues.sealNumber2);
     }
   }, [draftValues, guideToEdit]);
 
@@ -243,7 +246,9 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       setTotalWeight(guideToEdit.total_weight ? parseFloat(guideToEdit.total_weight).toFixed(2) : '');
       setStatus(guideToEdit.status || '');
       setNotes(guideToEdit.notes || '');
-      setSealNumber(guideToEdit.precinct_number || '');
+      // Cargar los dos números de precinto por separado
+      setSealNumber1(guideToEdit.precinct_number || '');
+      setSealNumber2(guideToEdit.precinct_number_2 || '');
       setServicePriority(guideToEdit.service_priority || 'NORMAL');
       setWashingType(guideToEdit.washing_type || '');
       setDeliveredBy(guideToEdit.delivered_by || '');
@@ -251,6 +256,10 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       setTotalBundlesReceived(guideToEdit.total_bundles_received?.toString() || '');
       setDepartureTime(guideToEdit.departure_time || '');
       setArrivalTime(guideToEdit.arrival_time || '');
+      // Cargar servicios solicitados si existen
+      if (guideToEdit.requested_services && Array.isArray(guideToEdit.requested_services)) {
+        setRequestedServices(guideToEdit.requested_services);
+      }
     }
   }, [guideToEdit]);
 
@@ -413,41 +422,43 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           disabled={true}
         />
 
-        {/* Servicios Solicitados */}
-        <View className="mt-2">
-          <Text className="text-sm font-medium text-gray-700 mb-2">Servicios Solicitados</Text>
-          <TouchableOpacity
-            className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-3"
-            onPress={() => setShowRequestedServices(prev => !prev)}
-          >
-            <Text className="text-gray-800">
-              {requestedServices.length > 0 ? requestedServices.join(', ') : 'Seleccionar servicios'}
-            </Text>
-          </TouchableOpacity>
-          {showRequestedServices && (
-            <View className="mt-2 bg-white border border-gray-200 rounded-lg p-3">
-              {[
-                { label: 'Lavado', value: 'WASH' },
-                { label: 'Secado', value: 'DRY' },
-                { label: 'Planchado', value: 'IRON' },
-                { label: 'Limpieza en Seco', value: 'DRY_CLEAN' },
-              ].map(opt => (
-                <TouchableOpacity
-                  key={opt.value}
-                  className="flex-row items-center py-2"
-                  onPress={() => {
-                    setRequestedServices(prev => prev.includes(opt.value)
-                      ? prev.filter(v => v !== opt.value)
-                      : [...prev, opt.value]);
-                  }}
-                >
-                  <View className={`w-5 h-5 mr-3 rounded border ${requestedServices.includes(opt.value) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`} />
-                  <Text className="text-gray-800">{opt.label}</Text>
-                </TouchableOpacity>
-              ))}
+        {/* Servicios Solicitados - Solo para servicio personal */}
+        {serviceType === 'PERSONAL' && (
+          <View className="mt-2">
+            <Text className="text-sm font-medium text-gray-700 mb-2">Servicios Solicitados</Text>
+            <TouchableOpacity
+              className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-3"
+              onPress={() => setShowRequestedServices(prev => !prev)}
+            >
+              <Text className="text-gray-800">
+                {requestedServices.length > 0 ? requestedServices.join(', ') : 'Seleccionar servicios'}
+              </Text>
+            </TouchableOpacity>
+            {showRequestedServices && (
+              <View className="mt-2 bg-white border border-gray-200 rounded-lg p-3">
+                {[
+                  { label: 'Lavado', value: 'WASH' },
+                  { label: 'Secado', value: 'DRY' },
+                  { label: 'Planchado', value: 'IRON' },
+                  { label: 'Limpieza en Seco', value: 'DRY_CLEAN' },
+                ].map(opt => (
+                  <TouchableOpacity
+                    key={opt.value}
+                    className="flex-row items-center py-2"
+                    onPress={() => {
+                      setRequestedServices(prev => prev.includes(opt.value)
+                        ? prev.filter(v => v !== opt.value)
+                        : [...prev, opt.value]);
+                    }}
+                  >
+                    <View className={`w-5 h-5 mr-3 rounded border ${requestedServices.includes(opt.value) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`} />
+                    <Text className="text-gray-800">{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+            </View>
+            )}
           </View>
-          )}
-        </View>
+        )}
         
         <View className="mt-2">
         <Dropdown
@@ -686,14 +697,27 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         multiline
       />
 
-      {/* Número de Precinto al final */}
+      {/* Números de Precinto al final */}
       <View className="mt-4">
-        <Input 
-          label="Número de Precinto" 
-          placeholder="Ej: SEAL-2024-001"
-          value={sealNumber} 
-          onChangeText={setSealNumber}
-        />
+        <Text className="text-base text-gray-700 font-semibold mb-2">Números de Precinto</Text>
+        <View className="flex-row -mx-1">
+          <View className="flex-1 px-1">
+            <Input 
+              label="Número de Precinto 1" 
+              placeholder="Ej: 123-0001-0002"
+              value={sealNumber1} 
+              onChangeText={setSealNumber1}
+            />
+          </View>
+          <View className="flex-1 px-1">
+            <Input 
+              label="Número de Precinto 2" 
+              placeholder="Ej: 123-0001-0003"
+              value={sealNumber2} 
+              onChangeText={setSealNumber2}
+            />
+          </View>
+        </View>
       </View>
 
       <View className="h-3" />
@@ -782,7 +806,9 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               total_bundles_received: safeParseInt(totalBundlesReceivedClean),
             delivered_by: serviceType === 'INDUSTRIAL' ? (deliveredBy || undefined) : (personalEmployee || undefined),
             vehicle_plate: vehiclePlate || undefined,
-            precinct_number: sealNumber || undefined,
+            // Enviar los dos números de precinto por separado
+            precinct_number: sealNumber1 || undefined,
+            precinct_number_2: sealNumber2 || undefined,
           } as any;
 
           const draftValuesPayload = {
@@ -793,7 +819,8 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             totalWeight,
             status,
             notes,
-            sealNumber,
+            sealNumber1,
+            sealNumber2,
             servicePriority,
             washingType,
             deliveredBy,
