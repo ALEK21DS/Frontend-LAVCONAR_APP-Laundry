@@ -10,6 +10,7 @@ import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
 import { useWashingProcesses } from '@/laundry/hooks/washing-processes';
 import { useCatalogLabelMap } from '@/laundry/hooks';
 import { ProcessDetailsModal } from './ui/ProcessDetailsModal';
+import { PROCESS_STATUS_COLORS } from '@/constants/processes';
 
 type ProcessesPageProps = { navigation: NativeStackNavigationProp<any> };
 
@@ -115,70 +116,54 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
               )}
 
               <View className="-mx-1 flex-row flex-wrap">
-                {filtered.map(p => (
-                  <View key={p.id} className="w-full px-1 mb-2">
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => handleOpenDetails(p)}
-                    >
-                      <Card padding="md" variant="default">
-                        <View className="flex-row items-center">
-                          <View className="rounded-lg p-2 mr-3" style={{ backgroundColor: '#8EB02120' }}>
-                            <IonIcon name="construct-outline" size={20} color="#8EB021" />
-                          </View>
-                          <View className="flex-1">
-                            <Text className="text-gray-900 font-semibold">
-                              {p.guide?.guide_number || p.machine_code || 'Sin código'}
-                            </Text>
-                            <Text className="text-gray-500 text-xs">
-                              {getProcessTypeLabel(p.process_type, (p as any).process_type_label || p.process_type || 'Sin tipo')}
-                            </Text>
-                            {p.guide?.client?.name && (
-                              <Text className="text-gray-400 text-xs mt-1">
-                                Cliente: {p.guide.client.name}
-                              </Text>
-                            )}
-                          </View>
-                          <View className="items-end">
-                            {/* Badge de estado */}
-                            <View className={`flex-row items-center px-2 py-1 rounded-full ${
-                              p.status === 'COMPLETED' ? 'bg-green-100' :
-                              p.status === 'IN_PROGRESS' ? 'bg-blue-100' :
-                              p.status === 'PENDING' ? 'bg-yellow-100' :
-                              p.status === 'CANCELLED' ? 'bg-red-100' :
-                              p.status === 'FAILED' ? 'bg-red-100' :
-                              'bg-gray-100'
-                            }`}>
-                              <View className={`w-2 h-2 rounded-full mr-1 ${
-                                p.status === 'COMPLETED' ? 'bg-green-500' :
-                                p.status === 'IN_PROGRESS' ? 'bg-blue-500' :
-                                p.status === 'PENDING' ? 'bg-yellow-500' :
-                                p.status === 'CANCELLED' ? 'bg-red-500' :
-                                p.status === 'FAILED' ? 'bg-red-500' :
-                                'bg-gray-500'
-                              }`} />
-                              <Text className={`text-xs font-medium ${
-                                p.status === 'COMPLETED' ? 'text-green-700' :
-                                p.status === 'IN_PROGRESS' ? 'text-blue-700' :
-                                p.status === 'PENDING' ? 'text-yellow-700' :
-                                p.status === 'CANCELLED' ? 'text-red-700' :
-                                p.status === 'FAILED' ? 'text-red-700' :
-                                'text-gray-700'
-                              }`}>
-                                {getProcessStatusLabel(p.status, (p as any).status_label || p.status || 'Sin estado')}
-                              </Text>
+                {filtered.map(p => {
+                  const statusColor = PROCESS_STATUS_COLORS[p.status as keyof typeof PROCESS_STATUS_COLORS] || '#6B7280';
+                  const statusLabel = getProcessStatusLabel(p.status, (p as any).status_label || p.status || 'Sin estado');
+                  
+                  return (
+                    <View key={p.id} className="w-full px-1 mb-2">
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => handleOpenDetails(p)}
+                      >
+                        <Card padding="md" variant="default">
+                          <View className="flex-row items-center">
+                            <View className="rounded-lg p-2 mr-3" style={{ backgroundColor: '#8EB02120' }}>
+                              <IonIcon name="construct-outline" size={20} color="#8EB021" />
                             </View>
-                            {p.garment_quantity && (
-                              <Text className="text-gray-400 text-xs mt-1">
-                                {p.garment_quantity} prendas
+                            <View className="flex-1 mr-2">
+                              <Text className="text-gray-900 font-semibold">
+                                {p.guide?.guide_number || p.machine_code || 'Sin código'}
                               </Text>
-                            )}
+                              <Text className="text-gray-500 text-xs">
+                                {getProcessTypeLabel(p.process_type, (p as any).process_type_label || p.process_type || 'Sin tipo')}
+                              </Text>
+                              {p.guide?.client?.name && (
+                                <Text className="text-gray-400 text-xs mt-1">
+                                  Cliente: {p.guide.client.name}
+                                </Text>
+                              )}
+                            </View>
+                            <View className="items-end">
+                              {/* Badge de estado con color */}
+                              <View className="flex-row items-center px-2 py-1 rounded-full" style={{ backgroundColor: statusColor + '20' }}>
+                                <View className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: statusColor }} />
+                                <Text className="text-xs font-medium" numberOfLines={1} style={{ color: statusColor }}>
+                                  {statusLabel}
+                                </Text>
+                              </View>
+                              {p.garment_quantity && (
+                                <Text className="text-gray-400 text-xs mt-1">
+                                  {p.garment_quantity} prendas
+                                </Text>
+                              )}
+                            </View>
                           </View>
-                        </View>
-                      </Card>
-                    </TouchableOpacity>
-                  </View>
-                ))}
+                        </Card>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
               </View>
             </ScrollView>
 

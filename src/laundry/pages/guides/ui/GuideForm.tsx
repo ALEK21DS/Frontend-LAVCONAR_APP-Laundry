@@ -92,9 +92,9 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   const [totalWeight, setTotalWeight] = useState<string>(
     draftValues?.totalWeight ?? (initialTotalWeight > 0 ? initialTotalWeight.toFixed(2) : '')
   );
-  // Estado inicial según tipo de servicio
+  // Estado inicial: COLLECTED para ambos tipos de servicio (PERSONAL e INDUSTRIAL)
   const getInitialStatus = () => {
-    return initialServiceType === 'PERSONAL' ? GUIDE_STATUS.SENT : GUIDE_STATUS.COLLECTED;
+    return GUIDE_STATUS.COLLECTED;
   };
   const [status, setStatus] = useState<string>(draftValues?.status || getInitialStatus());
   // Catálogos dinámicos (frescos) para condiciones, estados y tipos de servicio
@@ -103,6 +103,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   const { data: serviceTypeCatalog } = useCatalogValuesByType('service_type', true, { forceFresh: true });
   const { data: servicePriorityCatalog } = useCatalogValuesByType('service_priority', true, { forceFresh: true });
   const { data: washingTypeCatalog } = useCatalogValuesByType('washing_type', true, { forceFresh: true });
+  const { data: requestedServicesCatalog } = useCatalogValuesByType('requested_services', true, { forceFresh: true });
 
   const GENERAL_CONDITION_OPTIONS = useMemo(() => {
     return (generalConditionCatalog?.data || [])
@@ -136,6 +137,13 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       .sort((a,b) => (a.display_order||0) - (b.display_order||0))
       .map(v => ({ label: v.label, value: v.code }));
   }, [washingTypeCatalog]);
+
+  const REQUESTED_SERVICES_OPTIONS = useMemo(() => {
+    return (requestedServicesCatalog?.data || [])
+      .filter(v => v.is_active)
+      .sort((a,b) => (a.display_order||0) - (b.display_order||0))
+      .map(v => ({ label: v.label, value: v.code }));
+  }, [requestedServicesCatalog]);
   const [notes, setNotes] = useState<string>(draftValues?.notes || '');
   const [supplierGuideNumber, setSupplierGuideNumber] = useState<string>(draftValues?.supplierGuideNumber || '');
   const [requestedServices, setRequestedServices] = useState<string[]>(draftValues?.requestedServices || []);
@@ -436,25 +444,43 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             </TouchableOpacity>
             {showRequestedServices && (
               <View className="mt-2 bg-white border border-gray-200 rounded-lg p-3">
-                {[
-                  { label: 'Lavado', value: 'WASH' },
-                  { label: 'Secado', value: 'DRY' },
-                  { label: 'Planchado', value: 'IRON' },
-                  { label: 'Limpieza en Seco', value: 'DRY_CLEAN' },
-                ].map(opt => (
-                  <TouchableOpacity
-                    key={opt.value}
-                    className="flex-row items-center py-2"
-                    onPress={() => {
-                      setRequestedServices(prev => prev.includes(opt.value)
-                        ? prev.filter(v => v !== opt.value)
-                        : [...prev, opt.value]);
-                    }}
-                  >
-                    <View className={`w-5 h-5 mr-3 rounded border ${requestedServices.includes(opt.value) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`} />
-                    <Text className="text-gray-800">{opt.label}</Text>
-                  </TouchableOpacity>
-                ))}
+                {REQUESTED_SERVICES_OPTIONS.length > 0 ? (
+                  REQUESTED_SERVICES_OPTIONS.map(opt => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      className="flex-row items-center py-2"
+                      onPress={() => {
+                        setRequestedServices(prev => prev.includes(opt.value)
+                          ? prev.filter(v => v !== opt.value)
+                          : [...prev, opt.value]);
+                      }}
+                    >
+                      <View className={`w-5 h-5 mr-3 rounded border ${requestedServices.includes(opt.value) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`} />
+                      <Text className="text-gray-800">{opt.label}</Text>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  // Fallback si el catálogo no está disponible
+                  [
+                    { label: 'Lavado', value: 'WASH' },
+                    { label: 'Secado', value: 'DRY' },
+                    { label: 'Planchado', value: 'IRON' },
+                    { label: 'Limpieza en Seco', value: 'DRY_CLEAN' },
+                  ].map(opt => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      className="flex-row items-center py-2"
+                      onPress={() => {
+                        setRequestedServices(prev => prev.includes(opt.value)
+                          ? prev.filter(v => v !== opt.value)
+                          : [...prev, opt.value]);
+                      }}
+                    >
+                      <View className={`w-5 h-5 mr-3 rounded border ${requestedServices.includes(opt.value) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`} />
+                      <Text className="text-gray-800">{opt.label}</Text>
+                    </TouchableOpacity>
+                  ))
+                )}
             </View>
             )}
           </View>

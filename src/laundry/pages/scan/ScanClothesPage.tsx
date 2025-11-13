@@ -9,11 +9,14 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
 import { GuideForm } from '@/laundry/pages/guides/ui/GuideForm';
 import { ProcessForm } from '@/laundry/pages/processes/ui/ProcessForm';
+import { WashingProcessForm } from '@/laundry/pages/processes/ui/WashingProcessForm';
 import { GarmentForm } from '@/laundry/pages/garments/ui/GarmentForm';
 import { ScanFormModal } from '@/laundry/pages/scan/ui/ScanFormModal';
 import { useClients } from '@/laundry/hooks/clients';
 import { useCatalogValuesByType } from '@/laundry/hooks';
 import { useGarments, useCreateGarment, useUpdateGarment, useGuides, useGarmentsByRfidCodes, useCreateGuide } from '@/laundry/hooks/guides';
+import { useAuthStore } from '@/auth/store/auth.store';
+import { useQueryClient } from '@tanstack/react-query';
 import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
 import { GuideSelectionModal } from '@/laundry/components/GuideSelectionModal';
 import { garmentsApi } from '@/laundry/api/garments/garments.api';
@@ -96,6 +99,16 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [processModalOpen, setProcessModalOpen] = useState(false);
   const [selectedGuideId, setSelectedGuideId] = useState<string>('');
+  const [washingProcessFormOpen, setWashingProcessFormOpen] = useState(false);
+  const [washingProcessFormData, setWashingProcessFormData] = useState<{
+    guideId: string;
+    guideNumber: string;
+    branchOfficeId: string;
+    branchOfficeName: string;
+    processType: string;
+    rfidScanId?: string;
+    rfidScanUpdateData?: any;
+  } | null>(null);
   // Para servicio personal, usar sensibilidad media (-65) para detección confiable a corta distancia
   const [scanRange, setScanRange] = useState<number>(
     mode === 'guide' && serviceType === 'personal' ? -65 : -65 
@@ -114,44 +127,17 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   // Estado para controlar si ya se cargaron los RFIDs iniciales
   const [initialRfidsLoaded, setInitialRfidsLoaded] = useState(false);
   
-  // Mapear el tipo de proceso al estado de guía que debe mostrar
-  const getTargetStatusByProcessType = (processType: string): string => {
-    if (serviceType === 'personal') {
-      const personalMapping: Record<string, string> = {
-        'IN_PROCESS': 'SENT',
-        'WASHING': 'IN_PROCESS',
-        'DRYING': 'WASHING',
-        'IRONING': 'DRYING',
-        'FOLDING': 'IRONING',
-        'PACKAGING': 'FOLDING',
-        'LOADING': 'PACKAGING',
-        'DELIVERY': 'LOADING',
-      };
-      return personalMapping[processType] || processType;
-    } else {
-      const industrialMapping: Record<string, string> = {
-        'IN_PROCESS': 'COLLECTED',
-        'WASHING': 'IN_PROCESS',
-        'DRYING': 'WASHING',
-        'PACKAGING': 'DRYING',
-        'LOADING': 'PACKAGING',
-        'DELIVERY': 'LOADING',
-      };
-      return industrialMapping[processType] || processType;
-    }
-  };
-  
   // Obtener lista de clientes (máximo 50 según validación del backend)
   const { clients, isLoading: isLoadingClients } = useClients({ limit: 50 });
   
-  // Obtener guías filtradas por servicio y estado para procesos
-  const targetStatus = selectedProcessType ? getTargetStatusByProcessType(selectedProcessType) : undefined;
-  const { guides: guidesForProcess, isLoading: isLoadingGuides } = useGuides({
+  // Obtener guías filtradas solo por tipo de servicio (sin filtro por status)
+  const { guides: guidesForProcess, isLoading: isLoadingGuides, refetch: refetchGuidesForProcess } = useGuides({
     limit: 50,
-    status: targetStatus,
     service_type: serviceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL',
     enabled: !!selectedProcessType, // Solo cargar cuando se selecciona un proceso
   });
+  
+  const queryClient = useQueryClient();
   
   // Estados para manejar prenda existente
   const [existingGarment, setExistingGarment] = useState<any | null>(null);
@@ -1117,6 +1103,14 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       ? registeredGarments.map(g => g.rfidCode)
       : scannedTags.map(tag => tag.epc);
 
+    // Para servicio personal, las prendas ya están registradas (en registeredGarments)
+    // Por lo tanto, NO hay códigos no registrados - debe ser igual al servicio industrial
+    // En servicio industrial, unregisteredRfids se calcula desde scannedTags
+    // En servicio personal, todas las prendas están registradas, así que pasamos array vacío
+    const unregisteredCodesForForm = serviceType === 'personal' 
+      ? [] // En servicio personal, todas las prendas ya están registradas
+      : unregisteredRfids; // En servicio industrial, usar los códigos no registrados calculados
+
     setScanFormContext({
       origin: 'guide',
       guideId: result.guide?.id,
@@ -1125,23 +1119,41 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       draftValues: result.draftValues,
       scannedTags: scannedRfidCodes,
       initialScanType: 'COLLECTED',
-      unregisteredCodes: unregisteredRfids,
+      unregisteredCodes: unregisteredCodesForForm,
     });
   };
 
   const handleScanFormSuccess = async (context: ScanFormContext, result?: any) => {
     if (context.origin === 'process') {
       const updatePayload = result?.rfidScanUpdateData || result;
-      if (updatePayload) {
-        try {
-          await AsyncStorage.setItem('pendingRfidScanUpdate', JSON.stringify(updatePayload));
-        } catch (error) {
-          console.error('Error al guardar datos del RFID scan:', error);
-        }
+      
+      // Obtener datos de la guía para el formulario de proceso
+      try {
+        const { data } = await guidesApi.get<ApiResponse<any>>(`/get-guide/${context.guideId}`);
+        const guide = data.data;
+        const { user } = useAuthStore.getState();
+        const branchOfficeId = user?.branch_office_id || user?.sucursalId || guide?.branch_office_id || guide?.branch_offices_id || '';
+        const branchOfficeName = guide?.branch_office?.name || guide?.branch_office_name || 'Sucursal';
+        
+        // Configurar datos para el formulario de proceso
+        setWashingProcessFormData({
+          guideId: context.guideId || '',
+          guideNumber: guide?.guide_number || '',
+          branchOfficeId: branchOfficeId,
+          branchOfficeName: branchOfficeName,
+          processType: context.processType || '',
+          rfidScanId: context.rfidScanId,
+          rfidScanUpdateData: updatePayload,
+        });
+        
+        // Cerrar ScanForm y abrir WashingProcessForm
+        setScanFormContext(null);
+        setWashingProcessFormOpen(true);
+      } catch (error: any) {
+        console.error('Error al obtener datos de la guía:', error);
+        Alert.alert('Error', 'No se pudieron obtener los datos de la guía. Intente nuevamente.');
+        setScanFormContext(null);
       }
-      setScanFormContext(null);
-      clearAllScannedData();
-      navigation.navigate('Processes');
       return;
     }
 
@@ -1152,6 +1164,17 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     setGuideDraftData(undefined);
     setGuideDraftValues(undefined);
     clearAllScannedData();
+    
+    // Forzar refetch de las guías para procesos después de crear el escaneo RFID
+    // Esto asegura que la lista se actualice inmediatamente
+    if (selectedProcessType) {
+      // Pequeño delay para asegurar que el backend haya procesado el escaneo
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['guides'], exact: false });
+        refetchGuidesForProcess();
+      }, 500);
+    }
+    
     Alert.alert(
       'Registro completado',
       guideNumber
@@ -1193,9 +1216,11 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         <Text className="text-lg font-bold text-gray-900 ml-3">
           {isEditMode 
             ? 'EDITAR PRENDAS DE GUÍA'
-            : mode === 'guide' && serviceType === 'personal' 
-              ? 'REGISTRAR PRENDA' 
-              : 'ESCANEAR PRENDAS'}
+            : mode === 'process'
+              ? 'ESCANEO DE PROCESO'
+              : mode === 'guide' && serviceType === 'personal' 
+                ? 'REGISTRAR PRENDA' 
+                : 'ESCANEAR PRENDAS'}
         </Text>
       </View>
 
@@ -1453,7 +1478,11 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             }
             selectedClientId={selectedClientId}
             onChangeClient={setSelectedClientId}
-            guideItems={scannedTags.map(t => ({ tagEPC: t.epc, proceso: '' }))}
+            guideItems={
+              serviceType === 'personal' && registeredGarments.length > 0
+                ? registeredGarments.map(g => ({ tagEPC: g.rfidCode, proceso: '' }))
+                : scannedTags.map(t => ({ tagEPC: t.epc, proceso: '' }))
+            }
             onRemoveItem={() => {}}
             onScan={() => {}}
             onSubmit={handleGuideFormSubmit}
@@ -1609,6 +1638,30 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           unregisteredCodes={scanFormContext.unregisteredCodes}
           onSuccess={(data) => handleScanFormSuccess(scanFormContext, data)}
           onCancel={() => handleScanFormCancel(scanFormContext)}
+        />
+      )}
+
+      {/* Modal de WashingProcessForm para crear/actualizar proceso */}
+      {washingProcessFormData && (
+        <WashingProcessForm
+          visible={washingProcessFormOpen}
+          guideId={washingProcessFormData.guideId}
+          guideNumber={washingProcessFormData.guideNumber}
+          branchOfficeId={washingProcessFormData.branchOfficeId}
+          branchOfficeName={washingProcessFormData.branchOfficeName}
+          processType={washingProcessFormData.processType}
+          rfidScanId={washingProcessFormData.rfidScanId}
+          rfidScanUpdateData={washingProcessFormData.rfidScanUpdateData}
+          onSuccess={() => {
+            setWashingProcessFormOpen(false);
+            setWashingProcessFormData(null);
+            clearAllScannedData();
+            navigation.goBack();
+          }}
+          onCancel={() => {
+            setWashingProcessFormOpen(false);
+            setWashingProcessFormData(null);
+          }}
         />
       )}
     </Container>

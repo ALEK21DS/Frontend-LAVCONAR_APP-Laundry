@@ -154,6 +154,31 @@ export const ScanForm: React.FC<ScanFormProps> = ({
       return;
     }
 
+    // Si deferRfidScanUpdate es true (procesos), NO crear/actualizar la guía
+    // Solo pasar los datos del RFID scan para actualizarlos después junto con el proceso
+    if (deferRfidScanUpdate && editContext?.rfidScanId && editContext?.guideId) {
+      // Preparar los datos del RFID scan sin incluir el campo 'id' (solo se pasa en rfidScanUpdateData.id)
+      const rfidScanData = {
+        guide_id: editContext.guideId,
+        branch_offices_id: formData.branch_offices_id,
+        scan_type: formData.scan_type as any,
+        scanned_quantity: formData.scanned_quantity,
+        scanned_rfid_codes: formData.scanned_rfid_codes,
+        unexpected_codes: formData.unexpected_codes || [],
+        differences_detected: formData.differences_detected || undefined,
+      } as any;
+
+      // Pasar los datos actualizados al callback sin actualizar el RFID scan aquí
+      onSubmit({
+        rfidScanUpdateData: {
+          id: editContext.rfidScanId,
+          data: rfidScanData,
+        },
+      });
+      return;
+    }
+
+    // Comportamiento normal: crear/actualizar guía y RFID scan
     let createdGuide: any = editContext?.guideId ? { id: editContext.guideId } : null;
     let createdRfidScan: any = null;
 
@@ -171,35 +196,27 @@ export const ScanForm: React.FC<ScanFormProps> = ({
         }
       }
 
-      if (!createdGuide?.id) {
+      if (!createdGuide?.id && !editContext?.guideId) {
         throw new Error('No se pudo obtener el identificador de la guía.');
-        }
+      }
+
+      const guideId = createdGuide?.id || editContext?.guideId;
+      if (!guideId) {
+        throw new Error('No se pudo obtener el identificador de la guía.');
+      }
 
       // ========== PASO 2: CREAR/ACTUALIZAR ESCANEO RFID ==========
-          // NOTA: user_id NO se envía, el backend lo obtiene del token JWT
-          
-          const rfidScanData = {
-            guide_id: createdGuide.id,
-            branch_offices_id: formData.branch_offices_id,
-            scan_type: formData.scan_type as any,
-            scanned_quantity: formData.scanned_quantity,
-            scanned_rfid_codes: formData.scanned_rfid_codes,
-            unexpected_codes: formData.unexpected_codes || [],
-            differences_detected: formData.differences_detected || undefined,
-          } as any;
-
-      // Si deferRfidScanUpdate es true, NO actualizar el RFID scan aquí
-      // Los datos se pasarán al callback para actualizarlos después junto con el proceso
-      if (deferRfidScanUpdate && editContext?.rfidScanId) {
-        // Pasar los datos actualizados al callback sin actualizar el RFID scan
-        onSubmit({
-          rfidScanUpdateData: {
-            id: editContext.rfidScanId,
-            data: rfidScanData,
-          },
-        });
-        return;
-      }
+      // NOTA: user_id NO se envía, el backend lo obtiene del token JWT
+      
+      const rfidScanData = {
+        guide_id: guideId,
+        branch_offices_id: formData.branch_offices_id,
+        scan_type: formData.scan_type as any,
+        scanned_quantity: formData.scanned_quantity,
+        scanned_rfid_codes: formData.scanned_rfid_codes,
+        unexpected_codes: formData.unexpected_codes || [],
+        differences_detected: formData.differences_detected || undefined,
+      } as any;
 
       // Comportamiento normal: actualizar el RFID scan inmediatamente
       try {
@@ -230,7 +247,13 @@ export const ScanForm: React.FC<ScanFormProps> = ({
       }
 
     } catch (guideError: any) {
-      Alert.alert('Error', guideError.message || 'No se pudo crear la guía. Intente nuevamente.');
+      // Extraer el mensaje de error del backend si está disponible
+      const errorMessage = guideError?.response?.data?.message 
+        || guideError?.message 
+        || 'No se pudo crear la guía. Intente nuevamente.';
+      
+      console.error('Error al crear guía:', guideError);
+      Alert.alert('Error', errorMessage);
     }
   };
 

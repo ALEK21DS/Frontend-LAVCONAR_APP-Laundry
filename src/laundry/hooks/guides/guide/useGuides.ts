@@ -68,16 +68,9 @@ export const useGuides = ({
           params,
         });
         
-        // Filtrar por status en frontend si se proporciona
-        let filteredData = response.data.data || [];
-        if (status) {
-          filteredData = filteredData.filter(guide => guide.status === status);
-        }
-        
-        return {
-          ...response.data,
-          data: filteredData,
-        };
+        // El filtrado por status ahora se hace en el backend si se envía como parámetro
+        // No filtramos en frontend para evitar problemas con guías únicas
+        return response.data;
       } catch (error: any) {
         // Si es un 404 (no encontrado), devolver respuesta vacía en lugar de error
         if (error?.response?.status === 404) {

@@ -16,6 +16,7 @@ import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
 import { QrScanner } from '@/laundry/components';
 import { GuideDetailsModal } from './ui/GuideDetailsModal';
 import { useCatalogLabelMap } from '@/laundry/hooks';
+import { GUIDE_STATUS_COLORS } from '@/constants/processes';
 
  type GuidesPageProps = { navigation: NativeStackNavigationProp<any> };
 
@@ -340,27 +341,38 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
             <Text className="text-gray-500">No se encontraron guías.</Text>
           ) : (
             <View className="-mx-1 flex-row flex-wrap">
-            {filtered.map((g: any) => (
-              <View key={g.id} className="w-full px-1 mb-2">
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => openDetails(g)}
-                >
-                  <Card padding="md" variant="default">
-                    <View className="flex-row items-center">
-                      <View className="rounded-lg p-2 mr-3" style={{ backgroundColor: '#8EB02120' }}>
-                        <IonIcon name="document-text-outline" size={20} color="#8EB021" />
-                      </View>
-                      <View className="flex-1">
+            {filtered.map((g: any) => {
+              const statusColor = GUIDE_STATUS_COLORS[g.status as keyof typeof GUIDE_STATUS_COLORS] || '#6B7280';
+              const statusLabel = getGuideStatusLabel(g.status, g.status_label || g.status || '—');
+              
+              return (
+                <View key={g.id} className="w-full px-1 mb-2">
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => openDetails(g)}
+                  >
+                    <Card padding="md" variant="default">
+                      <View className="flex-row items-center">
+                        <View className="rounded-lg p-2 mr-3" style={{ backgroundColor: '#8EB02120' }}>
+                          <IonIcon name="document-text-outline" size={20} color="#8EB021" />
+                        </View>
+                      <View className="flex-1 mr-2">
                         <Text className="text-gray-900 font-semibold">{g.guide_number}</Text>
                         <Text className="text-gray-500 text-xs">{g.client_name}</Text>
                       </View>
-                      <Text className="text-gray-600 text-xs">{getGuideStatusLabel(g.status, g.status_label || g.status || '—')}</Text>
-                    </View>
-                  </Card>
-                </TouchableOpacity>
-              </View>
-            ))}
+                      {/* Badge de estado con color */}
+                      <View className="flex-row items-center px-2 py-1 rounded-full" style={{ backgroundColor: statusColor + '20' }}>
+                        <View className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: statusColor }} />
+                        <Text className="text-xs font-medium" numberOfLines={1} style={{ color: statusColor }}>
+                          {statusLabel}
+                        </Text>
+                      </View>
+                      </View>
+                    </Card>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
             </View>
           )}
         </ScrollView>
