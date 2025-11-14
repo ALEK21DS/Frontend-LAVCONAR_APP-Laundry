@@ -10,6 +10,10 @@ interface Guide {
   id: string;
   guide_number: string;
   client_name?: string;
+  client?: {
+    id?: string;
+    name?: string;
+  };
   status: string;
   created_at: string;
   total_garments?: number;
@@ -305,7 +309,7 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
                   <View className="flex-row justify-between py-2 border-b border-gray-100">
                     <Text className="text-sm text-gray-600">Cliente:</Text>
                     <Text className="text-sm font-semibold text-gray-900">
-                      {scannedGuide.client_name || 'Sin cliente'}
+                      {scannedGuide.client_name || scannedGuide.client?.name || 'Sin cliente'}
                     </Text>
                   </View>
                   

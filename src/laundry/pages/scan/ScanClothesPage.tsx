@@ -678,26 +678,32 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       const guideId = route?.params?.guideId;
       const rfidScanId = route?.params?.rfidScanId;
       
-      // Procesos con escaneo opcional u obligatorio: abrir ScanForm para actualizar RFID scan
-      const processesWithScan = ['WASHING', 'DRYING', 'IRONING', 'FOLDING', 'IN_PROCESS', 'PACKAGING', 'SHIPPING', 'LOADING', 'DELIVERY'];
-      if (processesWithScan.includes(processType || '') && rfidScanId && guideId) {
-      setScanFormContext({
-        origin: 'process',
-        guideId,
-        rfidScanId,
-        processType,
-        scannedTags: scannedTags.map(tag => tag.epc),
-        deferRfidScanUpdate: true,
-        unregisteredCodes: unregisteredRfids,
-      });
-      } else if (processType === 'PACKAGING' || processType === 'LOADING' || processType === 'DELIVERY') {
-        // Para EMPAQUE, CARGA y ENTREGA (sin rfidScanId), ir a la página de validación
+      // Procesos especiales que siempre van a validación (incluso si tienen rfidScanId)
+      if (processType === 'PACKAGING' || processType === 'LOADING' || processType === 'DELIVERY') {
+        // Para EMPAQUE, CARGA y ENTREGA, ir siempre a la página de validación
         navigation.navigate('GarmentValidation', {
           guideId: guideId || selectedGuideId,
           processType: processType,
           scannedTags: scannedTags.map(tag => tag.epc),
           serviceType: serviceType,
         });
+      } else if (processType && rfidScanId && guideId) {
+        // Procesos con escaneo opcional u obligatorio: abrir ScanForm para actualizar RFID scan
+        const processesWithScan = ['WASHING', 'DRYING', 'IRONING', 'FOLDING', 'IN_PROCESS', 'SHIPPING'];
+        if (processesWithScan.includes(processType)) {
+          setScanFormContext({
+            origin: 'process',
+            guideId,
+            rfidScanId,
+            processType,
+            scannedTags: scannedTags.map(tag => tag.epc),
+            deferRfidScanUpdate: true,
+            unregisteredCodes: unregisteredRfids,
+          });
+        } else {
+          // Para otros procesos, abrir el ProcessForm
+          setProcessModalOpen(true);
+        }
       } else {
         // Para otros procesos, abrir el ProcessForm
         setProcessModalOpen(true);
