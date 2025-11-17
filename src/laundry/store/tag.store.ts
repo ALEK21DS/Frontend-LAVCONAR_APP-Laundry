@@ -1,10 +1,12 @@
 import { create } from 'zustand';
+import { ScanRangeKey } from '@/constants/scanRange';
 import { ScannedTag } from '../interfaces/tags/tags.interface';
 
 interface TagStore {
   scannedTags: ScannedTag[];
   isScanning: boolean;
   scanError: string | null;
+  scanRangeKey: ScanRangeKey;
 
   addScannedTag: (tag: ScannedTag) => void;
   removeScannedTag: (epc: string) => void;
@@ -12,12 +14,14 @@ interface TagStore {
   setIsScanning: (isScanning: boolean) => void;
   setScanError: (error: string | null) => void;
   getUniqueScannedTags: () => ScannedTag[];
+  setScanRangeKey: (key: ScanRangeKey) => void;
 }
 
 export const useTagStore = create<TagStore>((set, get) => ({
   scannedTags: [],
   isScanning: false,
   scanError: null,
+  scanRangeKey: 'medium',
 
   addScannedTag: (tag: ScannedTag) => {
     set(state => {
@@ -61,5 +65,9 @@ export const useTagStore = create<TagStore>((set, get) => ({
       return acc;
     }, [] as ScannedTag[]);
     return uniqueTags;
+  },
+
+  setScanRangeKey: (key: ScanRangeKey) => {
+    set({ scanRangeKey: key });
   },
 }));

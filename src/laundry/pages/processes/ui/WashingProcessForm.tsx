@@ -132,7 +132,7 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
   // Obtener etiqueta del tipo de proceso (usar fallback por defecto, actualizar con catálogo si está disponible)
   const processTypeLabel = useMemo(() => {
     if (!processType) return 'Proceso';
-    
+  
     // Usar el mapa de fallback como valor por defecto (siempre funciona)
     const fallbackLabel = processTypeFallbackMap[processType] || processType;
     
@@ -620,36 +620,36 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
           </View>
 
           {/* Máquina (opcional para todos los procesos) */}
-          <View className="mb-4">
+            <View className="mb-4">
             <Text className="text-sm font-medium text-gray-700 mb-1">Máquina (Opcional)</Text>
-            <TouchableOpacity
-              onPress={() => setMachineModalOpen(true)}
-              className="bg-purple-500 p-4 rounded-lg flex-row items-center justify-between"
-              disabled={isLoadingMachines}
-            >
-              {selectedMachineByCode ? (
-                <>
-                  <View className="flex-row items-center flex-1">
-                    <Icon name="construct-outline" size={20} color="white" />
-                    <Text className="text-white font-semibold ml-2 text-base">
-                      {selectedMachineByCode.code}
-                    </Text>
-                  </View>
-                  <Icon name="create-outline" size={20} color="white" />
-                </>
-              ) : (
-                <>
-                  <View className="flex-row items-center flex-1">
-                    <Icon name="construct-outline" size={20} color="white" />
-                    <Text className="text-white font-medium ml-2">
-                      Seleccionar Máquina
-                    </Text>
-                  </View>
-                  <Icon name="qr-code-outline" size={20} color="white" />
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                onPress={() => setMachineModalOpen(true)}
+                className="bg-purple-500 p-4 rounded-lg flex-row items-center justify-between"
+                disabled={isLoadingMachines}
+              >
+                {selectedMachineByCode ? (
+                  <>
+                    <View className="flex-row items-center flex-1">
+                      <Icon name="construct-outline" size={20} color="white" />
+                      <Text className="text-white font-semibold ml-2 text-base">
+                        {selectedMachineByCode.code}
+                      </Text>
+                    </View>
+                    <Icon name="create-outline" size={20} color="white" />
+                  </>
+                ) : (
+                  <>
+                    <View className="flex-row items-center flex-1">
+                      <Icon name="construct-outline" size={20} color="white" />
+                      <Text className="text-white font-medium ml-2">
+                        Seleccionar Máquina
+                      </Text>
+                    </View>
+                    <Icon name="qr-code-outline" size={20} color="white" />
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
 
           {/* Peso de la carga */}
           <View className="mb-4">

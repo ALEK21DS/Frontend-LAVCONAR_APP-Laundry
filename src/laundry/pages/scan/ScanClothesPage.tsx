@@ -23,6 +23,8 @@ import { garmentsApi } from '@/laundry/api/garments/garments.api';
 import { guidesApi } from '@/laundry/api/guides/guides.api';
 import { ApiResponse } from '@/interfaces/base.response';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SCAN_RANGE_PRESETS, ScanRangeKey } from '@/constants/scanRange';
+import { ScanRangeModal } from '@/laundry/components/ScanRangeModal';
 
 type ScanClothesPageProps = {
   navigation: NativeStackNavigationProp<any>;
@@ -35,6 +37,7 @@ type ScanClothesPageProps = {
       initialRfids?: string[];
       isEditMode?: boolean;
       guideToEdit?: any;
+      rfidScanId?: string;
     };
   };
 };
@@ -45,7 +48,15 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const initialRfids = route?.params?.initialRfids || [];
   const isEditMode = route?.params?.isEditMode || false;
   const passedGuide = route?.params?.guideToEdit || null;
-  const { scannedTags, addScannedTag, clearScannedTags, isScanning, setIsScanning } = useTagStore();
+  const {
+    scannedTags,
+    addScannedTag,
+    clearScannedTags,
+    isScanning,
+    setIsScanning,
+    scanRangeKey,
+    setScanRangeKey,
+  } = useTagStore();
   
   // Hooks modulares
   const { createGarmentAsync, isCreating } = useCreateGarment();
@@ -109,11 +120,10 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     rfidScanId?: string;
     rfidScanUpdateData?: any;
   } | null>(null);
-  // Para servicio personal, usar sensibilidad media (-65) para detección confiable a corta distancia
-  const [scanRange, setScanRange] = useState<number>(
-    mode === 'guide' && serviceType === 'personal' ? -65 : -65 
-  );
-  const MIN_RSSI = scanRange; // Usar el rango configurado por el usuario
+  const [isRangeModalOpen, setIsRangeModalOpen] = useState(false);
+  const currentRangeConfig = SCAN_RANGE_PRESETS[scanRangeKey];
+  const RSSI_SAFETY_MARGIN = 10; // Permite tolerancia porque algunos lectores reportan valores más bajos
+  const MIN_RSSI = currentRangeConfig.minRssi - RSSI_SAFETY_MARGIN;
   
   // Estados para los nuevos modales
   const [processTypeModalOpen, setProcessTypeModalOpen] = useState(false);
@@ -146,6 +156,8 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   
   // Set para rastrear RFIDs que están siendo procesados (prevenir race conditions)
   const processingRfidsRef = useRef<Set<string>>(new Set());
+  const startScanningFnRef = useRef<() => Promise<void> | void>();
+  const stopScanningFnRef = useRef<() => Promise<void> | void>();
 
   // Función para verificar si un código RFID ya está registrado en la lista local
   const isRfidCodeAlreadyRegistered = useCallback((rfidCode: string) => {
@@ -408,11 +420,9 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     }
   }, [navigation]);
 
-  const applyReaderPower = useCallback(async (rangeDbm: number) => {
-    // Mapear sensibilidad a potencia real del lector (0-30 aprox. segun SDK)
-    // Muy Baja(-90) -> 30, Baja(-75)->26, Media(-65)->22, Alta(-55)->18
-    const power = rangeDbm <= -85 ? 30 : rangeDbm <= -70 ? 26 : rangeDbm <= -60 ? 22 : 18;
+  const applyReaderPower = useCallback(async (power: number) => {
     try {
+      console.log('[RFID][Front] Aplicando potencia seleccionada:', power, 'dBm');
       await rfidModule.setPower(power);
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -421,8 +431,8 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   }, []);
 
   useEffect(() => {
-    applyReaderPower(scanRange);
-  }, [scanRange, applyReaderPower]);
+    applyReaderPower(currentRangeConfig.power);
+  }, [currentRangeConfig.power, applyReaderPower]);
 
   // Cargar RFIDs iniciales cuando estamos en modo edición (solo una vez)
   useEffect(() => {
@@ -498,6 +508,12 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         return;
       }
       
+      console.log('[RFID][Front] Iniciando escaneo', {
+        range: scanRangeKey,
+        power: currentRangeConfig.power,
+        minRssi: MIN_RSSI,
+      });
+
       setIsScanning(true);
       isScanningRef.current = true;
       const subscription = rfidModule.addTagListener(async (tag: ScannedTag) => {
@@ -506,6 +522,13 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         if (typeof tag.rssi === 'number' && tag.rssi < MIN_RSSI) {
           return;
         }
+
+        console.log('[RFID][Front] Tag detectado', {
+          epc: tag.epc,
+          rssi: tag.rssi,
+          power: currentRangeConfig.power,
+          range: currentRangeConfig.label,
+        });
         
         // En modo "guide" con servicio personal, lógica especial
         if (mode === 'guide' && serviceType === 'personal') {
@@ -609,7 +632,19 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       Alert.alert('Error', 'No se pudo iniciar el escaneo RFID');
       setIsScanning(false);
     }
-  }, [addScannedTag, setIsScanning, stopScanning, mode, serviceType, checkRfidInBackend, isRfidCodeAlreadyRegistered]);
+  }, [
+    addScannedTag,
+    setIsScanning,
+    stopScanning,
+    mode,
+    serviceType,
+    checkRfidInBackend,
+    isRfidCodeAlreadyRegistered,
+    MIN_RSSI,
+    currentRangeConfig.label,
+    currentRangeConfig.power,
+    scanRangeKey,
+  ]);
 
   const handleGoBack = useCallback(() => {
     stopScanning();
@@ -617,6 +652,14 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       navigation.goBack();
     }
   }, [navigation, stopScanning]);
+
+  useEffect(() => {
+    startScanningFnRef.current = startScanning;
+  }, [startScanning]);
+
+  useEffect(() => {
+    stopScanningFnRef.current = stopScanning;
+  }, [stopScanning]);
 
   useEffect(() => {
     clearScannedTags();
@@ -627,12 +670,12 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     const emitter = new NativeEventEmitter();
     const subDown = emitter.addListener('hwTriggerDown', () => {
       if (!isScanningRef.current) {
-        startScanning();
+        startScanningFnRef.current?.();
       }
     });
     const subUp = emitter.addListener('hwTriggerUp', () => {
       if (isScanningRef.current) {
-        stopScanning();
+        stopScanningFnRef.current?.();
       }
     });
 
@@ -640,8 +683,8 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     // Manejar botón físico keyCode=293 (C72) vía eventos genéricos si están disponibles
     const subKey = emitter.addListener('hwKey', (payload: any) => {
       if (payload?.keyCode === 293) {
-        if (payload.action === 0 && !isScanningRef.current) startScanning();
-        if (payload.action === 1 && isScanningRef.current) stopScanning();
+        if (payload.action === 0 && !isScanningRef.current) startScanningFnRef.current?.();
+        if (payload.action === 1 && isScanningRef.current) stopScanningFnRef.current?.();
       }
     });
 
@@ -883,6 +926,18 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     setGuideDraftData(undefined);
     setGuideDraftValues(undefined);
   }, [clearScannedTags]);
+
+  const handleSelectRange = (key: ScanRangeKey) => {
+    const preset = SCAN_RANGE_PRESETS[key];
+    console.log('[RFID][Front] Rango seleccionado en UI:', {
+      key,
+      label: preset.label,
+      power: preset.power,
+      minRssi: preset.minRssi,
+    });
+    setScanRangeKey(key);
+    setIsRangeModalOpen(false);
+  };
 
   // Función para manejar la edición de prenda existente
   const handleEditExistingGarment = () => {
@@ -1231,32 +1286,47 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       </View>
 
       <View className="mb-6">
-        {!isScanning ? (
-          <Button
-            title="Iniciar Escaneo"
-            onPress={startScanning}
-            icon={<Icon name="play-outline" size={18} color="white" />}
-            fullWidth
-            size="sm"
-            style={{ backgroundColor: '#0b1f36' }}
-          />
-        ) : (
-          <Button
-            title="Detener Escaneo"
-            onPress={stopScanning}
-            variant="danger"
-            icon={<Icon name="stop-outline" size={16} color="white" />}
-            fullWidth
-            size="sm"
-            isLoading={isStopping}
-          />
-        )}
+        <View className="flex-row space-x-3">
+          <View className="flex-1">
+            <Button
+              title="Escanear"
+              onPress={startScanning}
+              icon={<Icon name="play-outline" size={18} color="white" />}
+              size="sm"
+              disabled={isScanning}
+              style={{ backgroundColor: '#0b1f36' }}
+            />
+          </View>
+          <View className="flex-1">
+            <Button
+              title={`Alcance: ${currentRangeConfig.label}`}
+              onPress={() => setIsRangeModalOpen(true)}
+              variant="outline"
+              size="sm"
+              icon={<Icon name="options-outline" size={16} color="#0b1f36" />}
+            />
+          </View>
+        </View>
 
         {isScanning && (
-          <View className="mt-3 bg-primary-DEFAULT/10 border border-primary-DEFAULT/20 rounded-lg px-3 py-2">
-            <View className="flex-row items-center justify-center">
-              <Icon name="radio-outline" size={16} color="#3B82F6" />
-              <Text className="text-primary-DEFAULT font-semibold ml-2 text-sm">Escaneando...</Text>
+          <View className="mt-3 space-y-3">
+            <Button
+              title="Detener Escaneo"
+              onPress={stopScanning}
+              variant="danger"
+              icon={<Icon name="stop-outline" size={16} color="white" />}
+              fullWidth
+              size="sm"
+              isLoading={isStopping}
+            />
+
+            <View className="bg-primary-DEFAULT/10 border border-primary-DEFAULT/20 rounded-lg px-3 py-2">
+              <View className="flex-row items-center justify-center">
+                <Icon name="radio-outline" size={16} color="#3B82F6" />
+                <Text className="text-primary-DEFAULT font-semibold ml-2 text-sm">
+                  Escaneando con potencia {currentRangeConfig.power} dBm
+                </Text>
+              </View>
             </View>
           </View>
         )}
@@ -1463,6 +1533,13 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           />
         </View>
       )}
+
+      <ScanRangeModal
+        visible={isRangeModalOpen}
+        selectedKey={scanRangeKey}
+        onClose={() => setIsRangeModalOpen(false)}
+        onSelect={handleSelectRange}
+      />
 
       <Modal visible={guideModalOpen} transparent animationType="slide" onRequestClose={handleCloseGuideModal}>
         <View className="flex-1 bg-black/40" />
