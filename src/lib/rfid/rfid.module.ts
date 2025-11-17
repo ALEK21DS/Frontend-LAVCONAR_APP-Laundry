@@ -4,6 +4,7 @@ import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
 // Nota: interfaz eliminada si no se usa para evitar errores de linter
 
 const { RFIDModule } = NativeModules;
+let currentPowerLevel = 0;
 
 // Evita warnings cuando el módulo nativo no implementa addListener/removeListeners
 const rfidEventEmitter = new NativeEventEmitter(
@@ -74,6 +75,8 @@ export const rfidModule = {
       throw new Error('Módulo RFID no disponible');
     }
     try {
+      currentPowerLevel = power;
+      console.log('[RFID Module] Potencia recibida:', power, 'dBm');
       await RFIDModule.setPower(power);
     } catch (error) {
       console.error('Error al establecer potencia:', error);
@@ -88,6 +91,11 @@ export const rfidModule = {
         rssi: event.rssi,
         timestamp: event.timestamp || Date.now(),
       };
+      console.log('[RFID Module] Tag detectado', {
+        epc: tag.epc,
+        rssi: tag.rssi,
+        power: currentPowerLevel,
+      });
       callback(tag);
     });
   },

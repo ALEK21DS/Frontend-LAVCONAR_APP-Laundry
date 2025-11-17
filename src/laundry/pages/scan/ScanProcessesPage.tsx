@@ -9,6 +9,8 @@ import { rfidModule } from '@/lib/rfid/rfid.module';
 import { PROCESSES } from '@/constants';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
+import { SCAN_RANGE_PRESETS, ScanRangeKey } from '@/constants/scanRange';
+import { ScanRangeModal } from '@/laundry/components/ScanRangeModal';
 
 type ScanProcessesPageProps = {
   navigation: NativeStackNavigationProp<any>;
@@ -16,9 +18,19 @@ type ScanProcessesPageProps = {
 
 export const ScanProcessesPage: React.FC<ScanProcessesPageProps> = ({ navigation }) => {
   const { updateTagAsync, isUpdating } = useUpdateTag();
-  const { scannedTags, addScannedTag, clearScannedTags, isScanning, setIsScanning } = useTagStore();
+  const {
+    scannedTags,
+    addScannedTag,
+    clearScannedTags,
+    isScanning,
+    setIsScanning,
+    scanRangeKey,
+    setScanRangeKey,
+  } = useTagStore();
 
   const [selectedProcess, setSelectedProcess] = useState<string>('');
+  const [isRangeModalOpen, setIsRangeModalOpen] = useState(false);
+  const currentRangeConfig = SCAN_RANGE_PRESETS[scanRangeKey];
 
   const stopScanning = useCallback(async () => {
     try {
@@ -33,11 +45,30 @@ export const ScanProcessesPage: React.FC<ScanProcessesPageProps> = ({ navigation
     }
   }, [setIsScanning]);
 
+  const applyReaderPower = useCallback(async () => {
+    try {
+      console.log('[RFID][Front][Procesos] Aplicando potencia seleccionada:', currentRangeConfig.power);
+      await rfidModule.setPower(currentRangeConfig.power);
+    } catch (error) {
+      console.warn('No se pudo aplicar potencia para procesos:', error);
+    }
+  }, [currentRangeConfig.power]);
+
   const startScanning = useCallback(async () => {
     try {
+      console.log('[RFID][Front][Procesos] Iniciando escaneo', {
+        range: scanRangeKey,
+        power: currentRangeConfig.power,
+      });
       setIsScanning(true);
 
       const interval = rfidModule.simulateScan((tag: ScannedTag) => {
+        console.log('[RFID][Front][Procesos] Tag simulado', {
+          epc: tag.epc,
+          rssi: tag.rssi,
+          power: currentRangeConfig.power,
+          range: currentRangeConfig.label,
+        });
         addScannedTag(tag);
       });
 
@@ -46,7 +77,7 @@ export const ScanProcessesPage: React.FC<ScanProcessesPageProps> = ({ navigation
       Alert.alert('Error', 'No se pudo iniciar el escaneo RFID');
       setIsScanning(false);
     }
-  }, [addScannedTag, setIsScanning]);
+  }, [addScannedTag, setIsScanning, currentRangeConfig.label, currentRangeConfig.power, scanRangeKey]);
 
   useEffect(() => {
     clearScannedTags();
@@ -56,6 +87,21 @@ export const ScanProcessesPage: React.FC<ScanProcessesPageProps> = ({ navigation
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    applyReaderPower();
+  }, [applyReaderPower]);
+
+  const handleSelectRange = (key: ScanRangeKey) => {
+    const preset = SCAN_RANGE_PRESETS[key];
+    console.log('[RFID][Front][Procesos] Rango seleccionado en UI:', {
+      key,
+      label: preset.label,
+      power: preset.power,
+    });
+    setScanRangeKey(key);
+    setIsRangeModalOpen(false);
+  };
 
   const handleAssignProcess = async () => {
     if (!selectedProcess) {
@@ -135,30 +181,45 @@ export const ScanProcessesPage: React.FC<ScanProcessesPageProps> = ({ navigation
       </View>
 
       <View className="mb-6">
-        {!isScanning ? (
-          <Button
-            title="Iniciar Escaneo"
-            onPress={startScanning}
-            icon={<Icon name="play-outline" size={20} color="white" />}
-            fullWidth
-            size="lg"
-          />
-        ) : (
-          <Button
-            title="Detener Escaneo"
-            onPress={stopScanning}
-            variant="danger"
-            icon={<Icon name="stop-outline" size={20} color="white" />}
-            fullWidth
-            size="lg"
-          />
-        )}
+        <View className="flex-row space-x-3">
+          <View className="flex-1">
+            <Button
+              title="Escanear"
+              onPress={startScanning}
+              icon={<Icon name="play-outline" size={20} color="white" />}
+              size="md"
+              disabled={isScanning}
+            />
+          </View>
+          <View className="flex-1">
+            <Button
+              title={`Alcance: ${currentRangeConfig.label}`}
+              onPress={() => setIsRangeModalOpen(true)}
+              variant="outline"
+              size="md"
+              icon={<Icon name="options-outline" size={18} color="#0b1f36" />}
+            />
+          </View>
+        </View>
 
         {isScanning && (
-          <View className="mt-4 bg-primary-DEFAULT/10 border border-primary-DEFAULT/20 rounded-lg p-4">
-            <View className="flex-row items-center justify-center">
-              <Icon name="radio-outline" size={20} color="#3B82F6" />
-              <Text className="text-primary-DEFAULT font-semibold ml-2">Escaneando...</Text>
+          <View className="mt-4 space-y-3">
+            <Button
+              title="Detener Escaneo"
+              onPress={stopScanning}
+              variant="danger"
+              icon={<Icon name="stop-outline" size={20} color="white" />}
+              fullWidth
+              size="md"
+            />
+
+            <View className="bg-primary-DEFAULT/10 border border-primary-DEFAULT/20 rounded-lg p-4">
+              <View className="flex-row items-center justify-center">
+                <Icon name="radio-outline" size={20} color="#3B82F6" />
+                <Text className="text-primary-DEFAULT font-semibold ml-2">
+                  Escaneando con potencia {currentRangeConfig.power} dBm
+                </Text>
+              </View>
             </View>
           </View>
         )}
@@ -216,6 +277,13 @@ export const ScanProcessesPage: React.FC<ScanProcessesPageProps> = ({ navigation
           />
         </View>
       )}
+
+      <ScanRangeModal
+        visible={isRangeModalOpen}
+        selectedKey={scanRangeKey}
+        onClose={() => setIsRangeModalOpen(false)}
+        onSelect={handleSelectRange}
+      />
     </Container>
   );
 };
