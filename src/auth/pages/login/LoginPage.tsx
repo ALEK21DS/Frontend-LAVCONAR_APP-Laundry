@@ -11,7 +11,7 @@ import { Image } from 'react-native';
 import { Toast } from '@/components/ui/toast';
 
 export const LoginPage: React.FC = () => {
-  const { login, isLoading, error, clearError } = useAuth();
+  const { login, error, clearError } = useAuth();
   const { sucursalesOptions, isLoading: isLoadingSucursales } = useBranchOffices();
   const navigation = useNavigation<any>();
 
@@ -33,7 +33,7 @@ export const LoginPage: React.FC = () => {
 
   const handleLogin = async () => {
     // Prevenir múltiples llamadas
-    if (isSubmitting || isLoading) {
+    if (isSubmitting) {
       console.log('🚫 Login ya en progreso, ignorando llamada duplicada');
       return;
     }
@@ -52,9 +52,14 @@ export const LoginPage: React.FC = () => {
 
     try {
       await login(formData);
+      // Si el login es exitoso, la navegación se manejará automáticamente
+      // No limpiar los datos aquí porque la navegación puede tardar
     } catch (err: any) {
-      setToastMsg(err?.message || 'No se pudo iniciar sesión. Verifica tus credenciales.');
+      // En caso de error, mantener los datos del formulario
+      const errorMessage = err?.response?.data?.message || err?.message || 'No se pudo iniciar sesión. Verifica tus credenciales.';
+      setToastMsg(errorMessage);
       setShowErrorToast(true);
+      // NO limpiar formData aquí - mantener los datos ingresados
     } finally {
       setIsSubmitting(false);
     }
@@ -133,7 +138,8 @@ export const LoginPage: React.FC = () => {
           <Button
             title="Iniciar Sesión"
             onPress={handleLogin}
-            isLoading={isLoading || isSubmitting}
+            isLoading={isSubmitting}
+            disabled={isSubmitting}
             fullWidth
             size="lg"
             style={{ backgroundColor: '#143b64' }}

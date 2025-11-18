@@ -13,6 +13,7 @@ interface AuthStore {
   token: string | null;
   refreshToken: string | null;
   isLoading: boolean;
+  isCheckingAuth: boolean; // Solo para el check inicial de autenticación
   error: string | null;
 
   // Actions
@@ -33,6 +34,7 @@ export const useAuthStore = create<AuthStore>()(
       token: null,
       refreshToken: null,
       isLoading: false,
+      isCheckingAuth: false,
       error: null,
 
       login: async (credentials: LoginCredentials) => {
@@ -111,6 +113,7 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       checkAuthStatus: async () => {
+        set({ isCheckingAuth: true });
         try {
           const response = await refreshAction();
           
@@ -119,6 +122,7 @@ export const useAuthStore = create<AuthStore>()(
             token: response.accessToken,
             refreshToken: response.refreshToken,
             isAuthenticated: true,
+            isCheckingAuth: false,
           });
 
           return {
@@ -136,6 +140,7 @@ export const useAuthStore = create<AuthStore>()(
             token: null,
             refreshToken: null,
             isAuthenticated: false,
+            isCheckingAuth: false,
           });
 
           return {
