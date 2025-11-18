@@ -3,7 +3,7 @@ import { User } from './user.interface';
 export interface LoginCredentials {
   username: string;
   password: string;
-  sucursalId: string; // UUID de la sucursal - el backend valida que coincida con la asignada
+  sucursalId?: string; // Para superadmin puede omitirse
 }
 
 export interface LoginResponse {
