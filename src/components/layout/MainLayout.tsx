@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Alert } from 'react-native';
+import { View, Alert, Modal, Text, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Container } from '@/components/common';
 import { HeaderBar } from './HeaderBar';
@@ -15,6 +15,8 @@ import { useAuthStore } from '@/auth/store/auth.store';
 import { useBranchOffices } from '@/laundry/hooks/branch-offices';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
+import IonIcon from 'react-native-vector-icons/Ionicons';
+import { getPreferredBranchOfficeId, isSuperAdminUser } from '@/helpers/user.helper';
 
 interface MainLayoutProps {
   activeTab: 'Dashboard' | 'Clients' | 'ScanClothes' | 'Guides' | 'Processes' | 'Incidents';
@@ -26,10 +28,21 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
   const { logout } = useAuth();
   const { user } = useAuthStore();
   const { sucursales } = useBranchOffices();
+  const isSuperAdmin = isSuperAdminUser(user);
   
-  const branchOfficeId = user?.branch_office_id || user?.sucursalId || '';
-  const currentBranch = sucursales.find(branch => branch.id === branchOfficeId);
-  const branchOfficeName = currentBranch?.name || 'Sucursal no asignada';
+  const preferredBranchOfficeId = getPreferredBranchOfficeId(user);
+  const branchOfficeId = preferredBranchOfficeId || '';
+  const currentBranch = preferredBranchOfficeId
+    ? sucursales.find(branch => branch.id === preferredBranchOfficeId)
+    : undefined;
+  const branchOfficeName = preferredBranchOfficeId
+    ? currentBranch?.name || 'Sucursal no asignada'
+    : isSuperAdmin
+      ? 'Todas las sucursales'
+      : 'Sucursal no asignada';
+  const fullName = [user?.nombre, user?.apellido].filter(Boolean).join(' ').trim();
+  const displayName = fullName || user?.username || 'Usuario';
+  const userEmail = user?.email || 'Sin correo';
 
   const [serviceTypeModalOpen, setServiceTypeModalOpen] = useState(false);
   const [processTypeModalOpen, setProcessTypeModalOpen] = useState(false);
@@ -39,6 +52,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
   const [selectedRfidScan, setSelectedRfidScan] = useState<any>(null);
   const [selectedGuideForProcess, setSelectedGuideForProcess] = useState<any>(null);
   const [washingProcessFormOpen, setWashingProcessFormOpen] = useState(false);
+  const [userInfoModalOpen, setUserInfoModalOpen] = useState(false);
 
   // Detectar cuando se regresa de ScanClothesPage y abrir form de proceso si corresponde
   useFocusEffect(
@@ -394,7 +408,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
 
   return (
     <Container safe padding="none">
-      <HeaderBar showThemeToggle={false} onLogoutPress={logout} />
+      <HeaderBar
+        showThemeToggle={false}
+        onLogoutPress={logout}
+        onUserPress={() => setUserInfoModalOpen(true)}
+      />
       <View className="flex-1">{children}</View>
       <BottomNav 
         active={activeTab} 
@@ -466,6 +484,46 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
           }}
       />
       )}
+
+      <Modal
+        visible={userInfoModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setUserInfoModalOpen(false)}
+      >
+        <View className="flex-1 bg-black/40 items-center justify-center px-6">
+          <View className="w-full bg-white rounded-3xl overflow-hidden shadow-2xl">
+            <View className="bg-[#0b1f36] px-5 py-6">
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center">
+                  <View className="w-12 h-12 rounded-full bg-white/20 items-center justify-center mr-3">
+                    <IonIcon name="person-outline" size={28} color="#ffffff" />
+                  </View>
+                  <View>
+                    <Text className="text-white text-2xl font-bold">{displayName}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setUserInfoModalOpen(false)}>
+                  <IonIcon name="close" size={22} color="#ffffff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View className="px-5 py-4 bg-gray-50">
+              <View className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-100">
+                <View className="px-4 py-4">
+                  <Text className="text-xs uppercase text-gray-500 mb-1">Correo</Text>
+                  <Text className="text-base text-gray-900 font-semibold">{userEmail}</Text>
+                </View>
+                <View className="px-4 py-4">
+                  <Text className="text-xs uppercase text-gray-500 mb-1">Sucursal</Text>
+                  <Text className="text-base text-gray-900 font-semibold">{branchOfficeName}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Container>
   );
 };

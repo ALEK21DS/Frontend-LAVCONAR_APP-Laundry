@@ -1,28 +1,31 @@
-import { useClients } from '../clients';
-import { useGuides, useGarments } from '../guides';
-import { useWashingProcesses } from '../washing-processes';
+import { useQuery } from '@tanstack/react-query';
+import { useAuthStore } from '@/auth/store/auth.store';
+import { dashboardApi } from '@/laundry/api/dashboard/dashboard.api';
+import { DashboardMetrics } from '@/laundry/interfaces/dashboard/dashboard-metrics.interface';
+import { getPreferredBranchOfficeId } from '@/helpers/user.helper';
 
 /**
  * Hook para obtener las estadísticas del dashboard
- * Combina datos de múltiples módulos para mostrar contadores
+ * Obtiene los porcentajes y totales usados en las tarjetas principales
  */
 export const useDashboardStats = () => {
-  // Obtener estadísticas básicas (solo primera página para obtener el total)
-  const { total: totalClients, isLoading: loadingClients } = useClients({ page: 1, limit: 1 });
-  const { total: totalGuides, isLoading: loadingGuides } = useGuides({ page: 1, limit: 1 });
-  const { total: totalGarments, isLoading: loadingGarments } = useGarments({ page: 1, limit: 1 });
-  const { total: totalProcesses, isLoading: loadingProcesses } = useWashingProcesses({ page: 1, limit: 1 });
+  const { user } = useAuthStore();
+  const branchOfficeId = getPreferredBranchOfficeId(user);
 
-  const isLoading = loadingClients || loadingGuides || loadingGarments || loadingProcesses;
+  const query = useQuery({
+    queryKey: ['dashboard-metrics', branchOfficeId || 'all'],
+    queryFn: async (): Promise<DashboardMetrics> => {
+      const { data } = await dashboardApi.get<DashboardMetrics>('/metrics', {
+        params: branchOfficeId ? { branch_office_id: branchOfficeId } : undefined,
+      });
+      return data;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
 
   return {
-    stats: {
-      clients: totalClients,
-      guides: totalGuides,
-      garments: totalGarments,
-      processes: totalProcesses,
-    },
-    isLoading,
+    metrics: query.data,
+    isLoading: query.isLoading,
+    isError: query.isError,
   };
 };
-
