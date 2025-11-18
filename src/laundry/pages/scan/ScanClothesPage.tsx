@@ -826,6 +826,8 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
               physical_condition: garmentData.physicalCondition,
               weight: garmentData.weight ? parseFloat(garmentData.weight.toString()) : undefined,
               observations: garmentData.observations,
+              service_type: garmentData.serviceType,
+              manufacturing_date: garmentData.manufacturingDate,
             }
           });
           Alert.alert('Prenda actualizada', `${garmentData.description} actualizada y agregada a la guía`);
@@ -842,6 +844,8 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             physical_condition: garmentData.physicalCondition,
             weight: garmentData.weight ? parseFloat(garmentData.weight.toString()) : undefined,
             observations: garmentData.observations,
+            service_type: garmentData.serviceType,
+            manufacturing_date: garmentData.manufacturingDate,
           });
           savedGarmentId = newGarmentResponse.id;
           Alert.alert('Prenda registrada', `${garmentData.description} registrada y agregada a la guía`);
@@ -1644,9 +1648,15 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
               garmentType: existingGarment.garment_type || '',
               brand: existingGarment.garment_brand || '', // Usar garment_brand en lugar de brand
               branchOfficeId: existingGarment.branch_offices_id || existingGarment.branch_office_id || '',
-              garmentCondition: existingGarment.garment_condition || '',
-              physicalCondition: existingGarment.physical_condition || '',
+              garmentCondition: Array.isArray(existingGarment.garment_condition)
+                ? existingGarment.garment_condition
+                : (existingGarment.garment_condition ? [existingGarment.garment_condition] : []),
+              physicalCondition: Array.isArray(existingGarment.physical_condition)
+                ? existingGarment.physical_condition
+                : (existingGarment.physical_condition ? [existingGarment.physical_condition] : []),
               weight: existingGarment.weight ? String(existingGarment.weight) : '',
+              serviceType: existingGarment.service_type || '',
+              manufacturingDate: existingGarment.manufacturing_date || '',
               observations: existingGarment.observations || '',
             } : undefined}
             submitting={isCreating || isUpdating}
