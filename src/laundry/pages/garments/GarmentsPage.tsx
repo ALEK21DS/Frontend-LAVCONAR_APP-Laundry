@@ -79,8 +79,12 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
         colors: Array.isArray(selectedGarment.color) ? selectedGarment.color : (selectedGarment.color ? [selectedGarment.color] : []),
         garmentType: selectedGarment.garment_type || '',
         brand: selectedGarment.garment_brand || '',
-        garmentCondition: selectedGarment.garment_condition || '',
-        physicalCondition: selectedGarment.physical_condition || '',
+        garmentCondition: Array.isArray(selectedGarment.garment_condition) 
+          ? selectedGarment.garment_condition 
+          : (selectedGarment.garment_condition ? [selectedGarment.garment_condition] : []),
+        physicalCondition: Array.isArray(selectedGarment.physical_condition)
+          ? selectedGarment.physical_condition
+          : (selectedGarment.physical_condition ? [selectedGarment.physical_condition] : []),
         observations: selectedGarment.observations || '',
         weight: selectedGarment.weight?.toString() || '',
       });
@@ -366,10 +370,12 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
                       color: data.colors && data.colors.length > 0 ? data.colors : undefined,
                       garment_type: data.garmentType || undefined,
                       garment_brand: data.brand || undefined,
-                      garment_condition: data.garmentCondition || undefined,
-                      physical_condition: data.physicalCondition || undefined,
+                      garment_condition: data.garmentCondition && data.garmentCondition.length > 0 ? data.garmentCondition : undefined,
+                      physical_condition: data.physicalCondition && data.physicalCondition.length > 0 ? data.physicalCondition : undefined,
                       observations: data.observations || undefined,
                       weight: data.weight ? parseFloat(String(data.weight)) : undefined,
+                      service_type: data.serviceType || undefined,
+                      manufacturing_date: data.manufacturingDate || undefined,
                     }
                   });
                   console.log('✅ Prenda actualizada exitosamente');
@@ -403,12 +409,15 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
                 await createGarmentAsync({
                   rfid_code: finalRfidCode,
                   description: data.description,
-                  color: data.color,
+                  color: data.colors && data.colors.length > 0 ? data.colors : undefined,
                   garment_type: data.garmentType,
-                  brand: data.brand,
-                  physical_state: data.physicalState,
+                  garment_brand: data.brand,
+                  garment_condition: data.garmentCondition && data.garmentCondition.length > 0 ? data.garmentCondition : undefined,
+                  physical_condition: data.physicalCondition && data.physicalCondition.length > 0 ? data.physicalCondition : undefined,
                   observations: data.observations,
                   weight: data.weight,
+                  service_type: data.serviceType,
+                  manufacturing_date: data.manufacturingDate,
                 });
                 console.log('✅ Prenda creada exitosamente');
                 setFormOpen(false);
@@ -422,12 +431,14 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
                     await createGarmentAsync({
                       rfid_code: data.rfidCode || rfidCode,
                       description: data.description,
-                      color: data.color,
+                      color: data.colors && data.colors.length > 0 ? data.colors : undefined,
                       garment_type: data.garmentType,
-                      brand: data.brand,
-                      physical_state: data.physicalState,
+                      garment_brand: data.brand,
+                      physical_condition: data.physicalCondition,
                       observations: data.observations,
                       weight: data.weight,
+                      service_type: data.serviceType,
+                      manufacturing_date: data.manufacturingDate,
                     });
                     console.log('✅ Prenda creada exitosamente');
                     setFormOpen(false);
