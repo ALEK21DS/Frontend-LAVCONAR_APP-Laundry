@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { Input, Button, Card } from '@/components/common';
+import { Input, Button, Card, Dropdown } from '@/components/common';
 import { CreateClientDto } from '@/laundry/interfaces/clients/clients.interface';
 import { validateClientData } from '@/helpers/validators.helper';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { useBranchOffices } from '@/laundry/hooks/branch-offices';
+import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
 
 interface ClientFormProps {
   initialValues?: Partial<CreateClientDto>;
@@ -31,6 +32,16 @@ export const ClientForm: React.FC<ClientFormProps> = ({
   const currentBranch = sucursales.find(branch => branch.id === branchOfficeId);
   const branchOfficeName = currentBranch?.name || 'Sucursal no asignada';
   
+  // Obtener catálogo de tipos de servicio
+  const { data: serviceTypeCatalog } = useCatalogValuesByType('service_type', true, { forceFresh: true });
+  
+  const SERVICE_TYPE_OPTIONS = useMemo(() => {
+    return (serviceTypeCatalog?.data || [])
+      .filter(v => v.is_active)
+      .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+      .map(v => ({ label: v.label, value: v.code }));
+  }, [serviceTypeCatalog]);
+  
   const [formData, setFormData] = useState<CreateClientDto>({
     name: initialValues?.name ?? '',
     email: initialValues?.email ?? '',
@@ -38,6 +49,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
     phone: initialValues?.phone ?? '',
     address: initialValues?.address ?? '',
     acronym: initialValues?.acronym ?? '',
+    service_type: initialValues?.service_type ?? '',
     branch_office_id: initialValues?.branch_office_id || branchOfficeId,
   });
   
@@ -99,6 +111,13 @@ export const ClientForm: React.FC<ClientFormProps> = ({
           delete newErrors.acronym;
         }
         break;
+      case 'service_type':
+        if (!value.trim()) {
+          newErrors.service_type = 'El tipo de servicio es requerido';
+        } else {
+          delete newErrors.service_type;
+        }
+        break;
     }
     
     setErrors(newErrors);
@@ -137,6 +156,10 @@ export const ClientForm: React.FC<ClientFormProps> = ({
 
     if (!formData.acronym.trim()) {
       tempErrors.acronym = 'El acrónimo es requerido';
+    }
+
+    if (!formData.service_type.trim()) {
+      tempErrors.service_type = 'El tipo de servicio es requerido';
     }
 
     // Actualizar los errores
@@ -192,6 +215,18 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                 </View>
               </Card>
             </View>
+
+            <Dropdown
+              label="Tipo de Servicio *"
+              placeholder="Selecciona un tipo de servicio"
+              options={SERVICE_TYPE_OPTIONS}
+              value={formData.service_type}
+              onValueChange={value => {
+                setFormData({ ...formData, service_type: value });
+                validateField('service_type', value);
+              }}
+              error={errors.service_type}
+            />
 
             <Input
               label="Email *"
