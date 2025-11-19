@@ -5,6 +5,7 @@ import { useBranchOffices } from '@/laundry/hooks/branch-offices';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
 import IonIcon from 'react-native-vector-icons/Ionicons';
+import { ConditionSelectionModal } from './ConditionSelectionModal';
 
 // Paleta de colores (como en la web)
 const COLOR_SUGGESTIONS = [
@@ -100,10 +101,12 @@ interface GarmentFormProps {
     garmentType?: string;
     brand?: string;
     branchOfficeId?: string;
-    garmentCondition?: string;
-    physicalCondition?: string;
+    garmentCondition?: string[];
+    physicalCondition?: string[];
     observations: string;
     weight?: number;
+    serviceType?: string;
+    manufacturingDate?: string;
   }) => void;
   submitting?: boolean;
   initialValues?: {
@@ -113,10 +116,12 @@ interface GarmentFormProps {
     garmentType?: string;
     brand?: string;
     branchOfficeId?: string;
-    garmentCondition?: string;
-    physicalCondition?: string;
+    garmentCondition?: string | string[];
+    physicalCondition?: string | string[];
     weight?: string;
     observations?: string;
+    serviceType?: string;
+    manufacturingDate?: string;
   };
   // Opcionales para escaneo integrado desde la página padre
   onScan?: () => void;
@@ -139,6 +144,41 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
   
   // Obtener catálogo de colores para convertir códigos a labels
   const { data: colorCatalog } = useCatalogValuesByType('color', true, { forceFresh: true });
+  
+  // Obtener catálogo de tipos de servicio
+  const { data: serviceTypeCatalog } = useCatalogValuesByType('service_type', true, { forceFresh: true });
+  
+  // Obtener catálogos de condiciones para obtener labels
+  const { data: garmentConditionCatalog } = useCatalogValuesByType('garment_condition_catalog', true, { forceFresh: true });
+  const { data: physicalConditionCatalog } = useCatalogValuesByType('physical_condition_catalog', true, { forceFresh: true });
+
+  const SERVICE_TYPE_OPTIONS = useMemo(() => {
+    return (serviceTypeCatalog?.data || [])
+      .filter(v => v.is_active)
+      .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+      .map(v => ({ label: v.label, value: v.code }));
+  }, [serviceTypeCatalog]);
+
+  // Mapas de códigos a labels para condiciones
+  const garmentConditionCodeToLabel = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (garmentConditionCatalog?.data) {
+      garmentConditionCatalog.data.forEach(item => {
+        map[item.code] = item.label;
+      });
+    }
+    return map;
+  }, [garmentConditionCatalog]);
+
+  const physicalConditionCodeToLabel = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (physicalConditionCatalog?.data) {
+      physicalConditionCatalog.data.forEach(item => {
+        map[item.code] = item.label;
+      });
+    }
+    return map;
+  }, [physicalConditionCatalog]);
   
   // Mapa de códigos del catálogo a labels
   const colorCodeToLabel = React.useMemo(() => {
@@ -184,9 +224,89 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
   const [brand, setBrand] = useState(initialValues?.brand || '');
   const [description, setDescription] = useState(initialValues?.description || '');
   const [branchOfficeId, setBranchOfficeId] = useState(initialValues?.branchOfficeId || userBranchId);
-  const [garmentCondition, setGarmentCondition] = useState(initialValues?.garmentCondition || '');
-  const [physicalCondition, setPhysicalCondition] = useState(initialValues?.physicalCondition || '');
+  // Normalizar condiciones iniciales a arrays
+  const initialGarmentConditions = useMemo(() => {
+    if (!initialValues?.garmentCondition) return [];
+    if (Array.isArray(initialValues.garmentCondition)) {
+      return initialValues.garmentCondition.filter((c): c is string => typeof c === 'string' && c.trim() !== '');
+    }
+    if (typeof initialValues.garmentCondition === 'string' && initialValues.garmentCondition.trim() !== '') {
+      return [initialValues.garmentCondition];
+    }
+    return [];
+  }, [initialValues?.garmentCondition]);
+
+  const initialPhysicalConditions = useMemo(() => {
+    if (!initialValues?.physicalCondition) return [];
+    if (Array.isArray(initialValues.physicalCondition)) {
+      return initialValues.physicalCondition.filter((c): c is string => typeof c === 'string' && c.trim() !== '');
+    }
+    if (typeof initialValues.physicalCondition === 'string' && initialValues.physicalCondition.trim() !== '') {
+      return [initialValues.physicalCondition];
+    }
+    return [];
+  }, [initialValues?.physicalCondition]);
+
+  const [garmentCondition, setGarmentCondition] = useState<string[]>(initialGarmentConditions);
+  const [physicalCondition, setPhysicalCondition] = useState<string[]>(initialPhysicalConditions);
+  const [garmentConditionModalOpen, setGarmentConditionModalOpen] = useState(false);
+  const [physicalConditionModalOpen, setPhysicalConditionModalOpen] = useState(false);
   const [weight, setWeight] = useState(initialValues?.weight || '');
+  const [serviceType, setServiceType] = useState(initialValues?.serviceType || '');
+  
+  // Función para formatear automáticamente la fecha mientras se escribe (dd/mm/aaaa)
+  const formatDateInput = (input: string): string => {
+    // Remover todos los caracteres que no sean números
+    const numbersOnly = input.replace(/\D/g, '');
+    
+    // Limitar a 8 dígitos (dd/mm/aaaa = 8 dígitos)
+    const limited = numbersOnly.slice(0, 8);
+    
+    // Agregar slashes automáticamente
+    if (limited.length === 0) return '';
+    if (limited.length <= 2) return limited;
+    if (limited.length <= 4) return `${limited.slice(0, 2)}/${limited.slice(2)}`;
+    return `${limited.slice(0, 2)}/${limited.slice(2, 4)}/${limited.slice(4)}`;
+  };
+
+  // Funciones para convertir entre dd/mm/aaaa y YYYY-MM-DD
+  const convertDateToDisplay = (isoDate: string): string => {
+    if (!isoDate) return '';
+    // Si ya está en formato dd/mm/aaaa, devolverlo tal cual
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(isoDate)) return isoDate;
+    // Convertir de YYYY-MM-DD a dd/mm/aaaa
+    try {
+      const [year, month, day] = isoDate.split('-');
+      if (year && month && day) {
+        return `${day}/${month}/${year}`;
+      }
+    } catch (e) {
+      // Si hay error, devolver el valor original
+    }
+    return isoDate;
+  };
+
+  const convertDateToISO = (displayDate: string): string => {
+    if (!displayDate) return '';
+    // Si ya está en formato YYYY-MM-DD, devolverlo tal cual
+    if (/^\d{4}-\d{2}-\d{2}$/.test(displayDate)) return displayDate;
+    // Convertir de dd/mm/aaaa a YYYY-MM-DD
+    try {
+      const [day, month, year] = displayDate.split('/');
+      if (year && month && day) {
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+    } catch (e) {
+      // Si hay error, devolver vacío
+    }
+    return '';
+  };
+
+  const initialManufacturingDateDisplay = useMemo(() => {
+    return convertDateToDisplay(initialValues?.manufacturingDate || '');
+  }, [initialValues?.manufacturingDate]);
+
+  const [manufacturingDateDisplay, setManufacturingDateDisplay] = useState(initialManufacturingDateDisplay);
   const [observations, setObservations] = useState(initialValues?.observations || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const filteredColorSuggestions = useMemo(() => {
@@ -211,12 +331,14 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
       setBrand(initialValues.brand || '');
       setDescription(initialValues.description || '');
       setBranchOfficeId(initialValues.branchOfficeId || userBranchId);
-      setGarmentCondition(initialValues.garmentCondition || '');
-      setPhysicalCondition(initialValues.physicalCondition || '');
+      setGarmentCondition(initialGarmentConditions);
+      setPhysicalCondition(initialPhysicalConditions);
       setWeight(initialValues.weight || '');
+      setServiceType(initialValues.serviceType || '');
+      setManufacturingDateDisplay(convertDateToDisplay(initialValues.manufacturingDate || ''));
       setObservations(initialValues.observations || '');
     }
-  }, [initialValues, initialColors]);
+  }, [initialValues, initialColors, initialGarmentConditions, initialPhysicalConditions]);
 
   const currentBranch = sucursales.find(s => s.id === branchOfficeId);
   const branchOfficeName = currentBranch?.name || 'Sucursal no asignada';
@@ -254,6 +376,9 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
         return label;
       });
 
+      // Convertir fecha de fabricación de dd/mm/aaaa a YYYY-MM-DD antes de enviar
+      const manufacturingDateISO = manufacturingDateDisplay ? convertDateToISO(manufacturingDateDisplay) : undefined;
+
       onSubmit({ 
         rfidCode, 
         description, 
@@ -261,10 +386,12 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
         garmentType: garmentType || undefined,
         brand: brand || undefined,
         branchOfficeId: branchOfficeId || undefined,
-        garmentCondition: garmentCondition || undefined,
-        physicalCondition: physicalCondition || undefined,
+        garmentCondition: garmentCondition.length > 0 ? garmentCondition : undefined,
+        physicalCondition: physicalCondition.length > 0 ? physicalCondition : undefined,
         observations,
-        weight: weightValue
+        weight: weightValue,
+        serviceType: serviceType || undefined,
+        manufacturingDate: manufacturingDateISO || undefined
       });
       setIsSubmitting(false);
     } catch (error) {
@@ -306,6 +433,47 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
             icon="business-outline"
           />
         </View>
+
+        <View className="mb-4">
+          <Dropdown
+            label="Tipo de Servicio"
+            placeholder="Selecciona un tipo de servicio"
+            options={SERVICE_TYPE_OPTIONS}
+            value={serviceType}
+            onValueChange={(value) => {
+              setServiceType(value);
+              // Si cambia a un servicio que no es industrial, limpiar la fecha de fabricación
+              if (value !== 'INDUSTRIAL') {
+                setManufacturingDateDisplay('');
+              }
+            }}
+            icon="business-outline"
+          />
+        </View>
+
+        <View className="mb-4">
+          <GarmentTypeDropdown
+          value={garmentType}
+            onValueChange={setGarmentType}
+        />
+        </View>
+
+        <Input
+          label="Marca de Prenda"
+          placeholder="Ej: Nike, Adidas, etc."
+          value={brand}
+          onChangeText={setBrand}
+          icon="pricetag-outline"
+        />
+
+        <Input
+          label="Descripción *"
+          placeholder="Ej: Camisa de vestir"
+          value={description}
+          onChangeText={(t) => { setDescription(t); if (errors.description) setErrors(prev => ({ ...prev, description: undefined })); }}
+          icon="document-text-outline"
+          error={errors.description}
+        />
 
         <View className="mb-4">
           <Input
@@ -357,57 +525,126 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
           {/* Paleta removida para simplificar en móvil; usar autocompletado y chips */}
         </View>
 
+        {/* Peso y Fecha de Fabricación debajo de Color */}
+        {serviceType === 'INDUSTRIAL' ? (
+          <View className="mb-4 flex-row -mx-1">
+            <View className="flex-1 px-1">
+              <Input
+                label="Peso (lb)"
+                placeholder="Ej: 1.5"
+                value={weight}
+                onChangeText={(t) => { setWeight(t); if (errors.weight) setErrors(prev => ({ ...prev, weight: undefined })); }}
+                keyboardType="decimal-pad"
+                icon="scale-outline"
+                error={errors.weight}
+              />
+            </View>
+            <View className="flex-1 px-1">
+              <Input
+                label="Fecha de Fabricación"
+                placeholder="dd/mm/aaaa"
+                value={manufacturingDateDisplay}
+                onChangeText={(text) => setManufacturingDateDisplay(formatDateInput(text))}
+                keyboardType="numeric"
+                icon="calendar-outline"
+              />
+            </View>
+          </View>
+        ) : (
+          <View className="mb-4">
+            <Input
+              label="Peso (lb)"
+              placeholder="Ej: 1.5"
+              value={weight}
+              onChangeText={(t) => { setWeight(t); if (errors.weight) setErrors(prev => ({ ...prev, weight: undefined })); }}
+              keyboardType="decimal-pad"
+              icon="scale-outline"
+              error={errors.weight}
+            />
+          </View>
+        )}
+
+        {/* Condición de la Prenda - Botón que abre modal */}
         <View className="mb-4">
-          <GarmentTypeDropdown
-          value={garmentType}
-            onValueChange={setGarmentType}
-        />
+          <Text className="text-sm font-semibold text-gray-700 mb-2">Condición de la Prenda</Text>
+          <TouchableOpacity
+            onPress={() => setGarmentConditionModalOpen(true)}
+            className="bg-white border border-gray-300 rounded-lg px-4 py-3 flex-row items-center justify-between"
+          >
+            <View className="flex-1 flex-row items-center">
+              <IonIcon name="create-outline" size={20} color="#6B7280" style={{ marginRight: 8 }} />
+              <View className="flex-1">
+                {garmentCondition.length > 0 ? (
+                  <Text className="text-gray-900 text-base">
+                    {garmentCondition.length} {garmentCondition.length === 1 ? 'opción seleccionada' : 'opciones seleccionadas'}
+                  </Text>
+                ) : (
+                  <Text className="text-gray-400 text-base">Seleccionar condiciones...</Text>
+                )}
+              </View>
+            </View>
+            <IonIcon name="chevron-forward-outline" size={20} color="#6B7280" />
+          </TouchableOpacity>
+          {garmentCondition.length > 0 && (
+            <View className="mt-2 flex-row flex-wrap">
+              {garmentCondition.slice(0, 3).map((code) => (
+                <View key={code} className="mr-2 mb-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full">
+                  <Text className="text-xs text-blue-800">
+                    {garmentConditionCodeToLabel[code] || code}
+                  </Text>
+                </View>
+              ))}
+              {garmentCondition.length > 3 && (
+                <View className="mr-2 mb-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full">
+                  <Text className="text-xs text-blue-800">
+                    +{garmentCondition.length - 3} más
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
         </View>
 
-        <Input
-          label="Marca de Prenda"
-          placeholder="Ej: Nike, Adidas, etc."
-          value={brand}
-          onChangeText={setBrand}
-          icon="pricetag-outline"
-        />
-
-        <Input
-          label="Descripción *"
-          placeholder="Ej: Camisa de vestir"
-          value={description}
-          onChangeText={(t) => { setDescription(t); if (errors.description) setErrors(prev => ({ ...prev, description: undefined })); }}
-          icon="document-text-outline"
-          error={errors.description}
-        />
-
-        <Input
-          label="Condición de la Prenda"
-          placeholder="Ej: Buen estado general..."
-          value={garmentCondition}
-          onChangeText={setGarmentCondition}
-          multiline
-          icon="create-outline"
-        />
-
-        <Input
-          label="Condición Física"
-          placeholder="Ej: Sin manchas, sin roturas..."
-          value={physicalCondition}
-          onChangeText={setPhysicalCondition}
-          multiline
-          icon="pulse-outline"
-        />
-
-        <Input
-          label="Peso (kg)"
-          placeholder="Ej: 0.5"
-          value={weight}
-          onChangeText={(t) => { setWeight(t); if (errors.weight) setErrors(prev => ({ ...prev, weight: undefined })); }}
-          keyboardType="decimal-pad"
-          icon="scale-outline"
-          error={errors.weight}
-        />
+        {/* Condición Física - Botón que abre modal */}
+        <View className="mb-4">
+          <Text className="text-sm font-semibold text-gray-700 mb-2">Condición Física</Text>
+          <TouchableOpacity
+            onPress={() => setPhysicalConditionModalOpen(true)}
+            className="bg-white border border-gray-300 rounded-lg px-4 py-3 flex-row items-center justify-between"
+          >
+            <View className="flex-1 flex-row items-center">
+              <IonIcon name="pulse-outline" size={20} color="#6B7280" style={{ marginRight: 8 }} />
+              <View className="flex-1">
+                {physicalCondition.length > 0 ? (
+                  <Text className="text-gray-900 text-base">
+                    {physicalCondition.length} {physicalCondition.length === 1 ? 'opción seleccionada' : 'opciones seleccionadas'}
+                  </Text>
+                ) : (
+                  <Text className="text-gray-400 text-base">Seleccionar condiciones...</Text>
+                )}
+              </View>
+            </View>
+            <IonIcon name="chevron-forward-outline" size={20} color="#6B7280" />
+          </TouchableOpacity>
+          {physicalCondition.length > 0 && (
+            <View className="mt-2 flex-row flex-wrap">
+              {physicalCondition.slice(0, 3).map((code) => (
+                <View key={code} className="mr-2 mb-2 px-3 py-1 bg-green-50 border border-green-200 rounded-full">
+                  <Text className="text-xs text-green-800">
+                    {physicalConditionCodeToLabel[code] || code}
+                  </Text>
+                </View>
+              ))}
+              {physicalCondition.length > 3 && (
+                <View className="mr-2 mb-2 px-3 py-1 bg-green-50 border border-green-200 rounded-full">
+                  <Text className="text-xs text-green-800">
+                    +{physicalCondition.length - 3} más
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
 
         <Input
           label="Observaciones"
@@ -428,6 +665,25 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
           style={{ backgroundColor: initialValues ? '#F59E0B' : '#0b1f36' }}
         />
       </ScrollView>
+
+      {/* Modales de selección de condiciones */}
+      <ConditionSelectionModal
+        visible={garmentConditionModalOpen}
+        onClose={() => setGarmentConditionModalOpen(false)}
+        onConfirm={(selectedCodes) => setGarmentCondition(selectedCodes)}
+        catalogType="garment_condition_catalog"
+        title="Seleccionar Condición de la Prenda"
+        initialSelected={garmentCondition}
+      />
+
+      <ConditionSelectionModal
+        visible={physicalConditionModalOpen}
+        onClose={() => setPhysicalConditionModalOpen(false)}
+        onConfirm={(selectedCodes) => setPhysicalCondition(selectedCodes)}
+        catalogType="physical_condition_catalog"
+        title="Seleccionar Condición Física"
+        initialSelected={physicalCondition}
+      />
     </KeyboardAvoidingView>
   );
 };

@@ -6,6 +6,7 @@ export interface Client {
   phone?: string;
   address?: string;
   acronym?: string;
+  service_type?: string;
   branch_office_id: string;
   branch_office_name?: string;
   status: string;
@@ -21,6 +22,7 @@ export interface CreateClientDto {
   phone: string;
   address: string;
   acronym: string;
+  service_type: string;
   branch_office_id?: string; // Se asigna automáticamente desde el usuario autenticado
   // is_active se maneja por defecto en el backend
 }
@@ -32,6 +34,7 @@ export interface UpdateClientDto {
   phone?: string;
   address?: string;
   acronym?: string;
+  service_type?: string;
   is_active?: boolean;
 }
 
