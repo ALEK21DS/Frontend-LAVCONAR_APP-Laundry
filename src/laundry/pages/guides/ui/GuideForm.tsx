@@ -229,7 +229,10 @@ export const GuideForm: React.FC<GuideFormProps> = ({
     if (guideToEdit) {
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
       
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 =======
@@ -283,6 +286,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       }
       setVehicleUnitNumber(guideToEdit.vehicle_unit_number || '');
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     }
   }, [guideToEdit, onChangeBranchOffice]);
 
@@ -297,6 +301,8 @@ export const GuideForm: React.FC<GuideFormProps> = ({
 >>>>>>> Stashed changes
     }
 =======
+=======
+>>>>>>> Stashed changes
     }
   }, [guideToEdit, onChangeBranchOffice]);
 
@@ -309,6 +315,9 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         onChangeClient(guideToEdit.client_id);
       }
     }
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
   }, [guideToEdit, filteredClientOptions, onChangeClient]);
 
@@ -522,10 +531,13 @@ export const GuideForm: React.FC<GuideFormProps> = ({
 
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
         <View className="flex-row -mx-1 mt-2">
           <View className="flex-1 px-1">
             <Input label="Total Prendas" value={String(totalGarments)} editable={false} />
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
         {showScanButton && !guideToEdit && (
@@ -564,6 +576,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         />
       </View>
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
       {showScanButton && (
@@ -655,6 +668,8 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         <View className="flex-row -mx-1">
           <View className="flex-1 px-1">
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
         {/* Detalles de Servicio (solo servicio personal) */}
