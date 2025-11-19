@@ -4,6 +4,7 @@ import { Button, Input, Card, Dropdown } from '@/components/common';
 import { useBranchOffices } from '@/laundry/hooks/branch-offices';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
+import { isSuperAdminUser } from '@/helpers/user.helper';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 
 // Paleta de colores (como en la web)
@@ -137,6 +138,7 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
 }) => {
   const { sucursales } = useBranchOffices();
   const { user } = useAuthStore();
+  const isSuperAdmin = isSuperAdminUser(user);
   const userBranchId = user?.branch_office_id || (user as any)?.sucursalId || '';
   const branchOptions = sucursales.map(s => ({ label: s.name, value: s.id }));
   const [colorInput, setColorInput] = useState('');
@@ -469,15 +471,31 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
           )}
         </View>
 
-        <View className="mb-4">
-          <Input
-            label="Sucursal"
-            value={branchOfficeName}
-            editable={false}
-            className="bg-gray-50"
-            icon="business-outline"
-          />
-        </View>
+        {/* Campo de Sucursal - Seleccionable para superadmin, solo lectura para admin */}
+        {isSuperAdmin ? (
+          <View className="mb-4">
+            <Dropdown
+              label="Sucursal *"
+              placeholder="Selecciona una sucursal"
+              options={branchOptions}
+              value={branchOfficeId || ''}
+              onValueChange={(value) => {
+                setBranchOfficeId(value);
+              }}
+              icon="business-outline"
+            />
+          </View>
+        ) : (
+          <View className="mb-4">
+            <Input
+              label="Sucursal"
+              value={branchOfficeName}
+              editable={false}
+              className="bg-gray-50"
+              icon="business-outline"
+            />
+          </View>
+        )}
 
         <View className="mb-4">
           <Dropdown

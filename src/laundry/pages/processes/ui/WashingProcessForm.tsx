@@ -168,21 +168,20 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
   }, [garmentsData]);
 
   // Máquinas: mostrar todas las máquinas disponibles sin filtrar por tipo
+  // Para SUPERADMIN, si branchOfficeId está vacío, no pasar el parámetro para obtener todas las máquinas
   const { data: machines, isLoading: isLoadingMachines } = useMachines(
-    branchOfficeId, 
-    undefined // No filtrar por tipo, mostrar todas las máquinas
+    branchOfficeId && branchOfficeId.trim() !== '' ? branchOfficeId : undefined,
+    undefined,
+    true // Siempre habilitado, el hook manejará la validación internamente
   );
 
   // Estado del formulario
+  // Siempre usar fecha/hora actual al abrir el formulario (tanto para crear como para editar)
   const nowFormatted = formatDateForInput(new Date());
   const [formData, setFormData] = useState({
     machine_code: initialProcess?.machine_code || '',
-    start_time: initialProcess?.start_time
-      ? formatDateForInput(initialProcess.start_time)
-      : nowFormatted,
-    end_time: initialProcess?.end_time
-      ? formatDateForInput(initialProcess.end_time)
-      : nowFormatted,
+    start_time: nowFormatted, // Siempre usar fecha/hora actual
+    end_time: nowFormatted, // Siempre usar fecha/hora actual
     load_weight: initialProcess?.load_weight !== undefined && initialProcess.load_weight !== null ? formatWeight(initialProcess.load_weight) : '',
     garment_quantity: toStringOrEmpty(initialProcess?.garment_quantity),
     special_treatment: initialProcess?.special_treatment || '',
@@ -197,6 +196,18 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [guideDetails, setGuideDetails] = useState<any | null>(null);
   const [isLoadingGuideDetails, setIsLoadingGuideDetails] = useState(false);
+
+  // Actualizar fechas a fecha/hora actual cada vez que se abre el formulario (tanto para crear como para editar)
+  useEffect(() => {
+    if (visible) {
+      const currentDateTime = formatDateForInput(new Date());
+      setFormData(prev => ({
+        ...prev,
+        start_time: currentDateTime,
+        end_time: currentDateTime,
+      }));
+    }
+  }, [visible]);
 
   const renderBooleanToggle = (
     label: string,
@@ -654,7 +665,7 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
           {/* Peso de la carga */}
           <View className="mb-4">
             <Input
-              label="Peso de la carga (kg)"
+              label="Peso de la carga (lb)"
               value={formData.load_weight}
               onChangeText={(text) => setFormData(prev => ({ ...prev, load_weight: text }))}
               placeholder="0.00"

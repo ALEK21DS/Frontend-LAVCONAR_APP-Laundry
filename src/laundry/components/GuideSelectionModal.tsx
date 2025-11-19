@@ -13,7 +13,9 @@ interface Guide {
   client?: {
     id?: string;
     name?: string;
+    acronym?: string;
   };
+  client_acronym?: string;
   status: string;
   created_at: string;
   total_garments?: number;
@@ -81,6 +83,12 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
     return colors[status] || '#6B7280';
   };
 
+  const getClientLabel = (guide: Guide) => {
+    const name = guide.client_name || guide.client?.name || 'Sin cliente';
+    const acronym = guide.client_acronym || guide.client?.acronym;
+    return acronym ? `${name} (${acronym})` : name;
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const day = date.getDate().toString().padStart(2, '0');
@@ -106,7 +114,7 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
               </Text>
             </View>
             <Text className="text-sm text-gray-600 mb-1">
-              Fecha: {formatDate(item.created_at)}
+              Cliente: {getClientLabel(item)}
             </Text>
             <View className="flex-row items-center justify-between">
               <Text className="text-sm text-gray-500">

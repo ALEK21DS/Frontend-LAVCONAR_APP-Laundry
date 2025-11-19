@@ -20,6 +20,8 @@ interface UseClientsParams {
   limit?: number;
   search?: string;
   status?: 'active' | 'inactive';
+  branch_office_id?: string;
+  only_active_status?: boolean; // Para filtrar solo clientes con status ACTIVE en selectores
 }
 
 /**
@@ -29,7 +31,9 @@ export const useClients = ({
   page = 1, 
   limit = 10,
   search,
-  status 
+  status,
+  branch_office_id,
+  only_active_status 
 }: UseClientsParams = {}) => {
   const {
     data,
@@ -37,16 +41,22 @@ export const useClients = ({
     error,
     refetch,
   } = useQuery({
-    queryKey: ['clients', page, limit, search, status],
+    queryKey: ['clients', page, limit, search, status, branch_office_id, only_active_status],
     queryFn: async (): Promise<BackendResponse> => {
-      const response = await clientsApi.get<BackendResponse>('/', {
-        params: { 
-          page, 
-          limit,
-          ...(search && { search }),
-          ...(status && { status }),
-        }
-      });
+      const params: any = { 
+        page, 
+        limit,
+      };
+      
+      if (search) params.search = search;
+      if (status) params.status = status;
+      // Pasar branch_office_id solo si está definido y no es una cadena vacía
+      if (branch_office_id && branch_office_id.trim() !== '') {
+        params.branch_office_id = branch_office_id.trim();
+      }
+      if (only_active_status) params.only_active_status = true;
+      
+      const response = await clientsApi.get<BackendResponse>('/', { params });
       return response.data;
     },
     staleTime: 1000 * 60 * 5, // 5 minutos

@@ -43,6 +43,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
   const fullName = [user?.nombre, user?.apellido].filter(Boolean).join(' ').trim();
   const displayName = fullName || user?.username || 'Usuario';
   const userEmail = user?.email || 'Sin correo';
+  // Obtener el rol del usuario tal como viene del backend (tomar el primer rol si hay varios)
+  const userRole = user?.roles && user.roles.length > 0 
+    ? user.roles[0]
+    : 'Sin rol';
 
   const [serviceTypeModalOpen, setServiceTypeModalOpen] = useState(false);
   const [processTypeModalOpen, setProcessTypeModalOpen] = useState(false);
@@ -141,6 +145,33 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
 
   // Si no hay servicio seleccionado, no mostrar RFID scans
   const finalRfidScans = !targetServiceType ? [] : rfidScans;
+
+  const getGuideClientMeta = useCallback(
+    (scan: any) => {
+      const guideFromList = filteredGuides.find(g => g.id === scan.guide_id);
+      const clientName =
+        scan.guide?.client_name ||
+        scan.guide?.client?.name ||
+        guideFromList?.client_name ||
+        guideFromList?.client?.name ||
+        'Sin cliente';
+      const clientAcronym =
+        scan.guide?.client?.acronym ||
+        guideFromList?.client_acronym ||
+        guideFromList?.client?.acronym;
+      const clientObj =
+        scan.guide?.client ||
+        (guideFromList
+          ? {
+              id: guideFromList.client_id,
+              name: guideFromList.client_name,
+              acronym: guideFromList.client_acronym,
+            }
+          : undefined);
+      return { clientName, clientAcronym, clientObj };
+    },
+    [filteredGuides]
+  );
 
   const handleNavigate = (route: MainLayoutProps['activeTab'], params?: any) => {
     onNavigate(route, params);
@@ -443,29 +474,41 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
         onSelectGuide={handleRfidScanSelect}
         processType={selectedProcessType}
         guides={finalRfidScans.map((scan: any) => {
-          // Ahora scan_type es el mismo que el proceso (1:1 con el catálogo)
           const processStatus = scan.scan_type;
+          const { clientName, clientAcronym, clientObj } = getGuideClientMeta(scan);
           return ({
-          id: scan.id,
-          guide_number: scan.guide?.guide_number || scan.guide_number || 'Sin número',
-          client_name: scan.guide?.client_name || scan.guide?.client?.name || 'Sin cliente',
-          total_garments: scan.scanned_quantity || 0,
-          status: processStatus,
-          location: scan.location,
-          created_at: scan.created_at,
-        })})}
+            id: scan.id,
+            guide_number: scan.guide?.guide_number || scan.guide_number || 'Sin número',
+            client_name: clientName,
+            client_acronym: clientAcronym,
+            client: clientObj,
+            total_garments: scan.scanned_quantity || 0,
+            status: processStatus,
+            location: scan.location,
+            created_at: scan.created_at,
+          });
+        })}
         serviceType={selectedServiceType}
         isLoading={isLoadingScans || isLoadingGuides}
       />
 
       {/* Modal de Form de Proceso (Lavado, Secado, Planchado, Doblado, etc.) */}
-      {selectedGuideForProcess && (
-        <WashingProcessForm
-          visible={washingProcessFormOpen}
-          guideId={selectedGuideForProcess.id}
-          guideNumber={selectedGuideForProcess.guide_number}
-          branchOfficeId={branchOfficeId}
-          branchOfficeName={branchOfficeName}
+      {selectedGuideForProcess && (() => {
+        // Obtener la sucursal de la guía (prioridad: guide.branch_office_id > rfidScan.branch_offices_id > branchOfficeId del usuario)
+        const guideBranchOfficeId = selectedGuideForProcess.rfidScan?.guide?.branch_office_id 
+          || selectedGuideForProcess.rfidScan?.branch_offices_id 
+          || selectedGuideForProcess.guide?.branch_office_id
+          || branchOfficeId;
+        const guideBranch = sucursales.find(branch => branch.id === guideBranchOfficeId);
+        const guideBranchOfficeName = guideBranch?.name || branchOfficeName;
+        
+        return (
+          <WashingProcessForm
+            visible={washingProcessFormOpen}
+            guideId={selectedGuideForProcess.id}
+            guideNumber={selectedGuideForProcess.guide_number}
+            branchOfficeId={guideBranchOfficeId}
+            branchOfficeName={guideBranchOfficeName}
           processType={selectedProcessType}
           rfidScanId={selectedGuideForProcess.rfidScanId}
           rfidScan={selectedGuideForProcess.rfidScan}
@@ -482,8 +525,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
             setSelectedGuideForProcess(null);
             setGuideSelectionModalOpen(true);
           }}
-      />
-      )}
+          />
+        );
+      })()}
 
       <Modal
         visible={userInfoModalOpen}
@@ -514,6 +558,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
                 <View className="px-4 py-4">
                   <Text className="text-xs uppercase text-gray-500 mb-1">Correo</Text>
                   <Text className="text-base text-gray-900 font-semibold">{userEmail}</Text>
+                </View>
+                <View className="px-4 py-4">
+                  <Text className="text-xs uppercase text-gray-500 mb-1">Rol</Text>
+                  <Text className="text-base text-gray-900 font-semibold">{userRole}</Text>
                 </View>
                 <View className="px-4 py-4">
                   <Text className="text-xs uppercase text-gray-500 mb-1">Sucursal</Text>
