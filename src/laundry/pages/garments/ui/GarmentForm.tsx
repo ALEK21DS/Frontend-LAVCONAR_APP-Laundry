@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, ScrollView, Alert, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { Button, Input, Card, Dropdown } from '@/components/common';
 import { useBranchOffices } from '@/laundry/hooks/branch-offices';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
 import IonIcon from 'react-native-vector-icons/Ionicons';
-import { ConditionSelectionModal } from './ConditionSelectionModal';
 
 // Paleta de colores (como en la web)
 const COLOR_SUGGESTIONS = [
@@ -149,8 +148,8 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
   const { data: serviceTypeCatalog } = useCatalogValuesByType('service_type', true, { forceFresh: true });
   
   // Obtener catálogos de condiciones para obtener labels
-  const { data: garmentConditionCatalog } = useCatalogValuesByType('garment_condition_catalog', true, { forceFresh: true });
-  const { data: physicalConditionCatalog } = useCatalogValuesByType('physical_condition_catalog', true, { forceFresh: true });
+  const { data: garmentConditionCatalog, isLoading: isLoadingGarmentConditions, error: garmentConditionError } = useCatalogValuesByType('garment_condition_catalog', true, { forceFresh: true });
+  const { data: physicalConditionCatalog, isLoading: isLoadingPhysicalConditions, error: physicalConditionError } = useCatalogValuesByType('physical_condition_catalog', true, { forceFresh: true });
 
   const SERVICE_TYPE_OPTIONS = useMemo(() => {
     return (serviceTypeCatalog?.data || [])
@@ -179,6 +178,40 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
     }
     return map;
   }, [physicalConditionCatalog]);
+
+  const groupCatalogValues = useCallback((catalogData: any) => {
+    if (!catalogData?.data || !Array.isArray(catalogData.data)) return [];
+    const groups: Record<string, any[]> = {};
+    catalogData.data
+      .filter((value: any) => value.is_active !== false)
+      .forEach((value: any) => {
+        const rawCategory =
+          value.metadata?.category_label ||
+          value.metadata?.category_name ||
+          value.metadata?.category ||
+          value.metadata?.category_group ||
+          value.metadata?.section ||
+          'General';
+        const formattedCategory = String(rawCategory || 'General').trim().toUpperCase();
+        if (!groups[formattedCategory]) {
+          groups[formattedCategory] = [];
+        }
+        groups[formattedCategory].push(value);
+      });
+
+    return Object.entries(groups).map(([category, values]) => ({
+      category,
+      values: (values as any[]).sort((a, b) => (a.display_order || 0) - (b.display_order || 0)),
+    }));
+  }, []);
+
+  const groupedGarmentConditionOptions = useMemo(() => {
+    return groupCatalogValues(garmentConditionCatalog);
+  }, [garmentConditionCatalog, groupCatalogValues]);
+
+  const groupedPhysicalConditionOptions = useMemo(() => {
+    return groupCatalogValues(physicalConditionCatalog);
+  }, [physicalConditionCatalog, groupCatalogValues]);
   
   // Mapa de códigos del catálogo a labels
   const colorCodeToLabel = React.useMemo(() => {
@@ -249,8 +282,8 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
 
   const [garmentCondition, setGarmentCondition] = useState<string[]>(initialGarmentConditions);
   const [physicalCondition, setPhysicalCondition] = useState<string[]>(initialPhysicalConditions);
-  const [garmentConditionModalOpen, setGarmentConditionModalOpen] = useState(false);
-  const [physicalConditionModalOpen, setPhysicalConditionModalOpen] = useState(false);
+  const [showGarmentConditionList, setShowGarmentConditionList] = useState(false);
+  const [showPhysicalConditionList, setShowPhysicalConditionList] = useState(false);
   const [weight, setWeight] = useState(initialValues?.weight || '');
   const [serviceType, setServiceType] = useState(initialValues?.serviceType || '');
   
@@ -321,6 +354,18 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
     branchOfficeId?: string;
     weight?: string;
   }>({});
+
+  const toggleGarmentConditionSelection = (code: string) => {
+    setGarmentCondition(prev =>
+      prev.includes(code) ? prev.filter(item => item !== code) : [...prev, code]
+    );
+  };
+
+  const togglePhysicalConditionSelection = (code: string) => {
+    setPhysicalCondition(prev =>
+      prev.includes(code) ? prev.filter(item => item !== code) : [...prev, code]
+    );
+  };
 
   // Actualizar campos si cambian los valores iniciales
   useEffect(() => {
@@ -564,11 +609,11 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
           </View>
         )}
 
-        {/* Condición de la Prenda - Botón que abre modal */}
+        {/* Condición de la Prenda */}
         <View className="mb-4">
           <Text className="text-sm font-semibold text-gray-700 mb-2">Condición de la Prenda</Text>
           <TouchableOpacity
-            onPress={() => setGarmentConditionModalOpen(true)}
+            onPress={() => setShowGarmentConditionList(prev => !prev)}
             className="bg-white border border-gray-300 rounded-lg px-4 py-3 flex-row items-center justify-between"
           >
             <View className="flex-1 flex-row items-center">
@@ -583,7 +628,11 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
                 )}
               </View>
             </View>
-            <IonIcon name="chevron-forward-outline" size={20} color="#6B7280" />
+            <IonIcon
+              name={showGarmentConditionList ? 'chevron-up-outline' : 'chevron-down-outline'}
+              size={20}
+              color="#6B7280"
+            />
           </TouchableOpacity>
           {garmentCondition.length > 0 && (
             <View className="mt-2 flex-row flex-wrap">
@@ -603,13 +652,59 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
               )}
             </View>
           )}
+          {showGarmentConditionList && (
+            <View className="mt-3 bg-white border border-gray-200 rounded-2xl p-3">
+              {isLoadingGarmentConditions ? (
+                <View className="py-6 items-center">
+                  <Text className="text-gray-500 text-sm">Cargando opciones...</Text>
+                </View>
+              ) : garmentConditionError ? (
+                <View className="py-6 items-center">
+                  <IonIcon name="alert-circle-outline" size={24} color="#EF4444" />
+                  <Text className="text-sm text-red-500 mt-2 text-center">No se pudieron cargar las condiciones.</Text>
+                </View>
+              ) : groupedGarmentConditionOptions.length === 0 ? (
+                <View className="py-6 items-center">
+                  <IonIcon name="list-outline" size={24} color="#9CA3AF" />
+                  <Text className="text-sm text-gray-500 mt-2 text-center">Sin valores disponibles.</Text>
+                </View>
+              ) : (
+                groupedGarmentConditionOptions.map(section => (
+                  <View key={section.category} className="mb-3">
+                    <Text className="text-xs font-semibold text-gray-500 mb-1 uppercase">{section.category}</Text>
+                    {section.values.map((value: any) => {
+                      const isSelected = garmentCondition.includes(value.code);
+                      return (
+                        <TouchableOpacity
+                          key={value.code}
+                          className="flex-row items-center py-2"
+                          onPress={() => toggleGarmentConditionSelection(value.code)}
+                        >
+                          <View
+                            className={`w-5 h-5 rounded-full border-2 mr-3 items-center justify-center ${
+                              isSelected ? 'bg-[#8EB021] border-[#8EB021]' : 'border-gray-300'
+                            }`}
+                          >
+                            {isSelected && <IonIcon name="checkmark" size={14} color="#ffffff" />}
+                          </View>
+                          <Text className={`text-sm ${isSelected ? 'text-[#0b1f36] font-semibold' : 'text-gray-700'}`}>
+                            {value.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ))
+              )}
+            </View>
+          )}
         </View>
 
-        {/* Condición Física - Botón que abre modal */}
+        {/* Condición Física */}
         <View className="mb-4">
           <Text className="text-sm font-semibold text-gray-700 mb-2">Condición Física</Text>
           <TouchableOpacity
-            onPress={() => setPhysicalConditionModalOpen(true)}
+            onPress={() => setShowPhysicalConditionList(prev => !prev)}
             className="bg-white border border-gray-300 rounded-lg px-4 py-3 flex-row items-center justify-between"
           >
             <View className="flex-1 flex-row items-center">
@@ -624,7 +719,11 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
                 )}
               </View>
             </View>
-            <IonIcon name="chevron-forward-outline" size={20} color="#6B7280" />
+            <IonIcon
+              name={showPhysicalConditionList ? 'chevron-up-outline' : 'chevron-down-outline'}
+              size={20}
+              color="#6B7280"
+            />
           </TouchableOpacity>
           {physicalCondition.length > 0 && (
             <View className="mt-2 flex-row flex-wrap">
@@ -641,6 +740,52 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
                     +{physicalCondition.length - 3} más
                   </Text>
                 </View>
+              )}
+            </View>
+          )}
+          {showPhysicalConditionList && (
+            <View className="mt-3 bg-white border border-gray-200 rounded-2xl p-3">
+              {isLoadingPhysicalConditions ? (
+                <View className="py-6 items-center">
+                  <Text className="text-gray-500 text-sm">Cargando opciones...</Text>
+                </View>
+              ) : physicalConditionError ? (
+                <View className="py-6 items-center">
+                  <IonIcon name="alert-circle-outline" size={24} color="#EF4444" />
+                  <Text className="text-sm text-red-500 mt-2 text-center">No se pudieron cargar las condiciones.</Text>
+                </View>
+              ) : groupedPhysicalConditionOptions.length === 0 ? (
+                <View className="py-6 items-center">
+                  <IonIcon name="list-outline" size={24} color="#9CA3AF" />
+                  <Text className="text-sm text-gray-500 mt-2 text-center">Sin valores disponibles.</Text>
+                </View>
+              ) : (
+                groupedPhysicalConditionOptions.map(section => (
+                  <View key={section.category} className="mb-3">
+                    <Text className="text-xs font-semibold text-gray-500 mb-1 uppercase">{section.category}</Text>
+                    {section.values.map((value: any) => {
+                      const isSelected = physicalCondition.includes(value.code);
+                      return (
+                        <TouchableOpacity
+                          key={value.code}
+                          className="flex-row items-center py-2"
+                          onPress={() => togglePhysicalConditionSelection(value.code)}
+                        >
+                          <View
+                            className={`w-5 h-5 rounded-full border-2 mr-3 items-center justify-center ${
+                              isSelected ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300'
+                            }`}
+                          >
+                            {isSelected && <IonIcon name="checkmark" size={14} color="#ffffff" />}
+                          </View>
+                          <Text className={`text-sm ${isSelected ? 'text-emerald-700 font-semibold' : 'text-gray-700'}`}>
+                            {value.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ))
               )}
             </View>
           )}
@@ -666,24 +811,6 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
         />
       </ScrollView>
 
-      {/* Modales de selección de condiciones */}
-      <ConditionSelectionModal
-        visible={garmentConditionModalOpen}
-        onClose={() => setGarmentConditionModalOpen(false)}
-        onConfirm={(selectedCodes) => setGarmentCondition(selectedCodes)}
-        catalogType="garment_condition_catalog"
-        title="Seleccionar Condición de la Prenda"
-        initialSelected={garmentCondition}
-      />
-
-      <ConditionSelectionModal
-        visible={physicalConditionModalOpen}
-        onClose={() => setPhysicalConditionModalOpen(false)}
-        onConfirm={(selectedCodes) => setPhysicalCondition(selectedCodes)}
-        catalogType="physical_condition_catalog"
-        title="Seleccionar Condición Física"
-        initialSelected={physicalCondition}
-      />
     </KeyboardAvoidingView>
   );
 };
