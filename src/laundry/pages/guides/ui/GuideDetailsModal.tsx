@@ -8,6 +8,8 @@ import { usePrintGuide } from '@/laundry/hooks/guides';
 import { useCreateAuthorizationRequest, useGetAuthorizationById } from '@/laundry/hooks/authorizations';
 import { useCatalogLabelMap } from '@/laundry/hooks';
 import { useDeleteGuide } from '@/laundry/hooks/guides/guide/useDeleteGuide';
+import { useAuthStore } from '@/auth/store/auth.store';
+import { isSuperAdminUser } from '@/helpers/user.helper';
 
 interface GuideDetailsModalProps {
   visible: boolean;
@@ -31,6 +33,10 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
   
   // Hook para exportar PDF
   const { downloadGuidePDF, isPrinting } = usePrintGuide();
+  
+  // Verificar si el usuario es superadmin
+  const { user } = useAuthStore();
+  const isSuperAdmin = isSuperAdminUser(user);
   
   // Hook para crear solicitud de autorización
   const { createAuthorizationRequestAsync, isCreating } = useCreateAuthorizationRequest();
@@ -98,12 +104,25 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
   if (!guide) return null;
 
   const handleEditRequest = () => {
+    // Si es superadmin, ejecutar directamente sin solicitar autorización
+    if (isSuperAdmin) {
+      onClose();
+      onEdit();
+      return;
+    }
+    // Si no es superadmin, solicitar autorización
     setAuthAction('EDIT');
     setDescription('');
     setAuthModalVisible(true);
   };
 
   const handleDeleteRequest = () => {
+    // Si es superadmin, abrir directamente el modal de confirmación de eliminación
+    if (isSuperAdmin) {
+      setDeleteConfirmVisible(true);
+      return;
+    }
+    // Si no es superadmin, solicitar autorización
     setAuthAction('DELETE');
     setDescription('');
     setAuthModalVisible(true);

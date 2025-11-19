@@ -227,7 +227,10 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   // Cargar datos de la guía en modo edición
   useEffect(() => {
     if (guideToEdit) {
+<<<<<<< Updated upstream
       
+=======
+>>>>>>> Stashed changes
       // Convertir fecha ISO a formato dd/mm/yyyy
       const formatISOToDisplay = (isoDate: string): string => {
         if (!isoDate) return '';
@@ -237,6 +240,15 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         const year = date.getFullYear();
         return `${day}/${month}/${year}`;
       };
+
+      // Cargar sucursal primero para que se carguen los clientes correctos
+      if (guideToEdit.branch_office_id) {
+        setSelectedBranchOfficeId(guideToEdit.branch_office_id);
+        // Notificar cambio de sucursal a GuidesPage
+        if (onChangeBranchOffice) {
+          onChangeBranchOffice(guideToEdit.branch_office_id);
+        }
+      }
 
       setServiceType(guideToEdit.service_type || '');
       // charge_type no aplica a guides
@@ -260,8 +272,27 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       if (guideToEdit.requested_services && Array.isArray(guideToEdit.requested_services)) {
         setRequestedServices(guideToEdit.requested_services);
       }
+<<<<<<< Updated upstream
+=======
+      setShift(guideToEdit.shift || '');
+      if (guideToEdit.missing_garments !== undefined && guideToEdit.missing_garments !== null) {
+        setMissingGarments(String(guideToEdit.missing_garments));
+      }
+      setVehicleUnitNumber(guideToEdit.vehicle_unit_number || '');
     }
-  }, [guideToEdit]);
+  }, [guideToEdit, onChangeBranchOffice]);
+
+  // Cargar cliente después de que se haya sincronizado la sucursal y los clientes estén disponibles
+  useEffect(() => {
+    if (guideToEdit && guideToEdit.client_id && filteredClientOptions.length > 0) {
+      // Verificar que el cliente esté en la lista filtrada
+      const clientExists = filteredClientOptions.some(option => option.value === guideToEdit.client_id);
+      if (clientExists) {
+        onChangeClient(guideToEdit.client_id);
+      }
+>>>>>>> Stashed changes
+    }
+  }, [guideToEdit, filteredClientOptions, onChangeClient]);
 
   // Función para formatear fecha mientras se escribe (dd/mm/yyyy)
   const formatDateInput = (text: string): string => {
@@ -471,9 +502,28 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         />
         </View>
 
+<<<<<<< Updated upstream
         <View className="flex-row -mx-1 mt-2">
           <View className="flex-1 px-1">
             <Input label="Total Prendas" value={String(totalGarments)} editable={false} />
+=======
+        {showScanButton && !guideToEdit && (
+          <View className="mb-4">
+            <Button
+              title={isScanning ? 'Detener Escaneo' : 'Iniciar Escaneo'}
+              onPress={() => {
+                onScan();
+              }}
+              icon={<Icon name={isScanning ? 'stop-circle-outline' : 'scan-outline'} size={18} color="white" />}
+              fullWidth
+              size="sm"
+              disabled={!selectedClientId}
+              style={{ backgroundColor: '#0b1f36' }}
+            />
+            {!selectedClientId && (
+              <Text className="text-sm text-gray-500 mt-2 text-center">Selecciona un cliente para continuar</Text>
+            )}
+>>>>>>> Stashed changes
           </View>
           <View className="flex-1 px-1">
             <Input
@@ -493,6 +543,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         />
       </View>
 
+<<<<<<< Updated upstream
       {showScanButton && (
         <View className="mb-4">
           <Button
@@ -581,6 +632,12 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         <Text className="text-base text-blue-800 font-semibold mb-3">Detalles de Servicio</Text>
         <View className="flex-row -mx-1">
           <View className="flex-1 px-1">
+=======
+        {/* Detalles de Servicio (solo servicio personal) */}
+        {serviceType === 'PERSONAL' && (
+          <View className="mb-6 bg-blue-50 p-4 rounded-lg">
+            <Text className="text-base text-blue-800 font-semibold mb-3">Detalles de Servicio</Text>
+>>>>>>> Stashed changes
             <Dropdown
               label="Prioridad"
               placeholder="Seleccionar prioridad"

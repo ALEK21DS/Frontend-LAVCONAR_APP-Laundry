@@ -171,6 +171,7 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
         phone: selectedClient.phone,
         address: selectedClient.address,
         acronym: selectedClient.acronym,
+        service_type: selectedClient.service_type,
         branch_office_id: selectedClient.branch_office_id,
         is_active: selectedClient.is_active,
         status: selectedClient.status,
