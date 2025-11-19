@@ -228,7 +228,10 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   useEffect(() => {
     if (guideToEdit) {
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
       
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
       // Convertir fecha ISO a formato dd/mm/yyyy
@@ -279,6 +282,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         setMissingGarments(String(guideToEdit.missing_garments));
       }
       setVehicleUnitNumber(guideToEdit.vehicle_unit_number || '');
+<<<<<<< Updated upstream
     }
   }, [guideToEdit, onChangeBranchOffice]);
 
@@ -292,6 +296,20 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       }
 >>>>>>> Stashed changes
     }
+=======
+    }
+  }, [guideToEdit, onChangeBranchOffice]);
+
+  // Cargar cliente después de que se haya sincronizado la sucursal y los clientes estén disponibles
+  useEffect(() => {
+    if (guideToEdit && guideToEdit.client_id && filteredClientOptions.length > 0) {
+      // Verificar que el cliente esté en la lista filtrada
+      const clientExists = filteredClientOptions.some(option => option.value === guideToEdit.client_id);
+      if (clientExists) {
+        onChangeClient(guideToEdit.client_id);
+      }
+    }
+>>>>>>> Stashed changes
   }, [guideToEdit, filteredClientOptions, onChangeClient]);
 
   // Función para formatear fecha mientras se escribe (dd/mm/yyyy)
@@ -503,10 +521,13 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         </View>
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
         <View className="flex-row -mx-1 mt-2">
           <View className="flex-1 px-1">
             <Input label="Total Prendas" value={String(totalGarments)} editable={false} />
 =======
+=======
+>>>>>>> Stashed changes
         {showScanButton && !guideToEdit && (
           <View className="mb-4">
             <Button
@@ -543,6 +564,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         />
       </View>
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
       {showScanButton && (
         <View className="mb-4">
@@ -633,6 +655,8 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         <View className="flex-row -mx-1">
           <View className="flex-1 px-1">
 =======
+=======
+>>>>>>> Stashed changes
         {/* Detalles de Servicio (solo servicio personal) */}
         {serviceType === 'PERSONAL' && (
           <View className="mb-6 bg-blue-50 p-4 rounded-lg">
