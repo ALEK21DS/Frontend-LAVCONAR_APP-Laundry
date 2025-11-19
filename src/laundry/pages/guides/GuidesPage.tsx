@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Alert, ActivityIndicator } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
-import { Card } from '@/components/common';
+import { Card, PaginationControls } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useGuides, useCreateGuide, useUpdateGuideStatus, useScanQr, useUpdateGuide } from '@/laundry/hooks/guides';
 import { useClients } from '@/laundry/hooks/clients';
@@ -114,11 +114,33 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const base = guides && guides.length > 0 ? guides : (demoGuides as any[]);
 
   const clientOptions = useMemo(() => {
-    return clients.map(client => ({
-      label: client.name,
-      value: client.id,
-    }));
-  }, [clients]);
+    const normalizedType = selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL';
+    let options = clients
+      .filter(client => (client.service_type || '').toUpperCase() === normalizedType)
+      .map(client => ({
+        label: client.acronym ? `${client.name} (${client.acronym})` : client.name,
+        value: client.id,
+        serviceType: (client.service_type || '').toUpperCase(),
+        acronym: client.acronym,
+      }));
+
+    if (selectedClientId && !options.some(opt => opt.value === selectedClientId)) {
+      const fallbackClient = clients.find(client => client.id === selectedClientId);
+      if (fallbackClient) {
+        options = [
+          ...options,
+          {
+            label: fallbackClient.acronym ? `${fallbackClient.name} (${fallbackClient.acronym})` : fallbackClient.name,
+            value: fallbackClient.id,
+            serviceType: (fallbackClient.service_type || '').toUpperCase(),
+            acronym: fallbackClient.acronym,
+          },
+        ];
+      }
+    }
+
+    return options;
+  }, [clients, selectedServiceType, selectedClientId]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -140,6 +162,9 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
     if (selectedGuide) {
       setEditingId(selectedGuide.id);
       setSelectedClientId(selectedGuide.client_id || '');
+      if (selectedGuide.service_type) {
+        setSelectedServiceType(selectedGuide.service_type === 'PERSONAL' ? 'personal' : 'industrial');
+      }
       setFormOpen(true);
     }
   };
@@ -150,6 +175,7 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
 
   const handleServiceTypeSelect = (serviceType: 'industrial' | 'personal') => {
     setSelectedServiceType(serviceType);
+    setSelectedClientId('');
     setShowServiceTypeModal(false);
     
     if (serviceType === 'industrial') {
@@ -375,49 +401,13 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
             })}
             </View>
           )}
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            total={total}
+            onPageChange={setPage}
+          />
         </ScrollView>
-
-        {/* Controles de paginación */}
-        {totalPages > 1 && (
-          <View className="border-t border-gray-200 bg-white p-4">
-            <View className="flex-row items-center justify-between">
-              <TouchableOpacity
-                onPress={() => setPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className={`flex-row items-center px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray-100' : ''}`}
-                style={{ backgroundColor: currentPage === 1 ? undefined : '#0b1f36' }}
-              >
-                <IonIcon 
-                  name="chevron-back" 
-                  size={18} 
-                  color={currentPage === 1 ? '#9CA3AF' : '#FFFFFF'} 
-                />
-              </TouchableOpacity>
-
-              <View className="flex-row items-center">
-                <Text className="text-gray-600 font-medium">
-                  Página {currentPage} de {totalPages}
-                </Text>
-                <Text className="text-gray-400 text-sm ml-2">
-                  ({total} total)
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className={`flex-row items-center px-4 py-2 rounded-lg ${currentPage === totalPages ? 'bg-gray-100' : ''}`}
-                style={{ backgroundColor: currentPage === totalPages ? undefined : '#0b1f36' }}
-              >
-                <IonIcon 
-                  name="chevron-forward" 
-                  size={18} 
-                  color={currentPage === totalPages ? '#9CA3AF' : '#FFFFFF'} 
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
       </View>
 
       {/* Interfaz para prendas registradas (Servicio Personal) */}
@@ -484,6 +474,10 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
             clientOptions={clientOptions}
             selectedClientId={selectedClientId}
             onChangeClient={onChangeClient}
+            initialServiceType={
+              (editingId && selectedGuide?.service_type) ||
+              (selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL')
+            }
             guideItems={(() => {
               const allTags = [...prefilledTags, ...scannedTags];
               const uniqueEPCs = new Set<string>();
