@@ -21,7 +21,10 @@ export const useCreateRfidScan = () => {
       queryClient.invalidateQueries({ queryKey: ['rfid-scans'] });
       queryClient.invalidateQueries({ queryKey: ['rfid-scans-by-guide', { guideId: rfidScan?.guide_id }] });
       queryClient.invalidateQueries({ queryKey: ['guide', { id: rfidScan?.guide_id }] });
-      queryClient.invalidateQueries({ queryKey: ['guides'] });
+      // Invalidar TODAS las queries de guides (con todos sus parámetros)
+      queryClient.invalidateQueries({ queryKey: ['guides'], exact: false });
+      // Forzar refetch de todas las queries de guides
+      queryClient.refetchQueries({ queryKey: ['guides'], type: 'active' });
     },
   });
 

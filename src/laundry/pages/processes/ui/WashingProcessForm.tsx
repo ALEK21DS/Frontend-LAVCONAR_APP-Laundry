@@ -4,9 +4,11 @@ import { Button, Input, Dropdown } from '@/components/common';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
+import { useCatalogLabelMap } from '@/laundry/hooks';
 import { useMachines, Machine } from '@/laundry/hooks/machines';
 import { useCreateWashingProcess, useUpdateWashingProcess, useWashingProcessByGuide } from '@/laundry/hooks/washing-processes';
 import { useUpdateRfidScan } from '@/laundry/hooks/guides/rfid-scan';
+import { useGarmentsByRfidCodes } from '@/laundry/hooks/guides/garments';
 import { safeParseFloat, safeParseInt } from '@/helpers/validators.helper';
 import { MachineSelectionModal } from '@/laundry/components';
 import { guidesApi } from '@/laundry/api/guides/guides.api';
@@ -55,6 +57,13 @@ const toStringOrEmpty = (value?: number | null) =>
   value !== undefined && value !== null && !Number.isNaN(value)
     ? String(value)
     : '';
+
+const formatWeight = (value?: number | null): string => {
+  if (value === undefined || value === null || Number.isNaN(value)) {
+    return '';
+  }
+  return Number(value).toFixed(2);
+};
 
 export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
   visible,
@@ -105,27 +114,75 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
   // Catálogos
   const { data: specialTreatmentCatalog } = useCatalogValuesByType('special_treatment', true, { forceFresh: true });
   const { data: washTemperatureCatalog } = useCatalogValuesByType('wash_temperature', true, { forceFresh: true });
-
-  // Determinar tipo de máquina según el proceso
-  const machineType = processType === 'WASHING' ? 'WASHER' : processType === 'DRYING' ? 'DRYER' : undefined;
+  const { getLabel: getProcessTypeLabel, isLoading: isLoadingProcessTypeLabel } = useCatalogLabelMap('process_type', { forceFresh: true });
   
-  // Máquinas (solo para procesos que requieren máquina)
+  // Mapa de fallback para tipos de proceso (usar cuando el catálogo no esté disponible)
+  const processTypeFallbackMap: Record<string, string> = useMemo(() => ({
+    'WASHING': 'Proceso de Lavado',
+    'DRYING': 'Proceso de Secado',
+    'IRONING': 'Proceso de Planchado',
+    'FOLDING': 'Proceso de Doblado',
+    'IN_PROCESS': 'Recepción en Almacén',
+    'PACKAGING': 'Proceso de Empaque',
+    'SHIPPING': 'Proceso de Embarque',
+    'LOADING': 'Proceso de Carga',
+    'DELIVERY': 'Proceso de Entrega',
+  }), []);
+  
+  // Obtener etiqueta del tipo de proceso (usar fallback por defecto, actualizar con catálogo si está disponible)
+  const processTypeLabel = useMemo(() => {
+    if (!processType) return 'Proceso';
+  
+    // Usar el mapa de fallback como valor por defecto (siempre funciona)
+    const fallbackLabel = processTypeFallbackMap[processType] || processType;
+    
+    // Si el catálogo está cargado, intentar obtener la etiqueta del catálogo
+    if (!isLoadingProcessTypeLabel) {
+      const catalogLabel = getProcessTypeLabel(processType, fallbackLabel);
+      // Si el catálogo devuelve una etiqueta válida (diferente del código y no vacía), usarla
+      if (catalogLabel && catalogLabel !== processType && catalogLabel !== '' && catalogLabel !== '—') {
+        return catalogLabel;
+      }
+    }
+    
+    // Usar el mapa de fallback
+    return fallbackLabel;
+  }, [processType, getProcessTypeLabel, isLoadingProcessTypeLabel, processTypeFallbackMap]);
+  
+  // Obtener prendas por códigos RFID escaneados para calcular el peso
+  const scannedRfidCodes = useMemo(() => {
+    return rfidScanUpdateData?.data?.scanned_rfid_codes || rfidScan?.scanned_rfid_codes || [];
+  }, [rfidScanUpdateData, rfidScan]);
+  
+  const { data: garmentsData } = useGarmentsByRfidCodes(
+    Array.isArray(scannedRfidCodes) ? scannedRfidCodes : [],
+    visible && scannedRfidCodes.length > 0
+  );
+  
+  // Calcular peso total desde las prendas escaneadas
+  const calculatedWeight = useMemo(() => {
+    if (!garmentsData?.data || !Array.isArray(garmentsData.data)) return 0;
+    return garmentsData.data.reduce((total: number, garment: any) => {
+      return total + (garment.weight || 0);
+    }, 0);
+  }, [garmentsData]);
+
+  // Máquinas: mostrar todas las máquinas disponibles sin filtrar por tipo
+  // Para SUPERADMIN, si branchOfficeId está vacío, no pasar el parámetro para obtener todas las máquinas
   const { data: machines, isLoading: isLoadingMachines } = useMachines(
-    branchOfficeId, 
-    machineType
+    branchOfficeId && branchOfficeId.trim() !== '' ? branchOfficeId : undefined,
+    undefined,
+    true // Siempre habilitado, el hook manejará la validación internamente
   );
 
   // Estado del formulario
+  // Siempre usar fecha/hora actual al abrir el formulario (tanto para crear como para editar)
   const nowFormatted = formatDateForInput(new Date());
   const [formData, setFormData] = useState({
     machine_code: initialProcess?.machine_code || '',
-    start_time: initialProcess?.start_time
-      ? formatDateForInput(initialProcess.start_time)
-      : nowFormatted,
-    end_time: initialProcess?.end_time
-      ? formatDateForInput(initialProcess.end_time)
-      : nowFormatted,
-    load_weight: toStringOrEmpty(initialProcess?.load_weight),
+    start_time: nowFormatted, // Siempre usar fecha/hora actual
+    end_time: nowFormatted, // Siempre usar fecha/hora actual
+    load_weight: initialProcess?.load_weight !== undefined && initialProcess.load_weight !== null ? formatWeight(initialProcess.load_weight) : '',
     garment_quantity: toStringOrEmpty(initialProcess?.garment_quantity),
     special_treatment: initialProcess?.special_treatment || '',
     wash_temperature: initialProcess?.wash_temperature || '',
@@ -139,6 +196,18 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [guideDetails, setGuideDetails] = useState<any | null>(null);
   const [isLoadingGuideDetails, setIsLoadingGuideDetails] = useState(false);
+
+  // Actualizar fechas a fecha/hora actual cada vez que se abre el formulario (tanto para crear como para editar)
+  useEffect(() => {
+    if (visible) {
+      const currentDateTime = formatDateForInput(new Date());
+      setFormData(prev => ({
+        ...prev,
+        start_time: currentDateTime,
+        end_time: currentDateTime,
+      }));
+    }
+  }, [visible]);
 
   const renderBooleanToggle = (
     label: string,
@@ -244,7 +313,7 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
         end_time:
           formatDateForInput(sourceProcess.end_time) ||
           formatDateForInput(sourceProcess.start_time),
-        load_weight: toStringOrEmpty(sourceProcess.load_weight),
+        load_weight: sourceProcess.load_weight !== undefined && sourceProcess.load_weight !== null ? formatWeight(sourceProcess.load_weight) : '',
         garment_quantity: toStringOrEmpty(sourceProcess.garment_quantity),
         special_treatment: sourceProcess.special_treatment || '',
         wash_temperature: sourceProcess.wash_temperature || '',
@@ -270,22 +339,53 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
   }, [sourceProcess, visible]);
 
   useEffect(() => {
-    if (!visible || existingProcess || latestProcess) return;
+    if (!visible) return;
+    
+    // Si hay un proceso existente, no actualizar desde el escaneo
+    if (existingProcess || latestProcess) return;
 
     const quantityFromScan = rfidScanUpdateData?.data?.scanned_quantity ?? rfidScan?.scanned_quantity;
+    const weightFromScan = rfidScanUpdateData?.data?.load_weight;
+
+    // Determinar el peso a usar (priorizar el del escaneo, luego el calculado)
+    let weightToSet = '';
+    if (weightFromScan !== undefined) {
+      weightToSet = formatWeight(weightFromScan);
+    } else if (calculatedWeight > 0) {
+      weightToSet = formatWeight(calculatedWeight);
+    }
 
     setFormData(prev => ({
       ...prev,
-      load_weight:
-        prev.load_weight ||
-        (rfidScanUpdateData?.data?.load_weight !== undefined
-          ? toStringOrEmpty(rfidScanUpdateData.data.load_weight)
-          : ''),
+      load_weight: prev.load_weight || weightToSet,
       garment_quantity:
         prev.garment_quantity ||
-        (quantityFromScan !== undefined ? String(quantityFromScan) : ''),
+        (quantityFromScan !== undefined 
+          ? String(quantityFromScan) 
+          : scannedRfidCodes.length > 0 
+          ? String(scannedRfidCodes.length) 
+          : ''),
     }));
-  }, [visible, existingProcess, rfidScan, rfidScanUpdateData]);
+  }, [visible, existingProcess, latestProcess, rfidScan, rfidScanUpdateData, scannedRfidCodes, calculatedWeight]);
+
+  // Actualizar peso cuando se calcula desde las prendas escaneadas (si aún no hay peso)
+  useEffect(() => {
+    if (!visible) return;
+    
+    // Si hay un proceso existente, no actualizar desde el escaneo
+    if (existingProcess || latestProcess) return;
+    
+    // Si ya hay un peso (del escaneo o manual), no sobrescribir
+    if (formData.load_weight) return;
+    
+    // Si se calculó el peso desde las prendas, actualizarlo
+    if (calculatedWeight > 0) {
+      setFormData(prev => ({
+        ...prev,
+        load_weight: formatWeight(calculatedWeight),
+      }));
+    }
+  }, [visible, existingProcess, latestProcess, calculatedWeight, formData.load_weight]);
 
   // Filtrar máquinas activas (is_active y status_machine === 'ACTIVE')
   const availableMachines = useMemo(() => {
@@ -448,19 +548,10 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
             <View className="flex-row items-center justify-between p-6 border-b border-gray-200">
               <View>
                 <Text className="text-2xl font-bold text-gray-900">
-                  {processType === 'WASHING' ? 'Proceso de Lavado' :
-                   processType === 'DRYING' ? 'Proceso de Secado' :
-                   processType === 'IRONING' ? 'Proceso de Planchado' :
-                   processType === 'FOLDING' ? 'Proceso de Doblado' :
-                   processType === 'IN_PROCESS' ? 'Recepción en Almacén' :
-                   processType === 'PACKAGING' ? 'Proceso de Empaque' :
-                   processType === 'SHIPPING' ? 'Proceso de Embarque' :
-                   processType === 'LOADING' ? 'Proceso de Carga' :
-                   processType === 'DELIVERY' ? 'Proceso de Entrega' :
-                   'Proceso'}
+                  {processTypeLabel || 'Proceso'}
                 </Text>
                 <Text className="text-sm text-gray-600 mt-1">
-                  Complete los datos del proceso. Estado objetivo: {processType}
+                  Complete los datos del proceso.
                 </Text>
               </View>
               <TouchableOpacity
@@ -488,7 +579,7 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
               </Text>
             </View>
             <Text className="text-xs text-purple-700 mt-2">
-              Al guardar, el proceso quedará en “{processType}”. Puedes ajustar la información antes de confirmar.
+              Al guardar, el proceso quedará en "{processTypeLabel}". Puedes ajustar la información antes de confirmar.
             </Text>
           </View>
  
@@ -539,10 +630,9 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
             <Text className="text-xs text-gray-500 mt-1">Formato: AAAA-MM-DD HH:mm</Text>
           </View>
 
-          {/* Máquina (solo para Lavado y Secado) */}
-          {(processType === 'WASHING' || processType === 'DRYING') && (
+          {/* Máquina (opcional para todos los procesos) */}
             <View className="mb-4">
-              <Text className="text-sm font-medium text-gray-700 mb-1">Máquina</Text>
+            <Text className="text-sm font-medium text-gray-700 mb-1">Máquina (Opcional)</Text>
               <TouchableOpacity
                 onPress={() => setMachineModalOpen(true)}
                 className="bg-purple-500 p-4 rounded-lg flex-row items-center justify-between"
@@ -571,12 +661,11 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
                 )}
               </TouchableOpacity>
             </View>
-          )}
 
           {/* Peso de la carga */}
           <View className="mb-4">
             <Input
-              label="Peso de la carga (kg)"
+              label="Peso de la carga (lb)"
               value={formData.load_weight}
               onChangeText={(text) => setFormData(prev => ({ ...prev, load_weight: text }))}
               placeholder="0.00"
@@ -584,9 +673,9 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
               icon="scale-outline"
               error={errors.load_weight}
             />
-            {rfidScanUpdateData?.data?.load_weight !== undefined && !sourceProcess && (
+            {(rfidScanUpdateData?.data?.load_weight !== undefined || calculatedWeight > 0) && !sourceProcess && (
               <Text className="text-xs text-gray-500 mt-1">
-                Capturado desde el escaneo
+                {calculatedWeight > 0 && !rfidScanUpdateData?.data?.load_weight ? 'Calculado desde el escaneo' : 'Capturado desde el escaneo'}
               </Text>
             )}
           </View>

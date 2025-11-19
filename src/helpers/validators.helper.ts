@@ -202,7 +202,7 @@ export const validateClientData = (data: {
 export const validateLoginData = (data: {
   username: string;
   password: string;
-  sucursalId: string;
+  sucursalId?: string;
 }): ValidationResult => {
   if (!validateRequired(data.username)) {
     return { isValid: false, error: 'Usuario requerido' };
@@ -210,10 +210,6 @@ export const validateLoginData = (data: {
 
   if (!validateRequired(data.password)) {
     return { isValid: false, error: 'Contraseña requerida' };
-  }
-
-  if (!validateRequired(data.sucursalId)) {
-    return { isValid: false, error: 'Selecciona una sucursal' };
   }
 
   return { isValid: true };

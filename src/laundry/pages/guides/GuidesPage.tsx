@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Alert, ActivityIndicator } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
-import { Card } from '@/components/common';
+import { Card, PaginationControls } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useGuides, useCreateGuide, useUpdateGuideStatus, useScanQr, useUpdateGuide } from '@/laundry/hooks/guides';
 import { useClients } from '@/laundry/hooks/clients';
@@ -16,6 +16,9 @@ import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
 import { QrScanner } from '@/laundry/components';
 import { GuideDetailsModal } from './ui/GuideDetailsModal';
 import { useCatalogLabelMap } from '@/laundry/hooks';
+import { GUIDE_STATUS_COLORS } from '@/constants/processes';
+import { useAuthStore } from '@/auth/store/auth.store';
+import { isSuperAdminUser, getPreferredBranchOfficeId } from '@/helpers/user.helper';
 
  type GuidesPageProps = { navigation: NativeStackNavigationProp<any> };
 
@@ -28,7 +31,22 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const { createGuideAsync, isCreating } = useCreateGuide();
   const { updateGuideAsync } = useUpdateGuide();
   const { updateGuideStatusAsync, isUpdating } = useUpdateGuideStatus();
-  const { clients } = useClients({ limit: 50 });
+  // Estado para la sucursal seleccionada (para filtrar clientes)
+  const { user } = useAuthStore();
+  const isSuperAdmin = isSuperAdminUser(user);
+  const userBranchOfficeId = getPreferredBranchOfficeId(user) || '';
+  const [selectedBranchOfficeId, setSelectedBranchOfficeId] = useState<string>(userBranchOfficeId);
+  // Pasar branch_office_id al hook de clientes para filtrar en el backend
+  // Para superadmin, usar selectedBranchOfficeId; para admin, usar userBranchOfficeId
+  const effectiveBranchOfficeId = isSuperAdmin && selectedBranchOfficeId 
+    ? selectedBranchOfficeId 
+    : (!isSuperAdmin ? userBranchOfficeId : undefined);
+  
+  const { clients } = useClients({ 
+    limit: 50,
+    branch_office_id: effectiveBranchOfficeId || undefined,
+    only_active_status: true // Solo clientes activos en selectores
+  });
   const { invalidateAuthorizationAsync } = useInvalidateAuthorization();
   const [query, setQuery] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -113,11 +131,37 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const base = guides && guides.length > 0 ? guides : (demoGuides as any[]);
 
   const clientOptions = useMemo(() => {
-    return clients.map(client => ({
-      label: client.name,
+    const normalizedType = selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL';
+    // Filtrar por tipo de servicio (el backend ya filtra por sucursal)
+    let filteredClients = clients.filter(client => {
+      const matchesServiceType = (client.service_type || '').toUpperCase() === normalizedType;
+      return matchesServiceType;
+    });
+    
+    let options = filteredClients.map(client => ({
+      label: client.acronym ? `${client.name} (${client.acronym})` : client.name,
       value: client.id,
+      serviceType: (client.service_type || '').toUpperCase(),
+      acronym: client.acronym,
     }));
-  }, [clients]);
+
+    if (selectedClientId && !options.some(opt => opt.value === selectedClientId)) {
+      const fallbackClient = clients.find(client => client.id === selectedClientId);
+      if (fallbackClient) {
+        options = [
+          ...options,
+          {
+            label: fallbackClient.acronym ? `${fallbackClient.name} (${fallbackClient.acronym})` : fallbackClient.name,
+            value: fallbackClient.id,
+            serviceType: (fallbackClient.service_type || '').toUpperCase(),
+            acronym: fallbackClient.acronym,
+          },
+        ];
+      }
+    }
+
+    return options;
+  }, [clients, selectedServiceType, selectedClientId]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -126,7 +170,11 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   }, [base, query]);
 
   const openCreate = () => { 
-    setEditingId(null); 
+    setEditingId(null);
+    // Resetear sucursal al valor por defecto del usuario al crear nueva guía
+    if (isSuperAdmin) {
+      setSelectedBranchOfficeId(userBranchOfficeId);
+    }
     setShowServiceTypeModal(true); 
   };
 
@@ -139,6 +187,13 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
     if (selectedGuide) {
       setEditingId(selectedGuide.id);
       setSelectedClientId(selectedGuide.client_id || '');
+      // Sincronizar sucursal de la guía con el estado de filtrado de clientes
+      if (isSuperAdmin && selectedGuide.branch_office_id) {
+        setSelectedBranchOfficeId(selectedGuide.branch_office_id);
+      }
+      if (selectedGuide.service_type) {
+        setSelectedServiceType(selectedGuide.service_type === 'PERSONAL' ? 'personal' : 'industrial');
+      }
       setFormOpen(true);
     }
   };
@@ -146,9 +201,17 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const onChangeClient = (clientId: string) => {
     setSelectedClientId(clientId);
   };
+  
+  // Callback para cuando GuideForm cambia la sucursal (solo para superadmin)
+  const onChangeBranchOffice = (branchOfficeId: string) => {
+    setSelectedBranchOfficeId(branchOfficeId);
+    // Limpiar cliente cuando cambia la sucursal
+    setSelectedClientId('');
+  };
 
   const handleServiceTypeSelect = (serviceType: 'industrial' | 'personal') => {
     setSelectedServiceType(serviceType);
+    setSelectedClientId('');
     setShowServiceTypeModal(false);
     
     if (serviceType === 'industrial') {
@@ -340,72 +403,47 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
             <Text className="text-gray-500">No se encontraron guías.</Text>
           ) : (
             <View className="-mx-1 flex-row flex-wrap">
-            {filtered.map((g: any) => (
-              <View key={g.id} className="w-full px-1 mb-2">
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => openDetails(g)}
-                >
-                  <Card padding="md" variant="default">
-                    <View className="flex-row items-center">
-                      <View className="rounded-lg p-2 mr-3" style={{ backgroundColor: '#8EB02120' }}>
-                        <IonIcon name="document-text-outline" size={20} color="#8EB021" />
-                      </View>
-                      <View className="flex-1">
+            {filtered.map((g: any) => {
+              const statusColor = GUIDE_STATUS_COLORS[g.status as keyof typeof GUIDE_STATUS_COLORS] || '#6B7280';
+              const statusLabel = getGuideStatusLabel(g.status, g.status_label || g.status || '—');
+              
+              return (
+                <View key={g.id} className="w-full px-1 mb-2">
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => openDetails(g)}
+                  >
+                    <Card padding="md" variant="default">
+                      <View className="flex-row items-center">
+                        <View className="rounded-lg p-2 mr-3" style={{ backgroundColor: '#8EB02120' }}>
+                          <IonIcon name="document-text-outline" size={20} color="#8EB021" />
+                        </View>
+                      <View className="flex-1 mr-2">
                         <Text className="text-gray-900 font-semibold">{g.guide_number}</Text>
                         <Text className="text-gray-500 text-xs">{g.client_name}</Text>
                       </View>
-                      <Text className="text-gray-600 text-xs">{getGuideStatusLabel(g.status, g.status_label || g.status || '—')}</Text>
-                    </View>
-                  </Card>
-                </TouchableOpacity>
-              </View>
-            ))}
+                      {/* Badge de estado con color */}
+                      <View className="flex-row items-center px-2 py-1 rounded-full" style={{ backgroundColor: statusColor + '20' }}>
+                        <View className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: statusColor }} />
+                        <Text className="text-xs font-medium" numberOfLines={1} style={{ color: statusColor }}>
+                          {statusLabel}
+                        </Text>
+                      </View>
+                      </View>
+                    </Card>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
             </View>
           )}
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            total={total}
+            onPageChange={setPage}
+          />
         </ScrollView>
-
-        {/* Controles de paginación */}
-        {totalPages > 1 && (
-          <View className="border-t border-gray-200 bg-white p-4">
-            <View className="flex-row items-center justify-between">
-              <TouchableOpacity
-                onPress={() => setPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className={`flex-row items-center px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray-100' : ''}`}
-                style={{ backgroundColor: currentPage === 1 ? undefined : '#0b1f36' }}
-              >
-                <IonIcon 
-                  name="chevron-back" 
-                  size={18} 
-                  color={currentPage === 1 ? '#9CA3AF' : '#FFFFFF'} 
-                />
-              </TouchableOpacity>
-
-              <View className="flex-row items-center">
-                <Text className="text-gray-600 font-medium">
-                  Página {currentPage} de {totalPages}
-                </Text>
-                <Text className="text-gray-400 text-sm ml-2">
-                  ({total} total)
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className={`flex-row items-center px-4 py-2 rounded-lg ${currentPage === totalPages ? 'bg-gray-100' : ''}`}
-                style={{ backgroundColor: currentPage === totalPages ? undefined : '#0b1f36' }}
-              >
-                <IonIcon 
-                  name="chevron-forward" 
-                  size={18} 
-                  color={currentPage === totalPages ? '#9CA3AF' : '#FFFFFF'} 
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
       </View>
 
       {/* Interfaz para prendas registradas (Servicio Personal) */}
@@ -472,6 +510,11 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
             clientOptions={clientOptions}
             selectedClientId={selectedClientId}
             onChangeClient={onChangeClient}
+            onChangeBranchOffice={onChangeBranchOffice}
+            initialServiceType={
+              (editingId && selectedGuide?.service_type) ||
+              (selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL')
+            }
             guideItems={(() => {
               const allTags = [...prefilledTags, ...scannedTags];
               const uniqueEPCs = new Set<string>();

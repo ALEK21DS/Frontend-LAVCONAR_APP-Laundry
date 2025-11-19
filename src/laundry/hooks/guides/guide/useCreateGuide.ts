@@ -16,9 +16,11 @@ export const useCreateGuide = () => {
       return data.data!;
     },
     onSuccess: () => {
-      // Invalidar todas las queries de guías para refrescar la lista
-      queryClient.invalidateQueries({ queryKey: ['guides'] });
-      queryClient.invalidateQueries({ queryKey: ['guide'] });
+      // Invalidar TODAS las queries de guías (con todos sus parámetros) para refrescar la lista
+      queryClient.invalidateQueries({ queryKey: ['guides'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['guide'], exact: false });
+      // Forzar refetch de todas las queries de guides activas
+      queryClient.refetchQueries({ queryKey: ['guides'], type: 'active' });
     },
     onError: (err) => {
       console.error('Error al crear guía:', handleApiError(err));

@@ -2,6 +2,7 @@ export interface Vehicle {
   id: string;
   branch_office_id: string;
   branch_office_name?: string;
+  unit_number?: string;
   plate_number: string;
   brand: string;
   model: string;

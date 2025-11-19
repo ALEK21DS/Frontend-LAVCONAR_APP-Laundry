@@ -10,9 +10,10 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export const AppNavigator: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, isCheckingAuth } = useAuthStore();
 
-  if (isLoading) {
+  // Solo mostrar spinner durante el check inicial de autenticación, no durante el login
+  if (isCheckingAuth) {
     return <LoadingSpinner fullScreen message="Cargando..." />;
   }
 
