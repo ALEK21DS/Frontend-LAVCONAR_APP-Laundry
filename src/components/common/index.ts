@@ -5,5 +5,4 @@ export * from './Card';
 export * from './Container';
 export * from './Badge';
 export * from './AutocompleteInput';
-export * from './PaginationControls';
 export * from '../ui/loading-spinner';
