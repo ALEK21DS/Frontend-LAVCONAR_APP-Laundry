@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, ScrollView, Modal, Alert, TextInput, Acti
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Button, Card } from '@/components/common';
 import { formatDateTime } from '@/helpers';
+import { useAuthStore } from '@/auth/store/auth.store';
+import { isSuperAdminUser } from '@/helpers/user.helper';
 import { useCreateAuthorizationRequest, useGetAuthorizationById } from '@/laundry/hooks/authorizations';
 import { useDeleteClient } from '@/laundry/hooks/clients';
 import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';

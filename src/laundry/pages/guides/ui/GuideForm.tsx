@@ -335,6 +335,8 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       setTotalWeight(guideToEdit.total_weight ? parseFloat(guideToEdit.total_weight).toFixed(2) : '');
       setStatus(guideToEdit.status || '');
       setNotes(guideToEdit.notes || '');
+      // Cargar número de guía del proveedor
+      setSupplierGuideNumber(guideToEdit.supplier_guide_number || '');
       // Cargar los dos números de precinto por separado
       setSealNumber1(guideToEdit.precinct_number || '');
       setSealNumber2(guideToEdit.precinct_number_2 || '');
@@ -354,21 +356,6 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         setMissingGarments(String(guideToEdit.missing_garments));
       }
       setVehicleUnitNumber(guideToEdit.vehicle_unit_number || '');
-    }
-  }, [guideToEdit, onChangeBranchOffice]);
-
-  // Cargar cliente después de que se haya sincronizado la sucursal y los clientes estén disponibles
-  useEffect(() => {
-    if (guideToEdit && guideToEdit.client_id && filteredClientOptions.length > 0) {
-      // Verificar que el cliente esté en la lista filtrada
-      const clientExists = filteredClientOptions.some(option => option.value === guideToEdit.client_id);
-      if (clientExists) {
-        onChangeClient(guideToEdit.client_id);
-      }
-      // Cargar sucursal de la guía en modo edición
-      if (guideToEdit.branch_office_id) {
-        setSelectedBranchOfficeId(guideToEdit.branch_office_id);
-      }
     }
   }, [guideToEdit, onChangeBranchOffice]);
 
@@ -582,25 +569,6 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             </View>
           </View>
 
-        <View className="flex-row -mx-1 mt-2">
-          <View className="flex-1 px-1">
-            <Input label="Total Prendas" value={String(totalGarments)} editable={false} />
-        {showScanButton && !guideToEdit && (
-          <View className="mb-4">
-            <Button
-              title={isScanning ? 'Detener Escaneo' : 'Iniciar Escaneo'}
-              onPress={() => {
-                onScan();
-              }}
-              icon={<Icon name={isScanning ? 'stop-circle-outline' : 'scan-outline'} size={18} color="white" />}
-              fullWidth
-              size="sm"
-              disabled={!selectedClientId}
-              style={{ backgroundColor: '#0b1f36' }}
-            />
-            {!selectedClientId && (
-              <Text className="text-sm text-gray-500 mt-2 text-center">Selecciona un cliente para continuar</Text>
-            )}
           {/* Servicios Solicitados - Solo para servicio personal */}
           {serviceType === 'PERSONAL' && (
             <View className="mt-2">
@@ -704,114 +672,24 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           </View>
         </View>
 
-      {showScanButton && (
+      {showScanButton && !guideToEdit && (
         <View className="mb-4">
           <Button
-            title={guideToEdit ? 'Editar Prendas' : (isScanning ? 'Detener Escaneo' : 'Iniciar Escaneo')}
+            title={isScanning ? 'Detener Escaneo' : 'Iniciar Escaneo'}
             onPress={() => {
-              // Si estamos en modo edición, SIEMPRE navegar a la página de escaneo
-              if (guideToEdit && onNavigate) {
-                onNavigate('ScanClothes', {
-                  mode: 'guide',
-                  serviceType: serviceType === 'PERSONAL' ? 'personal' : 'industrial',
-                  guideId: guideToEdit.id,
-                  initialRfids: existingRfids, // Usar los RFIDs del rfid_scan
-                  guideToEdit, // pasar toda la guía para prefills de edición
-                  isEditMode: true,
-                });
-              } else {
-                // Comportamiento normal de escaneo para creación de guía
-                onScan();
-              }
+              onScan();
             }}
-            icon={<Icon name={guideToEdit ? 'create-outline' : (isScanning ? 'stop-circle-outline' : 'scan-outline')} size={18} color="white" />}
+            icon={<Icon name={isScanning ? 'stop-circle-outline' : 'scan-outline'} size={18} color="white" />}
             fullWidth
             size="sm"
             disabled={!selectedClientId}
             style={{ backgroundColor: '#0b1f36' }}
           />
-          {!selectedClientId && !guideToEdit && (
+          {!selectedClientId && (
             <Text className="text-sm text-gray-500 mt-2 text-center">Selecciona un cliente para continuar</Text>
           )}
         </View>
       )}
-
-      {/* Prendas Registradas en la Guía (Modo Edición) */}
-      {guideToEdit && (
-        <View className="mb-4 bg-amber-50 p-4 rounded-lg border border-amber-200">
-          <View className="flex-row items-center mb-3">
-            <Icon name="shirt-outline" size={20} color="#F59E0B" />
-            <Text className="text-base text-amber-800 font-semibold ml-2">
-              Códigos RFID Escaneados ({existingRfids.length})
-            </Text>
-          </View>
-        )}
-
-        {/* Prendas Registradas en la Guía (Modo Edición) */}
-        {guideToEdit && (
-          <View className="mb-4 bg-amber-50 p-4 rounded-lg border border-amber-200">
-            <View className="flex-row items-center mb-3">
-              <Icon name="shirt-outline" size={20} color="#F59E0B" />
-              <Text className="text-base text-amber-800 font-semibold ml-2">
-                Códigos RFID Escaneados ({existingRfids.length})
-              </Text>
-            </View>
-
-            {existingRfids.length === 0 ? (
-              <View className="items-center py-3">
-                <Icon name="information-circle-outline" size={40} color="#F59E0B" />
-                <Text className="text-amber-800 font-medium mt-2 text-center text-sm">
-                  No hay códigos RFID
-                </Text>
-                <Text className="text-amber-700 text-xs mt-1 text-center px-2">
-                  Presiona "Editar Prendas" para escanear
-                </Text>
-              </View>
-            ))}
-          </ScrollView>
-          )}
-          
-          <Text className="text-xs text-amber-700 mt-3">
-            💡 Puedes escanear más prendas para agregarlas a esta guía
-          </Text>
-        </View>
-      )}
-
-      {/* Detalles de Servicio (solo servicio personal) */}
-      {serviceType === 'PERSONAL' && (
-      <View className="mb-6 bg-blue-50 p-4 rounded-lg">
-        <Text className="text-base text-blue-800 font-semibold mb-3">Detalles de Servicio</Text>
-        <View className="flex-row -mx-1">
-          <View className="flex-1 px-1">
-            ) : (
-
-              <ScrollView className="max-h-40">
-                {existingRfids.map((rfid: string, index: number) => (
-                  <View
-                    key={rfid}
-                    className="bg-white rounded-lg p-3 mb-2 flex-row items-center justify-between border border-amber-300"
-                  >
-                    <View className="flex-1">
-                      <Text className="text-sm font-mono text-gray-900">
-                        {rfid}
-                      </Text>
-                      <Text className="text-xs text-gray-500 mt-1">
-                        Código RFID #{index + 1}
-                      </Text>
-                    </View>
-                    <View className="bg-green-500 w-8 h-8 rounded-full items-center justify-center">
-                      <Icon name="checkmark" size={20} color="#FFFFFF" />
-                    </View>
-                  </View>
-                ))}
-              </ScrollView>
-            )}
-
-            <Text className="text-xs text-amber-700 mt-3">
-              💡 Puedes escanear más prendas para agregarlas a esta guía
-            </Text>
-          </View>
-        )}
 
         {/* Detalles de Servicio (solo servicio personal) */}
         {serviceType === 'PERSONAL' && (
