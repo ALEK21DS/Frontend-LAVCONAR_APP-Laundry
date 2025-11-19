@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Input, Button, Card, Dropdown } from '@/components/common';
@@ -7,6 +7,7 @@ import { validateClientData } from '@/helpers/validators.helper';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { useBranchOffices } from '@/laundry/hooks/branch-offices';
 import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
+import { isSuperAdminUser } from '@/helpers/user.helper';
 
 interface ClientFormProps {
   initialValues?: Partial<CreateClientDto>;
@@ -25,12 +26,29 @@ export const ClientForm: React.FC<ClientFormProps> = ({
 }) => {
   const { user } = useAuthStore();
   const { sucursales } = useBranchOffices();
+  const isSuperAdmin = isSuperAdminUser(user);
   
-  const branchOfficeId = user?.branch_office_id || user?.sucursalId;
+  const userBranchOfficeId = user?.branch_office_id || user?.sucursalId;
+  
+  // Estado para sucursal seleccionada (para superadmin puede seleccionar, para admin usa la del usuario)
+  const [selectedBranchOfficeId, setSelectedBranchOfficeId] = useState<string>(
+    initialValues?.branch_office_id || userBranchOfficeId || ''
+  );
+  
+  // La sucursal final: para superadmin es la seleccionada, para admin es la del usuario
+  const branchOfficeId = isSuperAdmin ? selectedBranchOfficeId : userBranchOfficeId;
   
   // Buscar el nombre de la sucursal en la lista de sucursales
   const currentBranch = sucursales.find(branch => branch.id === branchOfficeId);
   const branchOfficeName = currentBranch?.name || 'Sucursal no asignada';
+  
+  // Opciones de sucursales para el dropdown (solo para superadmin)
+  const branchOfficeOptions = useMemo(() => {
+    return sucursales.map(branch => ({
+      label: branch.name,
+      value: branch.id,
+    }));
+  }, [sucursales]);
   
   // Obtener catálogo de tipos de servicio
   const { data: serviceTypeCatalog } = useCatalogValuesByType('service_type', true, { forceFresh: true });
@@ -50,8 +68,13 @@ export const ClientForm: React.FC<ClientFormProps> = ({
     address: initialValues?.address ?? '',
     acronym: initialValues?.acronym ?? '',
     service_type: initialValues?.service_type ?? '',
-    branch_office_id: initialValues?.branch_office_id || branchOfficeId,
+    branch_office_id: initialValues?.branch_office_id || selectedBranchOfficeId || branchOfficeId,
   });
+  
+  // Sincronizar formData.branch_office_id con selectedBranchOfficeId cuando cambia
+  useEffect(() => {
+    setFormData(prev => ({ ...prev, branch_office_id: selectedBranchOfficeId || branchOfficeId }));
+  }, [selectedBranchOfficeId, branchOfficeId]);
   
   const initialActive = typeof (initialValues as any)?.status === 'string'
     ? ((initialValues as any).status === 'ACTIVE')
@@ -205,16 +228,31 @@ export const ClientForm: React.FC<ClientFormProps> = ({
               error={errors.name}
             />
 
-            {/* Campo de Sucursal - Solo lectura */}
-            <View className="mb-4">
-              <Text className="text-base font-semibold text-gray-700 mb-2">Sucursal</Text>
-              <Card padding="md" variant="outlined">
-                <View className="flex-row items-center">
-                  <Icon name="business-outline" size={20} color="#6B7280" />
-                  <Text className="text-base text-gray-900 ml-2">{branchOfficeName}</Text>
-                </View>
-              </Card>
-            </View>
+            {/* Campo de Sucursal - Seleccionable para superadmin, solo lectura para admin */}
+            {isSuperAdmin ? (
+              <View className="mb-4">
+                <Dropdown
+                  label="Sucursal *"
+                  placeholder="Selecciona una sucursal"
+                  options={branchOfficeOptions}
+                  value={selectedBranchOfficeId || ''}
+                  onValueChange={(value) => {
+                    setSelectedBranchOfficeId(value);
+                  }}
+                  icon="business-outline"
+                />
+              </View>
+            ) : (
+              <View className="mb-4">
+                <Text className="text-base font-semibold text-gray-700 mb-2">Sucursal</Text>
+                <Card padding="md" variant="outlined">
+                  <View className="flex-row items-center">
+                    <Icon name="business-outline" size={20} color="#6B7280" />
+                    <Text className="text-base text-gray-900 ml-2">{branchOfficeName}</Text>
+                  </View>
+                </Card>
+              </View>
+            )}
 
             <Dropdown
               label="Tipo de Servicio *"

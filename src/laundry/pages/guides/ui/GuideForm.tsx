@@ -24,6 +24,7 @@ interface GuideFormProps {
   clientOptions: Option[];
   selectedClientId?: string;
   onChangeClient: (id: string) => void;
+  onChangeBranchOffice?: (branchOfficeId: string) => void; // Callback para notificar cambio de sucursal
   guideItems: GuideItem[];
   onRemoveItem: (epc: string) => void;
   onScan: () => void;
@@ -46,6 +47,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   clientOptions,
   selectedClientId,
   onChangeClient,
+  onChangeBranchOffice,
   guideItems,
   onRemoveItem,
   onScan,
@@ -65,12 +67,28 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   const { sucursales } = useBranchOffices();
 
   // Obtener la sucursal del usuario logueado
-  const branchOfficeId = user?.branch_office_id || (user as any)?.sucursalId;
-
+  const userBranchOfficeId = user?.branch_office_id || (user as any)?.sucursalId;
+  const isSuperAdmin = isSuperAdminUser(user);
+  
+  // Estado para sucursal seleccionada (para superadmin puede seleccionar, para admin usa la del usuario)
+  const [selectedBranchOfficeId, setSelectedBranchOfficeId] = useState<string>(
+    draftValues?.branchOfficeId || guideToEdit?.branch_office_id || userBranchOfficeId || ''
+  );
+  
+  // La sucursal final: para superadmin es la seleccionada, para admin es la del usuario
+  const branchOfficeId = isSuperAdmin ? selectedBranchOfficeId : userBranchOfficeId;
+  
   // Buscar el nombre de la sucursal en la lista de sucursales
   const currentBranch = sucursales.find(branch => branch.id === branchOfficeId);
   const branchOfficeName = currentBranch?.name || 'Sucursal no asignada';
-  const isSuperAdmin = isSuperAdminUser(user);
+  
+  // Opciones de sucursales para el dropdown (solo para superadmin)
+  const branchOfficeOptions = useMemo(() => {
+    return sucursales.map(branch => ({
+      label: branch.name,
+      value: branch.id,
+    }));
+  }, [sucursales]);
 
   // Estado local para campos del servicio y fechas
   const resolvedInitialServiceType = initialServiceType || 'INDUSTRIAL';
@@ -156,16 +174,35 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       .map(v => ({ label: v.label, value: v.code }));
   }, [shiftCatalog]);
 
+  // Filtrar clientes por sucursal seleccionada
+  const filteredClientOptions = useMemo(() => {
+    // Por ahora retornamos todos los clientes ya que la filtración se hace en GuidesPage
+    // TODO: Filtrar por sucursal cuando GuidesPage pase la información de sucursal de cada cliente
+    return clientOptions;
+  }, [clientOptions, branchOfficeId]);
+
   const selectedClientOption = useMemo(() => {
     if (!selectedClientId) return undefined;
-    return clientOptions.find(option => option.value === selectedClientId);
-  }, [clientOptions, selectedClientId]);
+    return filteredClientOptions.find(option => option.value === selectedClientId);
+  }, [filteredClientOptions, selectedClientId]);
 
   const selectedClientServiceLabel = useMemo(() => {
     const type = (selectedClientOption?.serviceType || serviceType || '').toUpperCase();
     if (!type) return null;
     return type === 'INDUSTRIAL' ? 'Servicio Industrial' : 'Servicio Personal';
   }, [selectedClientOption?.serviceType, serviceType]);
+  
+  // Limpiar cliente cuando cambia la sucursal (para superadmin)
+  useEffect(() => {
+    if (isSuperAdmin && selectedBranchOfficeId && selectedClientId) {
+      // Verificar si el cliente seleccionado pertenece a la nueva sucursal
+      // Si no, limpiar la selección
+      const clientBelongsToBranch = filteredClientOptions.some(opt => opt.value === selectedClientId);
+      if (!clientBelongsToBranch) {
+        onChangeClient('');
+      }
+    }
+  }, [selectedBranchOfficeId, isSuperAdmin, filteredClientOptions, selectedClientId, onChangeClient]);
 
   const REQUESTED_SERVICES_OPTIONS = useMemo(() => {
     return (requestedServicesCatalog?.data || [])
@@ -263,6 +300,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       if (draftValues.shift) setShift(draftValues.shift);
       if (draftValues.missingGarments !== undefined) setMissingGarments(String(draftValues.missingGarments));
       if (draftValues.vehicleUnitNumber) setVehicleUnitNumber(draftValues.vehicleUnitNumber);
+      if (draftValues.branchOfficeId) setSelectedBranchOfficeId(draftValues.branchOfficeId);
     }
   }, [draftValues, guideToEdit]);
 
@@ -307,6 +345,10 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         setMissingGarments(String(guideToEdit.missing_garments));
       }
       setVehicleUnitNumber(guideToEdit.vehicle_unit_number || '');
+      // Cargar sucursal de la guía en modo edición
+      if (guideToEdit.branch_office_id) {
+        setSelectedBranchOfficeId(guideToEdit.branch_office_id);
+      }
     }
   }, [guideToEdit]);
 
@@ -393,12 +435,34 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           </View>
         )}
 
-        {/* Cliente primero */}
+        {/* Sucursal primero (solo para superadmin) */}
+        {isSuperAdmin && (
+          <View className="mb-4">
+            <Dropdown
+              label="Sucursal *"
+              placeholder="Selecciona una sucursal"
+              options={branchOfficeOptions}
+              value={selectedBranchOfficeId || ''}
+              onValueChange={(value) => {
+                setSelectedBranchOfficeId(value);
+                // Notificar cambio de sucursal a GuidesPage
+                if (onChangeBranchOffice) {
+                  onChangeBranchOffice(value);
+                }
+                // Limpiar cliente cuando cambia la sucursal
+                onChangeClient('');
+              }}
+              icon="business-outline"
+            />
+          </View>
+        )}
+        
+        {/* Cliente (filtrado por sucursal) */}
         <View className="mb-4">
           <Dropdown
             label="Cliente *"
             placeholder="Selecciona un cliente"
-            options={clientOptions}
+            options={filteredClientOptions}
             value={selectedClientId || ''}
             onValueChange={onChangeClient}
             icon="person-outline"
@@ -445,7 +509,10 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               </View>
             </>
           )}
-          <Input label="Sucursal" value={branchOfficeName} editable={false} className="mt-1" />
+          {/* Mostrar sucursal solo para admin (no superadmin, ya que lo selecciona arriba) */}
+          {!isSuperAdmin && (
+            <Input label="Sucursal" value={branchOfficeName} editable={false} className="mt-1" />
+          )}
           <View className="flex-row mt-1 -mx-1">
             <View className="flex-1 px-1">
               <Input
@@ -888,7 +955,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             // Construir payload y crear guía directamente
             const guideData = {
               client_id: selectedClientId,
-              branch_office_id: branchOfficeId || undefined,
+              branch_office_id: branchOfficeId && branchOfficeId.trim() !== '' ? branchOfficeId : undefined,
               service_type: serviceType as any,
               supplier_guide_number: serviceType === 'INDUSTRIAL' ? (supplierGuideNumber || undefined) : undefined,
               collection_date: formatDateToISO(collectionDate, true),
@@ -930,6 +997,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               departureTime,
               arrivalTime,
               totalBundlesReceived,
+              branchOfficeId: selectedBranchOfficeId,
               vehiclePlate,
               vehicleUnitNumber,
               requestedServices,

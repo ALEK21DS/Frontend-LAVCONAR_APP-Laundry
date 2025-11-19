@@ -17,6 +17,8 @@ import { QrScanner } from '@/laundry/components';
 import { GuideDetailsModal } from './ui/GuideDetailsModal';
 import { useCatalogLabelMap } from '@/laundry/hooks';
 import { GUIDE_STATUS_COLORS } from '@/constants/processes';
+import { useAuthStore } from '@/auth/store/auth.store';
+import { isSuperAdminUser, getPreferredBranchOfficeId } from '@/helpers/user.helper';
 
  type GuidesPageProps = { navigation: NativeStackNavigationProp<any> };
 
@@ -29,7 +31,22 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const { createGuideAsync, isCreating } = useCreateGuide();
   const { updateGuideAsync } = useUpdateGuide();
   const { updateGuideStatusAsync, isUpdating } = useUpdateGuideStatus();
-  const { clients } = useClients({ limit: 50 });
+  // Estado para la sucursal seleccionada (para filtrar clientes)
+  const { user } = useAuthStore();
+  const isSuperAdmin = isSuperAdminUser(user);
+  const userBranchOfficeId = getPreferredBranchOfficeId(user) || '';
+  const [selectedBranchOfficeId, setSelectedBranchOfficeId] = useState<string>(userBranchOfficeId);
+  // Pasar branch_office_id al hook de clientes para filtrar en el backend
+  // Para superadmin, usar selectedBranchOfficeId; para admin, usar userBranchOfficeId
+  const effectiveBranchOfficeId = isSuperAdmin && selectedBranchOfficeId 
+    ? selectedBranchOfficeId 
+    : (!isSuperAdmin ? userBranchOfficeId : undefined);
+  
+  const { clients } = useClients({ 
+    limit: 50,
+    branch_office_id: effectiveBranchOfficeId || undefined,
+    only_active_status: true // Solo clientes activos en selectores
+  });
   const { invalidateAuthorizationAsync } = useInvalidateAuthorization();
   const [query, setQuery] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -115,14 +132,18 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
 
   const clientOptions = useMemo(() => {
     const normalizedType = selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL';
-    let options = clients
-      .filter(client => (client.service_type || '').toUpperCase() === normalizedType)
-      .map(client => ({
-        label: client.acronym ? `${client.name} (${client.acronym})` : client.name,
-        value: client.id,
-        serviceType: (client.service_type || '').toUpperCase(),
-        acronym: client.acronym,
-      }));
+    // Filtrar por tipo de servicio (el backend ya filtra por sucursal)
+    let filteredClients = clients.filter(client => {
+      const matchesServiceType = (client.service_type || '').toUpperCase() === normalizedType;
+      return matchesServiceType;
+    });
+    
+    let options = filteredClients.map(client => ({
+      label: client.acronym ? `${client.name} (${client.acronym})` : client.name,
+      value: client.id,
+      serviceType: (client.service_type || '').toUpperCase(),
+      acronym: client.acronym,
+    }));
 
     if (selectedClientId && !options.some(opt => opt.value === selectedClientId)) {
       const fallbackClient = clients.find(client => client.id === selectedClientId);
@@ -149,7 +170,11 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   }, [base, query]);
 
   const openCreate = () => { 
-    setEditingId(null); 
+    setEditingId(null);
+    // Resetear sucursal al valor por defecto del usuario al crear nueva guía
+    if (isSuperAdmin) {
+      setSelectedBranchOfficeId(userBranchOfficeId);
+    }
     setShowServiceTypeModal(true); 
   };
 
@@ -162,6 +187,10 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
     if (selectedGuide) {
       setEditingId(selectedGuide.id);
       setSelectedClientId(selectedGuide.client_id || '');
+      // Sincronizar sucursal de la guía con el estado de filtrado de clientes
+      if (isSuperAdmin && selectedGuide.branch_office_id) {
+        setSelectedBranchOfficeId(selectedGuide.branch_office_id);
+      }
       if (selectedGuide.service_type) {
         setSelectedServiceType(selectedGuide.service_type === 'PERSONAL' ? 'personal' : 'industrial');
       }
@@ -171,6 +200,13 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
 
   const onChangeClient = (clientId: string) => {
     setSelectedClientId(clientId);
+  };
+  
+  // Callback para cuando GuideForm cambia la sucursal (solo para superadmin)
+  const onChangeBranchOffice = (branchOfficeId: string) => {
+    setSelectedBranchOfficeId(branchOfficeId);
+    // Limpiar cliente cuando cambia la sucursal
+    setSelectedClientId('');
   };
 
   const handleServiceTypeSelect = (serviceType: 'industrial' | 'personal') => {
@@ -474,6 +510,7 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
             clientOptions={clientOptions}
             selectedClientId={selectedClientId}
             onChangeClient={onChangeClient}
+            onChangeBranchOffice={onChangeBranchOffice}
             initialServiceType={
               (editingId && selectedGuide?.service_type) ||
               (selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL')

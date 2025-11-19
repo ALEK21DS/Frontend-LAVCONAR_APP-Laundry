@@ -86,12 +86,25 @@ export const ScanForm: React.FC<ScanFormProps> = ({
     return (scannedTags || []).filter((c) => !prevSet.has(c?.trim()));
   }, [initialCodes, scannedTags, hasBaseline]);
   
+  const combinedScannedCodes = useMemo(() => {
+    if (!hasBaseline) {
+      return scannedTags;
+    }
+    const combined = [...initialCodes];
+    scannedTags.forEach(code => {
+      if (!combined.includes(code)) {
+        combined.push(code);
+      }
+    });
+    return combined;
+  }, [initialCodes, scannedTags, hasBaseline]);
+
   const [formData, setFormData] = useState({
     branch_offices_id: branchOfficeId,
     branch_office_name: branchOfficeName,
     scan_type: initialRfidScan?.scan_type || 'COLLECTED',
-    scanned_quantity: scannedTags.length || 0,
-    scanned_rfid_codes: scannedTags,
+    scanned_quantity: combinedScannedCodes.length || 0,
+    scanned_rfid_codes: combinedScannedCodes,
     differences_detected: initialRfidScan?.differences_detected || '',
     unexpected_codes: hasBaseline ? computedUnexpected : unregisteredCodes,
   });
@@ -100,11 +113,11 @@ export const ScanForm: React.FC<ScanFormProps> = ({
   useEffect(() => {
     setFormData((prev) => ({
       ...prev,
-      scanned_quantity: scannedTags.length || 0,
-      scanned_rfid_codes: scannedTags,
+      scanned_quantity: combinedScannedCodes.length || 0,
+      scanned_rfid_codes: combinedScannedCodes,
       unexpected_codes: computedUnexpected,
     }));
-  }, [scannedTags, computedUnexpected, hasBaseline, unregisteredCodes]);
+  }, [combinedScannedCodes, computedUnexpected, hasBaseline, unregisteredCodes]);
 
   // Catálogo dinámico de tipos de escaneo (scan_type) con datos frescos
   const { data: scanTypeCatalog } = useCatalogValuesByType('scan_type', true, { forceFresh: true });

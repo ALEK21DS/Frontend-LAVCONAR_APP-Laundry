@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
-import { Input, Button } from '@/components/common';
+import { Input, Button, Dropdown } from '@/components/common';
 import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
 import { CreateIncidentDto, IncidentType, IncidentStatus, ActionTaken } from '@/laundry/interfaces/incidents/incidents.interface';
 import { useAuthStore } from '@/auth/store/auth.store';
@@ -10,6 +10,7 @@ import { useGetRfidScanByGuide } from '@/laundry/hooks/guides/rfid-scan';
 import { useBranchOffices } from '@/laundry/hooks/branch-offices';
 import { GuideSelectionModal, GarmentSelectionModal } from '@/laundry/components';
 import { guidesApi } from '@/laundry/api/guides/guides.api';
+import { isSuperAdminUser } from '@/helpers/user.helper';
 
 interface IncidentFormProps {
   initialValues?: any;
@@ -26,13 +27,29 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
 }) => {
   const { user } = useAuthStore();
   const { sucursales } = useBranchOffices();
+  const isSuperAdmin = isSuperAdminUser(user);
   
-  // Obtener la sucursal del usuario logueado (igual que en GuideForm)
-  const branchOfficeId = user?.branch_office_id || user?.sucursalId || '';
+  const userBranchOfficeId = user?.branch_office_id || user?.sucursalId || '';
+  
+  // Estado para sucursal seleccionada (para superadmin puede seleccionar, para admin usa la del usuario)
+  const [selectedBranchOfficeId, setSelectedBranchOfficeId] = useState<string>(
+    initialValues?.branch_offices_id || userBranchOfficeId || ''
+  );
+  
+  // La sucursal final: para superadmin es la seleccionada, para admin es la del usuario
+  const branchOfficeId = isSuperAdmin ? selectedBranchOfficeId : userBranchOfficeId;
   
   // Buscar el nombre de la sucursal en la lista de sucursales
   const currentBranch = sucursales.find(branch => branch.id === branchOfficeId);
   const branchOfficeName = currentBranch?.name || 'Sucursal no asignada';
+  
+  // Opciones de sucursales para el dropdown (solo para superadmin)
+  const branchOfficeOptions = useMemo(() => {
+    return sucursales.map(branch => ({
+      label: branch.name,
+      value: branch.id,
+    }));
+  }, [sucursales]);
 
   const [formData, setFormData] = useState({
     guide_id: initialValues?.guide_id || '',
@@ -266,6 +283,7 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
     id: g.id,
     guide_number: g.guide_number,
     client_name: g.client_name || '',
+    client_acronym: g.client_acronym || g.client?.acronym,
     status: g.status,
     created_at: g.created_at,
     total_garments: scannedCountsByGuide[g.id] ?? 0, // Total de códigos RFID escaneados
@@ -277,15 +295,30 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
       className="flex-1"
     >
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {/* Sucursal (solo lectura) */}
-        <View className="mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-2">Sucursal *</Text>
-          <View className="bg-gray-100 rounded-lg px-4 py-3 border border-gray-300">
-            <Text className="text-gray-900">
-              {branchOfficeName}
-            </Text>
+        {/* Sucursal - Seleccionable para superadmin, solo lectura para admin */}
+        {isSuperAdmin ? (
+          <View className="mb-4">
+            <Dropdown
+              label="Sucursal *"
+              placeholder="Selecciona una sucursal"
+              options={branchOfficeOptions}
+              value={selectedBranchOfficeId || ''}
+              onValueChange={(value) => {
+                setSelectedBranchOfficeId(value);
+              }}
+              icon="business-outline"
+            />
           </View>
-        </View>
+        ) : (
+          <View className="mb-4">
+            <Text className="text-sm font-semibold text-gray-700 mb-2">Sucursal *</Text>
+            <View className="bg-gray-100 rounded-lg px-4 py-3 border border-gray-300">
+              <Text className="text-gray-900">
+                {branchOfficeName}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Guía */}
         <View className="mb-4">

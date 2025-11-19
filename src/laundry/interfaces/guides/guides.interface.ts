@@ -10,6 +10,12 @@ export interface Guide {
   guide_number: string;
   client_id: string;
   client_name?: string;
+  client_acronym?: string;
+  client?: {
+    id?: string;
+    name?: string;
+    acronym?: string;
+  };
   branch_office_id: string;
   branch_office_name?: string;
   general_condition?: 'GOOD' | 'REGULAR' | 'BAD';

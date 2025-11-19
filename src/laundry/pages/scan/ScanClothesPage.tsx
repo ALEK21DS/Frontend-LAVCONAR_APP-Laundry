@@ -1715,6 +1715,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           id: g.id,
           guide_number: g.guide_number,
           client_name: g.client_name || 'Cliente desconocido',
+          client_acronym: g.client_acronym || g.client?.acronym,
           status: g.status,
           created_at: g.created_at,
           total_garments: g.total_garments || 0,
