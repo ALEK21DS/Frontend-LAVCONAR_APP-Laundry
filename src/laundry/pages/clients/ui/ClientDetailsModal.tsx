@@ -7,6 +7,7 @@ import { useCreateAuthorizationRequest, useGetAuthorizationById } from '@/laundr
 import { useDeleteClient } from '@/laundry/hooks/clients';
 import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
 
+
 interface ClientDetailsModalProps {
   visible: boolean;
   onClose: () => void;
@@ -29,6 +30,8 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
   const [currentRequestId, setCurrentRequestId] = useState('');
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
 
+  const { user } = useAuthStore();
+  const isSuperAdmin = isSuperAdminUser(user);
   const { createAuthorizationRequestAsync, isCreating } = useCreateAuthorizationRequest();
   const { authorization, status: authStatus } = useGetAuthorizationById(
     currentRequestId,
@@ -92,12 +95,25 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
   if (!client) return null;
 
   const handleEditRequest = () => {
+    // Si es superadmin, ejecutar directamente sin solicitar autorización
+    if (isSuperAdmin) {
+      onClose();
+      onEdit();
+      return;
+    }
+    // Si no es superadmin, solicitar autorización
     setAuthAction('EDIT');
     setDescription('');
     setAuthModalVisible(true);
   };
 
   const handleDeleteRequest = () => {
+    // Si es superadmin, abrir directamente el modal de confirmación de eliminación
+    if (isSuperAdmin) {
+      setDeleteConfirmVisible(true);
+      return;
+    }
+    // Si no es superadmin, solicitar autorización
     setAuthAction('DELETE');
     setDescription('');
     setAuthModalVisible(true);

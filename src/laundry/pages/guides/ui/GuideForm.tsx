@@ -307,7 +307,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   // Cargar datos de la guía en modo edición
   useEffect(() => {
     if (guideToEdit) {
-
+     
       // Convertir fecha ISO a formato dd/mm/yyyy
       const formatISOToDisplay = (isoDate: string): string => {
         if (!isoDate) return '';
@@ -317,6 +317,15 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         const year = date.getFullYear();
         return `${day}/${month}/${year}`;
       };
+
+      // Cargar sucursal primero para que se carguen los clientes correctos
+      if (guideToEdit.branch_office_id) {
+        setSelectedBranchOfficeId(guideToEdit.branch_office_id);
+        // Notificar cambio de sucursal a GuidesPage
+        if (onChangeBranchOffice) {
+          onChangeBranchOffice(guideToEdit.branch_office_id);
+        }
+      }
 
       setServiceType(guideToEdit.service_type || '');
       // charge_type no aplica a guides
@@ -345,12 +354,34 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         setMissingGarments(String(guideToEdit.missing_garments));
       }
       setVehicleUnitNumber(guideToEdit.vehicle_unit_number || '');
+    }
+  }, [guideToEdit, onChangeBranchOffice]);
+
+  // Cargar cliente después de que se haya sincronizado la sucursal y los clientes estén disponibles
+  useEffect(() => {
+    if (guideToEdit && guideToEdit.client_id && filteredClientOptions.length > 0) {
+      // Verificar que el cliente esté en la lista filtrada
+      const clientExists = filteredClientOptions.some(option => option.value === guideToEdit.client_id);
+      if (clientExists) {
+        onChangeClient(guideToEdit.client_id);
+      }
       // Cargar sucursal de la guía en modo edición
       if (guideToEdit.branch_office_id) {
         setSelectedBranchOfficeId(guideToEdit.branch_office_id);
       }
     }
-  }, [guideToEdit]);
+  }, [guideToEdit, onChangeBranchOffice]);
+
+  // Cargar cliente después de que se haya sincronizado la sucursal y los clientes estén disponibles
+  useEffect(() => {
+    if (guideToEdit && guideToEdit.client_id && filteredClientOptions.length > 0) {
+      // Verificar que el cliente esté en la lista filtrada
+      const clientExists = filteredClientOptions.some(option => option.value === guideToEdit.client_id);
+      if (clientExists) {
+        onChangeClient(guideToEdit.client_id);
+      }
+    }
+  }, [guideToEdit, filteredClientOptions, onChangeClient]);
 
   // Función para formatear fecha mientras se escribe (dd/mm/yyyy)
   const formatDateInput = (text: string): string => {
@@ -538,9 +569,6 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             </View>
           </View>
         </View>
-
-
-
         <View className="mb-4">
           <Text className="text-base text-gray-700 font-semibold mb-2">Información del Servicio</Text>
 
@@ -554,6 +582,25 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             </View>
           </View>
 
+        <View className="flex-row -mx-1 mt-2">
+          <View className="flex-1 px-1">
+            <Input label="Total Prendas" value={String(totalGarments)} editable={false} />
+        {showScanButton && !guideToEdit && (
+          <View className="mb-4">
+            <Button
+              title={isScanning ? 'Detener Escaneo' : 'Iniciar Escaneo'}
+              onPress={() => {
+                onScan();
+              }}
+              icon={<Icon name={isScanning ? 'stop-circle-outline' : 'scan-outline'} size={18} color="white" />}
+              fullWidth
+              size="sm"
+              disabled={!selectedClientId}
+              style={{ backgroundColor: '#0b1f36' }}
+            />
+            {!selectedClientId && (
+              <Text className="text-sm text-gray-500 mt-2 text-center">Selecciona un cliente para continuar</Text>
+            )}
           {/* Servicios Solicitados - Solo para servicio personal */}
           {serviceType === 'PERSONAL' && (
             <View className="mt-2">
@@ -657,35 +704,46 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           </View>
         </View>
 
-        {showScanButton && (
-          <View className="mb-4">
-            <Button
-              title={guideToEdit ? 'Editar Prendas' : (isScanning ? 'Detener Escaneo' : 'Iniciar Escaneo')}
-              onPress={() => {
-                // Si estamos en modo edición, SIEMPRE navegar a la página de escaneo
-                if (guideToEdit && onNavigate) {
-                  onNavigate('ScanClothes', {
-                    mode: 'guide',
-                    serviceType: serviceType === 'PERSONAL' ? 'personal' : 'industrial',
-                    guideId: guideToEdit.id,
-                    initialRfids: existingRfids, // Usar los RFIDs del rfid_scan
-                    guideToEdit, // pasar toda la guía para prefills de edición
-                    isEditMode: true,
-                  });
-                } else {
-                  // Comportamiento normal de escaneo para creación de guía
-                  onScan();
-                }
-              }}
-              icon={<Icon name={guideToEdit ? 'create-outline' : (isScanning ? 'stop-circle-outline' : 'scan-outline')} size={18} color="white" />}
-              fullWidth
-              size="sm"
-              disabled={!selectedClientId}
-              style={{ backgroundColor: '#0b1f36' }}
-            />
-            {!selectedClientId && !guideToEdit && (
-              <Text className="text-sm text-gray-500 mt-2 text-center">Selecciona un cliente para continuar</Text>
-            )}
+      {showScanButton && (
+        <View className="mb-4">
+          <Button
+            title={guideToEdit ? 'Editar Prendas' : (isScanning ? 'Detener Escaneo' : 'Iniciar Escaneo')}
+            onPress={() => {
+              // Si estamos en modo edición, SIEMPRE navegar a la página de escaneo
+              if (guideToEdit && onNavigate) {
+                onNavigate('ScanClothes', {
+                  mode: 'guide',
+                  serviceType: serviceType === 'PERSONAL' ? 'personal' : 'industrial',
+                  guideId: guideToEdit.id,
+                  initialRfids: existingRfids, // Usar los RFIDs del rfid_scan
+                  guideToEdit, // pasar toda la guía para prefills de edición
+                  isEditMode: true,
+                });
+              } else {
+                // Comportamiento normal de escaneo para creación de guía
+                onScan();
+              }
+            }}
+            icon={<Icon name={guideToEdit ? 'create-outline' : (isScanning ? 'stop-circle-outline' : 'scan-outline')} size={18} color="white" />}
+            fullWidth
+            size="sm"
+            disabled={!selectedClientId}
+            style={{ backgroundColor: '#0b1f36' }}
+          />
+          {!selectedClientId && !guideToEdit && (
+            <Text className="text-sm text-gray-500 mt-2 text-center">Selecciona un cliente para continuar</Text>
+          )}
+        </View>
+      )}
+
+      {/* Prendas Registradas en la Guía (Modo Edición) */}
+      {guideToEdit && (
+        <View className="mb-4 bg-amber-50 p-4 rounded-lg border border-amber-200">
+          <View className="flex-row items-center mb-3">
+            <Icon name="shirt-outline" size={20} color="#F59E0B" />
+            <Text className="text-base text-amber-800 font-semibold ml-2">
+              Códigos RFID Escaneados ({existingRfids.length})
+            </Text>
           </View>
         )}
 
@@ -709,6 +767,22 @@ export const GuideForm: React.FC<GuideFormProps> = ({
                   Presiona "Editar Prendas" para escanear
                 </Text>
               </View>
+            ))}
+          </ScrollView>
+          )}
+          
+          <Text className="text-xs text-amber-700 mt-3">
+            💡 Puedes escanear más prendas para agregarlas a esta guía
+          </Text>
+        </View>
+      )}
+
+      {/* Detalles de Servicio (solo servicio personal) */}
+      {serviceType === 'PERSONAL' && (
+      <View className="mb-6 bg-blue-50 p-4 rounded-lg">
+        <Text className="text-base text-blue-800 font-semibold mb-3">Detalles de Servicio</Text>
+        <View className="flex-row -mx-1">
+          <View className="flex-1 px-1">
             ) : (
 
               <ScrollView className="max-h-40">
