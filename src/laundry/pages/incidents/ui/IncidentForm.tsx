@@ -70,8 +70,12 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
   const [showActionTakenDropdown, setShowActionTakenDropdown] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   
-  // Cargar guías igual que en GuidesPage (paginación normal)
-  const { guides, isLoading: isLoadingGuides } = useGuides({ page: 1, limit: 10 });
+  // Cargar guías filtradas por sucursal seleccionada
+  const { guides, isLoading: isLoadingGuides } = useGuides({ 
+    page: 1, 
+    limit: 10,
+    branch_office_id: branchOfficeId || undefined
+  });
   
   // Estado para almacenar el total de códigos RFID escaneados por guía
   const [scannedCountsByGuide, setScannedCountsByGuide] = useState<Record<string, number>>({});
@@ -305,6 +309,13 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
               value={selectedBranchOfficeId || ''}
               onValueChange={(value) => {
                 setSelectedBranchOfficeId(value);
+                // Limpiar guía y RFID cuando cambia la sucursal
+                setFormData(prev => ({
+                  ...prev,
+                  guide_id: '',
+                  guide_number: '',
+                  rfid_code: '',
+                }));
               }}
               icon="business-outline"
             />
