@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Alert, ActivityIndicator } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
-import { Card } from '@/components/common';
+import { Card, PaginationControls } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useGuides, useCreateGuide, useUpdateGuideStatus, useScanQr, useUpdateGuide } from '@/laundry/hooks/guides';
 import { useClients } from '@/laundry/hooks/clients';
@@ -375,49 +375,15 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
             })}
             </View>
           )}
+
+          {/* Controles de paginación */}
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            total={total}
+            onPageChange={(page) => setPage(page)}
+          />
         </ScrollView>
-
-        {/* Controles de paginación */}
-        {totalPages > 1 && (
-          <View className="border-t border-gray-200 bg-white p-4">
-            <View className="flex-row items-center justify-between">
-              <TouchableOpacity
-                onPress={() => setPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className={`flex-row items-center px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray-100' : ''}`}
-                style={{ backgroundColor: currentPage === 1 ? undefined : '#0b1f36' }}
-              >
-                <IonIcon 
-                  name="chevron-back" 
-                  size={18} 
-                  color={currentPage === 1 ? '#9CA3AF' : '#FFFFFF'} 
-                />
-              </TouchableOpacity>
-
-              <View className="flex-row items-center">
-                <Text className="text-gray-600 font-medium">
-                  Página {currentPage} de {totalPages}
-                </Text>
-                <Text className="text-gray-400 text-sm ml-2">
-                  ({total} total)
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className={`flex-row items-center px-4 py-2 rounded-lg ${currentPage === totalPages ? 'bg-gray-100' : ''}`}
-                style={{ backgroundColor: currentPage === totalPages ? undefined : '#0b1f36' }}
-              >
-                <IonIcon 
-                  name="chevron-forward" 
-                  size={18} 
-                  color={currentPage === totalPages ? '#9CA3AF' : '#FFFFFF'} 
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
       </View>
 
       {/* Interfaz para prendas registradas (Servicio Personal) */}
