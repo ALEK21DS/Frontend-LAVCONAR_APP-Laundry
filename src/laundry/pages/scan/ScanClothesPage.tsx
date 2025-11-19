@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useRef, useState } from 'react';
+import React, { useEffect, useCallback, useRef, useState, useMemo } from 'react';
 import { View, Text, FlatList, Alert, NativeModules, NativeEventEmitter, Modal, TouchableOpacity } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Container, Button, Card } from '@/components/common';
@@ -139,6 +139,35 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   
   // Obtener lista de clientes (máximo 50 según validación del backend)
   const { clients, isLoading: isLoadingClients } = useClients({ limit: 50 });
+
+  const filteredClientOptions = useMemo(() => {
+    const normalizedType = serviceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL';
+    let options = clients
+      .filter(client => (client.service_type || '').toUpperCase() === normalizedType)
+      .map(client => ({
+        label: client.acronym ? `${client.name} (${client.acronym})` : client.name,
+        value: client.id,
+        serviceType: (client.service_type || '').toUpperCase(),
+        acronym: client.acronym,
+      }));
+
+    if (selectedClientId && !options.some(opt => opt.value === selectedClientId)) {
+      const fallback = clients.find(client => client.id === selectedClientId);
+      if (fallback) {
+        options = [
+          ...options,
+          {
+            label: fallback.acronym ? `${fallback.name} (${fallback.acronym})` : fallback.name,
+            value: fallback.id,
+            serviceType: (fallback.service_type || '').toUpperCase(),
+            acronym: fallback.acronym,
+          },
+        ];
+      }
+    }
+
+    return options;
+  }, [clients, serviceType, selectedClientId]);
   
   // Obtener guías filtradas solo por tipo de servicio (sin filtro por status)
   const { guides: guidesForProcess, isLoading: isLoadingGuides, refetch: refetchGuidesForProcess } = useGuides({
@@ -422,7 +451,6 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
 
   const applyReaderPower = useCallback(async (power: number) => {
     try {
-      console.log('[RFID][Front] Aplicando potencia seleccionada:', power, 'dBm');
       await rfidModule.setPower(power);
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -508,12 +536,6 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         return;
       }
       
-      console.log('[RFID][Front] Iniciando escaneo', {
-        range: scanRangeKey,
-        power: currentRangeConfig.power,
-        minRssi: MIN_RSSI,
-      });
-
       setIsScanning(true);
       isScanningRef.current = true;
       const subscription = rfidModule.addTagListener(async (tag: ScannedTag) => {
@@ -523,13 +545,6 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           return;
         }
 
-        console.log('[RFID][Front] Tag detectado', {
-          epc: tag.epc,
-          rssi: tag.rssi,
-          power: currentRangeConfig.power,
-          range: currentRangeConfig.label,
-        });
-        
         // En modo "guide" con servicio personal, lógica especial
         if (mode === 'guide' && serviceType === 'personal') {
           // PRIMERO: Verificar si ya está en la lista de registradas (duplicado local)
@@ -932,13 +947,6 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   }, [clearScannedTags]);
 
   const handleSelectRange = (key: ScanRangeKey) => {
-    const preset = SCAN_RANGE_PRESETS[key];
-    console.log('[RFID][Front] Rango seleccionado en UI:', {
-      key,
-      label: preset.label,
-      power: preset.power,
-      minRssi: preset.minRssi,
-    });
     setScanRangeKey(key);
     setIsRangeModalOpen(false);
   };
@@ -1558,10 +1566,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             clientOptions={
               isLoadingClients
                 ? [{ label: 'Cargando clientes...', value: '' }]
-                : clients.map(client => ({
-                    label: client.name,
-                    value: client.id,
-                  }))
+                : filteredClientOptions
             }
             selectedClientId={selectedClientId}
             onChangeClient={setSelectedClientId}
