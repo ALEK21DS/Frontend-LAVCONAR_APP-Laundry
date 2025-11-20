@@ -1,10 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, Alert, TextInput, ActivityIndicator } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Button, Card } from '@/components/common';
 import { formatDateTime } from '@/helpers';
+import { useAuthStore } from '@/auth/store/auth.store';
+import { isSuperAdminUser } from '@/helpers/user.helper';
 import { useCreateAuthorizationRequest, useGetAuthorizationById } from '@/laundry/hooks/authorizations';
 import { useDeleteClient } from '@/laundry/hooks/clients';
+import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
+
 
 interface ClientDetailsModalProps {
   visible: boolean;
@@ -28,6 +32,8 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
   const [currentRequestId, setCurrentRequestId] = useState('');
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
 
+  const { user } = useAuthStore();
+  const isSuperAdmin = isSuperAdminUser(user);
   const { createAuthorizationRequestAsync, isCreating } = useCreateAuthorizationRequest();
   const { authorization, status: authStatus } = useGetAuthorizationById(
     currentRequestId,
@@ -35,6 +41,15 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
   );
 
   const { deleteClientAsync, isDeleting } = useDeleteClient();
+
+  // Obtener catálogo de tipos de servicio para mostrar la etiqueta
+  const { data: serviceTypeCatalog } = useCatalogValuesByType('service_type', true, { forceFresh: true });
+
+  const serviceTypeLabel = useMemo(() => {
+    if (!client?.service_type) return 'N/A';
+    const catalogItem = serviceTypeCatalog?.data?.find(v => v.code === client.service_type);
+    return catalogItem?.label || client.service_type;
+  }, [client?.service_type, serviceTypeCatalog]);
 
   useEffect(() => {
     if (checkingAuth && authStatus) {
@@ -82,12 +97,25 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
   if (!client) return null;
 
   const handleEditRequest = () => {
+    // Si es superadmin, ejecutar directamente sin solicitar autorización
+    if (isSuperAdmin) {
+      onClose();
+      onEdit();
+      return;
+    }
+    // Si no es superadmin, solicitar autorización
     setAuthAction('EDIT');
     setDescription('');
     setAuthModalVisible(true);
   };
 
   const handleDeleteRequest = () => {
+    // Si es superadmin, abrir directamente el modal de confirmación de eliminación
+    if (isSuperAdmin) {
+      setDeleteConfirmVisible(true);
+      return;
+    }
+    // Si no es superadmin, solicitar autorización
     setAuthAction('DELETE');
     setDescription('');
     setAuthModalVisible(true);
@@ -170,6 +198,11 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
             <View className="mb-3">
               <Text className="text-xs text-gray-500 mb-1">Acrónimo</Text>
               <Text className="text-base text-gray-900 font-medium">{client.acronym || 'N/A'}</Text>
+            </View>
+
+            <View className="mb-3">
+              <Text className="text-xs text-gray-500 mb-1">Tipo de Servicio</Text>
+              <Text className="text-base text-gray-900 font-medium">{serviceTypeLabel}</Text>
             </View>
 
             <View>

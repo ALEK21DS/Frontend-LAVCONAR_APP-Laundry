@@ -1,17 +1,48 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React from 'react';
+import { View, Text, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Card } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { useAuth } from '@/auth/hooks/useAuth';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useDashboardStats, useRecentActivity } from '@/laundry/hooks/dashboard';
+
+type StatCardProps = {
+  title: string;
+  icon: string;
+  value?: number | null;
+  subtitle: string;
+  isLoading: boolean;
+};
+
+const formatPercentage = (value?: number | null) => {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return '--';
+  }
+  return `${Number(value).toFixed(1)}%`;
+};
+
+const StatCard: React.FC<StatCardProps> = ({ title, icon, value, subtitle, isLoading }) => (
+  <Card variant="outlined" padding="lg" className="bg-white">
+    <View className="flex-row items-start justify-between">
+      <View className="flex-1 pr-3">
+        <Text className="text-sm font-semibold text-gray-900">{title}</Text>
+        <Text className="text-3xl font-bold text-gray-900 mt-1">
+          {isLoading ? '--' : formatPercentage(value)}
+        </Text>
+        <Text className="text-sm text-gray-500 mt-1">{subtitle}</Text>
+      </View>
+      <View className="w-12 h-12 rounded-full bg-[#8EB021]/15 items-center justify-center">
+        <Icon name={icon as any} size={22} color="#8EB021" />
+      </View>
+    </View>
+  </Card>
+);
 
  type DashboardPageProps = { navigation: NativeStackNavigationProp<any> };
 
  export const DashboardPage: React.FC<DashboardPageProps> = ({ navigation }) => {
   // Obtener estadísticas reales del backend
-  const { stats, isLoading: statsLoading } = useDashboardStats();
+  const { metrics, isLoading: metricsLoading } = useDashboardStats();
   const { data: activities = [], isLoading: activitiesLoading, refetch: refetchActivities } = useRecentActivity();
   const [refreshing, setRefreshing] = React.useState(false);
 
@@ -35,43 +66,40 @@ import { useDashboardStats, useRecentActivity } from '@/laundry/hooks/dashboard'
             <Text className="text-lg font-bold text-black">DASHBOARD</Text>
             <Text className="text-base text-black mt-1">Monitoreo en tiempo real del sistema de lavandería</Text>
             <View className="h-4" />
-            <View className="flex-row flex-wrap -mx-2">
-              <View className="w-1/2 px-2 mb-4">
-                <Card variant="elevated" padding="md">
-                  <View className="items-center">
-                    <Icon name="people-outline" size={28} color="#8EB021" />
-                    <Text className="text-2xl font-bold text-gray-900 mt-2">{stats.clients || 0}</Text>
-                    <Text className="text-sm text-gray-500">Clientes</Text>
-                  </View>
-                </Card>
-              </View>
-              <View className="w-1/2 px-2 mb-4">
-                <Card variant="elevated" padding="md">
-                  <View className="items-center">
-                    <Icon name="document-text-outline" size={28} color="#8EB021" />
-                    <Text className="text-2xl font-bold text-gray-900 mt-2">{stats.guides || 0}</Text>
-                    <Text className="text-sm text-gray-500">Guías</Text>
-                  </View>
-                </Card>
-              </View>
-              <View className="w-1/2 px-2 mb-4">
-                <Card variant="elevated" padding="md">
-                  <View className="items-center">
-                    <Icon name="shirt-outline" size={28} color="#8EB021" />
-                    <Text className="text-2xl font-bold text-gray-900 mt-2">{stats.garments || 0}</Text>
-                    <Text className="text-sm text-gray-500">Prendas</Text>
-                  </View>
-                </Card>
-              </View>
-              <View className="w-1/2 px-2 mb-4">
-                <Card variant="elevated" padding="md">
-                  <View className="items-center">
-                    <Icon name="construct-outline" size={28} color="#8EB021" />
-                    <Text className="text-2xl font-bold text-gray-900 mt-2">{stats.processes || 0}</Text>
-                    <Text className="text-sm text-gray-500">Procesos</Text>
-                  </View>
-                </Card>
-              </View>
+            <View className="space-y-3">
+              <StatCard
+                title="Incidentes Pendientes"
+                icon="pulse-outline"
+                value={metrics?.pendingIncidentsPercentage}
+                isLoading={metricsLoading}
+                subtitle={
+                  metrics
+                    ? `${metrics.pendingIncidents ?? 0} de ${metrics.totalIncidents ?? 0} totales`
+                    : 'Sin datos'
+                }
+              />
+              <StatCard
+                title="Máquinas Operativas"
+                icon="hardware-chip-outline"
+                value={metrics?.operationalMachinesPercentage}
+                isLoading={metricsLoading}
+                subtitle={
+                  metrics
+                    ? `${metrics.operationalMachines ?? 0} Operativas | ${metrics.maintenanceMachines ?? 0} Mantenimiento`
+                    : 'Sin datos'
+                }
+              />
+              <StatCard
+                title="Vehículos Disponibles"
+                icon="car-outline"
+                value={metrics?.availableVehiclesPercentage}
+                isLoading={metricsLoading}
+                subtitle={
+                  metrics
+                    ? `${metrics.availableVehicles ?? 0} Disponibles | ${metrics.inUseVehicles ?? 0} En Uso | ${metrics.maintenanceVehicles ?? 0} Mantenimiento`
+                    : 'Sin datos'
+                }
+              />
             </View>
           </View>
 
@@ -91,7 +119,7 @@ import { useDashboardStats, useRecentActivity } from '@/laundry/hooks/dashboard'
               </Card>
             ) : (
               <View className="-mx-2 flex-row flex-wrap">
-                {activities.map((item) => (
+                {activities.map(item => (
                   <View key={item.id} className="w-full px-2 mb-3">
                     <Card variant="elevated" padding="md">
                       {/* Título con badge al lado */}

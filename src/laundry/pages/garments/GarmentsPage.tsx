@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, ActivityIndicator, Alert } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
-import { Card } from '@/components/common';
+import { Card, PaginationControls } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -171,50 +171,13 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
             ))}
             </View>
           )}
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            total={total}
+            onPageChange={setPage}
+          />
         </ScrollView>
-
-        {/* Controles de paginación */}
-        {totalPages > 1 && (
-          <View className="border-t border-gray-200 bg-white p-4">
-            <View className="flex-row items-center justify-between">
-              <TouchableOpacity
-                onPress={() => setPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className={`flex-row items-center px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray-100' : ''}`}
-                style={{ backgroundColor: currentPage === 1 ? undefined : '#0b1f36' }}
-              >
-                <IonIcon 
-                  name="chevron-back" 
-                  size={18} 
-                  color={currentPage === 1 ? '#9CA3AF' : '#FFFFFF'} 
-                />
-              </TouchableOpacity>
-
-              <View className="flex-row items-center">
-                <Text className="text-gray-600 font-medium">
-                  Página {currentPage} de {totalPages}
-                </Text>
-                <Text className="text-gray-400 text-sm ml-2">
-                  ({total} total)
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className={`flex-row items-center px-4 py-2 rounded-lg ${currentPage === totalPages ? 'bg-gray-100' : ''}`}
-                style={{ backgroundColor: currentPage === totalPages ? undefined : '#0b1f36' }}
-              >
-                
-                <IonIcon 
-                  name="chevron-forward" 
-                  size={18} 
-                  color={currentPage === totalPages ? '#9CA3AF' : '#FFFFFF'} 
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
       </View>
 
       {/* Modal de Detalles */}
@@ -375,8 +338,8 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
                       color: data.colors && data.colors.length > 0 ? data.colors : undefined,
                       garment_type: data.garmentType || undefined,
                       garment_brand: data.brand || undefined,
-                      garment_condition: data.garmentCondition || undefined,
-                      physical_condition: data.physicalCondition || undefined,
+                      garment_condition: data.garmentCondition && data.garmentCondition.length > 0 ? data.garmentCondition : undefined,
+                      physical_condition: data.physicalCondition && data.physicalCondition.length > 0 ? data.physicalCondition : undefined,
                       observations: data.observations || undefined,
                       weight: data.weight ? parseFloat(String(data.weight)) : undefined,
                       quantity: data.quantity ? parseInt(String(data.quantity)) : undefined,

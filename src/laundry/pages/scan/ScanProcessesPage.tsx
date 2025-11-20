@@ -47,7 +47,6 @@ export const ScanProcessesPage: React.FC<ScanProcessesPageProps> = ({ navigation
 
   const applyReaderPower = useCallback(async () => {
     try {
-      console.log('[RFID][Front][Procesos] Aplicando potencia seleccionada:', currentRangeConfig.power);
       await rfidModule.setPower(currentRangeConfig.power);
     } catch (error) {
       console.warn('No se pudo aplicar potencia para procesos:', error);
@@ -56,19 +55,9 @@ export const ScanProcessesPage: React.FC<ScanProcessesPageProps> = ({ navigation
 
   const startScanning = useCallback(async () => {
     try {
-      console.log('[RFID][Front][Procesos] Iniciando escaneo', {
-        range: scanRangeKey,
-        power: currentRangeConfig.power,
-      });
       setIsScanning(true);
 
       const interval = rfidModule.simulateScan((tag: ScannedTag) => {
-        console.log('[RFID][Front][Procesos] Tag simulado', {
-          epc: tag.epc,
-          rssi: tag.rssi,
-          power: currentRangeConfig.power,
-          range: currentRangeConfig.label,
-        });
         addScannedTag(tag);
       });
 
@@ -93,12 +82,6 @@ export const ScanProcessesPage: React.FC<ScanProcessesPageProps> = ({ navigation
   }, [applyReaderPower]);
 
   const handleSelectRange = (key: ScanRangeKey) => {
-    const preset = SCAN_RANGE_PRESETS[key];
-    console.log('[RFID][Front][Procesos] Rango seleccionado en UI:', {
-      key,
-      label: preset.label,
-      power: preset.power,
-    });
     setScanRangeKey(key);
     setIsRangeModalOpen(false);
   };

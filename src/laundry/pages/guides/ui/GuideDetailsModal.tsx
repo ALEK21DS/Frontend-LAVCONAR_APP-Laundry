@@ -8,6 +8,8 @@ import { usePrintGuide } from '@/laundry/hooks/guides';
 import { useCreateAuthorizationRequest, useGetAuthorizationById } from '@/laundry/hooks/authorizations';
 import { useCatalogLabelMap } from '@/laundry/hooks';
 import { useDeleteGuide } from '@/laundry/hooks/guides/guide/useDeleteGuide';
+import { useAuthStore } from '@/auth/store/auth.store';
+import { isSuperAdminUser } from '@/helpers/user.helper';
 
 interface GuideDetailsModalProps {
   visible: boolean;
@@ -31,6 +33,10 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
   
   // Hook para exportar PDF
   const { downloadGuidePDF, isPrinting } = usePrintGuide();
+  
+  // Verificar si el usuario es superadmin
+  const { user } = useAuthStore();
+  const isSuperAdmin = isSuperAdminUser(user);
   
   // Hook para crear solicitud de autorización
   const { createAuthorizationRequestAsync, isCreating } = useCreateAuthorizationRequest();
@@ -98,12 +104,25 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
   if (!guide) return null;
 
   const handleEditRequest = () => {
+    // Si es superadmin, ejecutar directamente sin solicitar autorización
+    if (isSuperAdmin) {
+      onClose();
+      onEdit();
+      return;
+    }
+    // Si no es superadmin, solicitar autorización
     setAuthAction('EDIT');
     setDescription('');
     setAuthModalVisible(true);
   };
 
   const handleDeleteRequest = () => {
+    // Si es superadmin, abrir directamente el modal de confirmación de eliminación
+    if (isSuperAdmin) {
+      setDeleteConfirmVisible(true);
+      return;
+    }
+    // Si no es superadmin, solicitar autorización
     setAuthAction('DELETE');
     setDescription('');
     setAuthModalVisible(true);
@@ -220,34 +239,42 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
             </View>
           </Card>
 
-          {/* Números de Identificación */}
-          <Card padding="md" variant="outlined" className="mb-4">
-            <View className="flex-row items-center mb-3">
-              <IonIcon name="id-card-outline" size={20} color="#8EB021" />
-              <Text className="text-lg font-semibold text-gray-900 ml-2">Números de Identificación</Text>
-            </View>
-            {/* Números de Precinto */}
-            {(guide.precinct_number || guide.precinct_number_2) && (
-              <View className="space-y-2">
-                {guide.precinct_number && (
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-sm text-gray-700">Número de Precinto 1:</Text>
-                    <View className="px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
-                      <Text className="text-sm text-blue-800 font-mono">{guide.precinct_number}</Text>
-                    </View>
-                  </View>
-                )}
-                {guide.precinct_number_2 && (
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-sm text-gray-700">Número de Precinto 2:</Text>
-                    <View className="px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
-                      <Text className="text-sm text-blue-800 font-mono">{guide.precinct_number_2}</Text>
-                    </View>
-                  </View>
-                )}
+          {guide.service_type === 'INDUSTRIAL' && (guide.supplier_guide_number || guide.precinct_number || guide.precinct_number_2) && (
+            <Card padding="md" variant="outlined" className="mb-4">
+              <View className="flex-row items-center mb-3">
+                <IonIcon name="id-card-outline" size={20} color="#8EB021" />
+                <Text className="text-lg font-semibold text-gray-900 ml-2">Números de Identificación</Text>
               </View>
-            )}
-          </Card>
+              {guide.supplier_guide_number && (
+                <View className="flex-row items-center justify-between mb-2">
+                  <Text className="text-sm text-gray-700">Guía del Proveedor:</Text>
+                  <View className="px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
+                    <Text className="text-sm text-blue-800 font-mono">{guide.supplier_guide_number}</Text>
+                  </View>
+                </View>
+              )}
+              {(guide.precinct_number || guide.precinct_number_2) && (
+                <View className="space-y-2">
+                  {guide.precinct_number && (
+                    <View className="flex-row items-center justify-between">
+                      <Text className="text-sm text-gray-700">Número de Precinto 1:</Text>
+                      <View className="px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
+                        <Text className="text-sm text-blue-800 font-mono">{guide.precinct_number}</Text>
+                      </View>
+                    </View>
+                  )}
+                  {guide.precinct_number_2 && (
+                    <View className="flex-row items-center justify-between">
+                      <Text className="text-sm text-gray-700">Número de Precinto 2:</Text>
+                      <View className="px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
+                        <Text className="text-sm text-blue-800 font-mono">{guide.precinct_number_2}</Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              )}
+            </Card>
+          )}
 
           {/* Información del Servicio */}
           <Card padding="md" variant="outlined" className="mb-4">
@@ -306,8 +333,14 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
               </View>
               <View className="w-1/2 px-2 mb-3">
                 <Text className="text-xs text-gray-500 mb-1">Peso Total</Text>
-                <Text className="text-sm text-gray-800">{guide.total_weight ? `${guide.total_weight} kg` : 'N/A'}</Text>
+                <Text className="text-sm text-gray-800">{guide.total_weight ? `${guide.total_weight} lb` : 'N/A'}</Text>
               </View>
+              {typeof guide.missing_garments === 'number' && (
+                <View className="w-1/2 px-2 mb-3">
+                  <Text className="text-xs text-gray-500 mb-1">Prendas Faltantes</Text>
+                  <Text className="text-sm text-gray-800">{guide.missing_garments}</Text>
+                </View>
+              )}
               {guide.collection_date && (
                 <View className="w-1/2 px-2 mb-3">
                   <Text className="text-xs text-gray-500 mb-1">Fecha de Recolección</Text>

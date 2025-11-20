@@ -8,6 +8,7 @@ import { QrScanner } from './QrScanner';
 interface Vehicle {
   id: string;
   plate_number: string;
+  unit_number?: string;
   brand: string;
   model: string;
   year: number;
@@ -37,6 +38,7 @@ export const VehicleSelectionModal: React.FC<VehicleSelectionModalProps> = ({
     if (!searchQuery.trim()) return vehicles;
     const query = searchQuery.toLowerCase();
     return vehicles.filter(vehicle => 
+      vehicle.unit_number?.toLowerCase().includes(query) ||
       vehicle.plate_number.toLowerCase().includes(query) ||
       vehicle.brand.toLowerCase().includes(query) ||
       vehicle.model.toLowerCase().includes(query)
@@ -77,11 +79,14 @@ export const VehicleSelectionModal: React.FC<VehicleSelectionModalProps> = ({
             <View className="flex-row items-center mb-2">
               <Icon name="car-outline" size={20} color="#6B7280" />
               <Text className="text-lg font-bold text-gray-900 ml-2">
-                {item.plate_number}
+                {item.unit_number || item.plate_number}
               </Text>
             </View>
+            <Text className="text-sm text-gray-600">
+              Placa: {item.plate_number}
+            </Text>
             <Text className="text-sm text-gray-600 mb-1">
-              {item.brand} {item.model} ({item.year})
+              Nombre: {item.brand} {item.model} ({item.year})
             </Text>
             <View className="flex-row items-center justify-between">
               {item.capacity && (
@@ -141,7 +146,7 @@ export const VehicleSelectionModal: React.FC<VehicleSelectionModalProps> = ({
               <Icon name="search-outline" size={18} color="#6B7280" />
               <TextInput
                 className="flex-1 ml-2 text-gray-900"
-                placeholder="Buscar por placa, marca o modelo..."
+                placeholder="Buscar por unidad, placa, marca o modelo..."
                 placeholderTextColor="#9CA3AF"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -251,16 +256,23 @@ export const VehicleSelectionModal: React.FC<VehicleSelectionModalProps> = ({
             {/* Body */}
             {scannedVehicle && (
               <View className="p-6">
-                {/* Placa del Vehículo */}
+                {/* Unidad del Vehículo */}
                 <View className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <Text className="text-sm font-medium mb-1" style={{ color: '#0b1f36' }}>Placa</Text>
+                  <Text className="text-sm font-medium mb-1" style={{ color: '#0b1f36' }}>Unidad</Text>
                   <Text className="text-2xl font-bold text-blue-900">
-                    {scannedVehicle.plate_number}
+                    {scannedVehicle.unit_number || scannedVehicle.plate_number}
                   </Text>
                 </View>
 
                 {/* Información Principal */}
                 <View className="space-y-3 mb-6">
+                  <View className="flex-row justify-between py-2 border-b border-gray-100">
+                    <Text className="text-sm text-gray-600">Placa:</Text>
+                    <Text className="text-sm font-semibold text-gray-900">
+                      {scannedVehicle.plate_number}
+                    </Text>
+                  </View>
+                  
                   <View className="flex-row justify-between py-2 border-b border-gray-100">
                     <Text className="text-sm text-gray-600">Vehículo:</Text>
                     <Text className="text-sm font-semibold text-gray-900">

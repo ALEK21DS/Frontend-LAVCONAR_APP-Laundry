@@ -21,13 +21,17 @@ const USE_DEMO_AUTH = false;
 
 export const authApi = {
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
+    const payload: Record<string, any> = {
+      username: credentials.username,
+      password: credentials.password,
+    };
+    if (credentials.sucursalId) {
+      payload.branchOfficeId = credentials.sucursalId; // Solo enviar cuando el usuario lo selecciona
+    }
+
     const { data } = await authApiClient.post<ApiResponse<LoginResponse>>(
       '/login',
-      {
-        username: credentials.username,
-        password: credentials.password,
-        branchOfficeId: credentials.sucursalId, // El backend valida que coincida con la sucursal asignada
-      }
+      payload
     );
     
     return data.data!;

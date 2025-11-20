@@ -20,22 +20,25 @@ export interface Machine {
 /**
  * Hook para obtener máquinas filtradas por sucursal
  */
-export const useMachines = (branchOfficeId?: string, machineType?: string) => {
-  // Validar que branchOfficeId sea un string no vacío
-  const isValidBranchOfficeId = branchOfficeId && branchOfficeId.trim() !== '';
-  
+export const useMachines = (branchOfficeId?: string, machineType?: string, enabled: boolean = true) => {
+  // Para SUPERADMIN, branchOfficeId puede ser undefined y eso es válido (obtiene todas las máquinas)
+  // Para otros usuarios, branchOfficeId debe ser válido
+  const isValidBranchOfficeId = branchOfficeId === undefined || 
+    (typeof branchOfficeId === 'string' && branchOfficeId.trim() !== '');
+
   return useQuery({
     queryKey: ['machines', branchOfficeId, machineType],
     queryFn: async (): Promise<Machine[]> => {
-      if (!isValidBranchOfficeId) {
-        return [];
-      }
-
       const params: any = {
         page: 1,
         limit: 50,
-        branch_office_id: branchOfficeId!.trim(),
       };
+
+      // Solo agregar branch_office_id si está definido y no está vacío
+      // Si es undefined, el backend (para SUPERADMIN) mostrará todas las máquinas
+      if (branchOfficeId && typeof branchOfficeId === 'string' && branchOfficeId.trim() !== '') {
+        params.branch_office_id = branchOfficeId.trim();
+      }
 
       if (machineType) {
         params.machine_type = machineType;
@@ -51,13 +54,18 @@ export const useMachines = (branchOfficeId?: string, machineType?: string) => {
         const machines = response.data.data || [];
         return machines;
       } catch (error: any) {
+        // El backend lanza ResourceNotFoundException cuando no hay máquinas (404)
+        // También puede ser un error 400 u otro, pero si es 404 significa que no hay máquinas
         if (error?.response?.status === 404) {
           return [];
         }
-        throw error;
+        // Si es otro error, también retornar array vacío para no romper la UI
+        // pero loguear el error para debugging
+        console.warn('Error al obtener máquinas:', error?.response?.data?.message || error?.message);
+        return [];
       }
     },
-    enabled: isValidBranchOfficeId,
+    enabled: enabled && isValidBranchOfficeId,
     staleTime: 1000 * 60 * 5, // 5 minutos
     retry: false,
   });

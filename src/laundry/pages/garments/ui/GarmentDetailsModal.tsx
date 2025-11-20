@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, Alert } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Button, Card } from '@/components/common';
 import { formatDateTime } from '@/helpers';
+import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
+import { useAuthStore } from '@/auth/store/auth.store';
+import { isSuperAdminUser } from '@/helpers/user.helper';
 
 interface GarmentDetailsModalProps {
   visible: boolean;
@@ -17,6 +20,25 @@ export const GarmentDetailsModal: React.FC<GarmentDetailsModalProps> = ({
   garment,
   onEdit,
 }) => {
+  const { user } = useAuthStore();
+  const { data: serviceTypeCatalog } = useCatalogValuesByType('service_type', true, { forceFresh: true });
+
+  const serviceTypeLabel = useMemo(() => {
+    if (!garment?.service_type) return 'N/A';
+    const catalogItem = serviceTypeCatalog?.data?.find(v => v.code === garment.service_type);
+    return catalogItem?.label || garment.service_type;
+  }, [garment?.service_type, serviceTypeCatalog]);
+
+  // Determinar si se debe mostrar el botón de editar
+  const shouldShowEditButton = useMemo(() => {
+    // Si la prenda NO es de servicio industrial, mostrar el botón normalmente
+    if (garment?.service_type !== 'INDUSTRIAL') {
+      return true;
+    }
+    // Si la prenda ES de servicio industrial, solo mostrar el botón si el usuario es SUPERADMIN
+    return isSuperAdminUser(user);
+  }, [garment?.service_type, user]);
+
   if (!garment) return null;
 
   return (
@@ -74,10 +96,31 @@ export const GarmentDetailsModal: React.FC<GarmentDetailsModalProps> = ({
                 <View className="flex-row items-center">
                   <IonIcon name="scale-outline" size={16} color="#4B5563" />
                   <Text className="text-sm text-gray-800 ml-2">
-                    {garment.weight ? `${garment.weight} kg` : 'N/A'}
+                    {garment.weight ? `${garment.weight} lb` : 'N/A'}
                   </Text>
                 </View>
               </View>
+            </View>
+
+            <View className="flex-row flex-wrap -mx-2">
+              <View className="w-1/2 px-2 mb-3">
+                <Text className="text-xs text-gray-500 mb-1">Tipo de Servicio</Text>
+                <View className="flex-row items-center">
+                  <IonIcon name="business-outline" size={16} color="#4B5563" />
+                  <Text className="text-sm text-gray-800 ml-2">{serviceTypeLabel}</Text>
+                </View>
+              </View>
+              {garment.service_type === 'INDUSTRIAL' && garment.manufacturing_date && (
+                <View className="w-1/2 px-2 mb-3">
+                  <Text className="text-xs text-gray-500 mb-1">Fecha de Fabricación</Text>
+                  <View className="flex-row items-center">
+                    <IonIcon name="calendar-outline" size={16} color="#4B5563" />
+                    <Text className="text-sm text-gray-800 ml-2">
+                      {formatDateTime(garment.manufacturing_date)}
+                    </Text>
+                  </View>
+                </View>
+              )}
             </View>
 
             {garment.observations && (
@@ -131,18 +174,20 @@ export const GarmentDetailsModal: React.FC<GarmentDetailsModalProps> = ({
         </ScrollView>
 
         {/* Actions */}
-        <View className="p-4 border-t border-gray-200 bg-white">
-          <Button
-            title="Editar Prenda"
-            onPress={() => {
-              onClose();
-              onEdit();
-            }}
-            variant="primary"
-            icon={<IonIcon name="pencil-outline" size={18} color="white" />}
-            fullWidth
-          />
-        </View>
+        {shouldShowEditButton && (
+          <View className="p-4 border-t border-gray-200 bg-white">
+            <Button
+              title="Editar Prenda"
+              onPress={() => {
+                onClose();
+                onEdit();
+              }}
+              variant="primary"
+              icon={<IonIcon name="pencil-outline" size={18} color="white" />}
+              fullWidth
+            />
+          </View>
+        )}
       </View>
     </Modal>
   );

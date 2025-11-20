@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, ActivityIndicator, Alert } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
-import { Card } from '@/components/common';
+import { Card, PaginationControls } from '@/components/common';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { 
   useClients, 
@@ -171,6 +171,7 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
         phone: selectedClient.phone,
         address: selectedClient.address,
         acronym: selectedClient.acronym,
+        service_type: selectedClient.service_type,
         branch_office_id: selectedClient.branch_office_id,
         is_active: selectedClient.is_active,
         status: selectedClient.status,
@@ -279,49 +280,13 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
             ))}
             </View>
           )}
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            total={total}
+            onPageChange={setPage}
+          />
         </ScrollView>
-
-        {/* Controles de paginación */}
-        {totalPages > 1 && (
-          <View className="border-t border-gray-200 bg-white p-4">
-            <View className="flex-row items-center justify-between">
-              <TouchableOpacity
-                onPress={() => setPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className={`flex-row items-center px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray-100' : ''}`}
-                style={{ backgroundColor: currentPage === 1 ? undefined : '#0b1f36' }}
-              >
-                <IonIcon 
-                  name="chevron-back" 
-                  size={18} 
-                  color={currentPage === 1 ? '#9CA3AF' : '#FFFFFF'} 
-                />
-              </TouchableOpacity>
-
-              <View className="flex-row items-center">
-                <Text className="text-gray-600 font-medium">
-                  Página {currentPage} de {totalPages}
-                </Text>
-                <Text className="text-gray-400 text-sm ml-2">
-                  ({total} total)
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className={`flex-row items-center px-4 py-2 rounded-lg ${currentPage === totalPages ? 'bg-gray-100' : ''}`}
-                style={{ backgroundColor: currentPage === totalPages ? undefined : '#0b1f36' }}
-              >
-                <IonIcon 
-                  name="chevron-forward" 
-                  size={18} 
-                  color={currentPage === totalPages ? '#9CA3AF' : '#FFFFFF'} 
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
       </View>
 
       {/* Modal de Detalles */}
