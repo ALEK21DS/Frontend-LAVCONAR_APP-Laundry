@@ -104,6 +104,9 @@ interface GarmentFormProps {
     physicalCondition?: string;
     observations: string;
     weight?: number;
+    quantity?: number;
+    serviceType?: string;
+    manufacturingDate?: string;
   }) => void;
   submitting?: boolean;
   initialValues?: {
@@ -116,7 +119,10 @@ interface GarmentFormProps {
     garmentCondition?: string;
     physicalCondition?: string;
     weight?: string;
+    quantity?: number | string;
     observations?: string;
+    serviceType?: string;
+    manufacturingDate?: string;
   };
   // Opcionales para escaneo integrado desde la página padre
   onScan?: () => void;
@@ -187,6 +193,68 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
   const [garmentCondition, setGarmentCondition] = useState(initialValues?.garmentCondition || '');
   const [physicalCondition, setPhysicalCondition] = useState(initialValues?.physicalCondition || '');
   const [weight, setWeight] = useState(initialValues?.weight || '');
+  const getInitialQuantityValue = () => {
+    if (initialValues?.quantity !== undefined && initialValues?.quantity !== null) {
+      return initialValues.quantity.toString();
+    }
+    return '1';
+  };
+  const [quantity, setQuantity] = useState(getInitialQuantityValue());
+  const [serviceType, setServiceType] = useState(initialValues?.serviceType || '');
+  
+  // Función para formatear automáticamente la fecha mientras se escribe (dd/mm/aaaa)
+  const formatDateInput = (input: string): string => {
+    // Remover todos los caracteres que no sean números
+    const numbersOnly = input.replace(/\D/g, '');
+    
+    // Limitar a 8 dígitos (dd/mm/aaaa = 8 dígitos)
+    const limited = numbersOnly.slice(0, 8);
+    
+    // Agregar slashes automáticamente
+    if (limited.length === 0) return '';
+    if (limited.length <= 2) return limited;
+    if (limited.length <= 4) return `${limited.slice(0, 2)}/${limited.slice(2)}`;
+    return `${limited.slice(0, 2)}/${limited.slice(2, 4)}/${limited.slice(4)}`;
+  };
+
+  // Funciones para convertir entre dd/mm/aaaa y YYYY-MM-DD
+  const convertDateToDisplay = (isoDate: string): string => {
+    if (!isoDate) return '';
+    // Si ya está en formato dd/mm/aaaa, devolverlo tal cual
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(isoDate)) return isoDate;
+    // Convertir de YYYY-MM-DD a dd/mm/aaaa
+    try {
+      const [year, month, day] = isoDate.split('-');
+      if (year && month && day) {
+        return `${day}/${month}/${year}`;
+      }
+    } catch (e) {
+      // Si hay error, devolver el valor original
+    }
+    return isoDate;
+  };
+
+  const convertDateToISO = (displayDate: string): string => {
+    if (!displayDate) return '';
+    // Si ya está en formato YYYY-MM-DD, devolverlo tal cual
+    if (/^\d{4}-\d{2}-\d{2}$/.test(displayDate)) return displayDate;
+    // Convertir de dd/mm/aaaa a YYYY-MM-DD
+    try {
+      const [day, month, year] = displayDate.split('/');
+      if (year && month && day) {
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+    } catch (e) {
+      // Si hay error, devolver vacío
+    }
+    return '';
+  };
+
+  const initialManufacturingDateDisplay = useMemo(() => {
+    return convertDateToDisplay(initialValues?.manufacturingDate || '');
+  }, [initialValues?.manufacturingDate]);
+
+  const [manufacturingDateDisplay, setManufacturingDateDisplay] = useState(initialManufacturingDateDisplay);
   const [observations, setObservations] = useState(initialValues?.observations || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const filteredColorSuggestions = useMemo(() => {
@@ -214,6 +282,18 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
       setGarmentCondition(initialValues.garmentCondition || '');
       setPhysicalCondition(initialValues.physicalCondition || '');
       setWeight(initialValues.weight || '');
+      // Manejar quantity tanto como string como número
+      // Si quantity tiene un valor (incluso 0), usarlo
+      if (initialValues.quantity !== undefined && initialValues.quantity !== null) {
+        const qtyValue = initialValues.quantity;
+        if (typeof qtyValue === 'string') {
+          setQuantity(qtyValue.trim() !== '' ? qtyValue : '1');
+        } else {
+          setQuantity(String(qtyValue));
+        }
+      }
+      setServiceType(initialValues.serviceType || '');
+      setManufacturingDateDisplay(convertDateToDisplay(initialValues.manufacturingDate || ''));
       setObservations(initialValues.observations || '');
     }
   }, [initialValues, initialColors]);
@@ -253,7 +333,10 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
         // Si no existe en el mapa, asumir que ya es un código
         return label;
       });
-
+      // Convertir fecha de fabricación de dd/mm/aaaa a YYYY-MM-DD antes de enviar
+      const manufacturingDateISO = manufacturingDateDisplay ? convertDateToISO(manufacturingDateDisplay) : undefined;
+      const quantityValue = quantity ? parseInt(quantity) : undefined;
+      
       onSubmit({ 
         rfidCode, 
         description, 
@@ -264,7 +347,10 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
         garmentCondition: garmentCondition || undefined,
         physicalCondition: physicalCondition || undefined,
         observations,
-        weight: weightValue
+        weight: weightValue,
+        quantity: quantityValue,
+        serviceType: serviceType || undefined,
+        manufacturingDate: manufacturingDateISO || undefined
       });
       setIsSubmitting(false);
     } catch (error) {
@@ -356,7 +442,58 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
 
           {/* Paleta removida para simplificar en móvil; usar autocompletado y chips */}
         </View>
+        {/* Peso y Fecha de Fabricación debajo de Color */}
+        {serviceType === 'INDUSTRIAL' ? (
+          <View className="mb-4 flex-row -mx-1">
+            <View className="flex-1 px-1">
+              <Input
+                label="Peso (lb)"
+                placeholder="Ej: 1.5"
+                value={weight}
+                onChangeText={(t) => { setWeight(t); if (errors.weight) setErrors(prev => ({ ...prev, weight: undefined })); }}
+                keyboardType="decimal-pad"
+                icon="scale-outline"
+                error={errors.weight}
+              />
+            </View>
+            <View className="flex-1 px-1">
+              <Input
+                label="Fecha de Fabricación"
+                placeholder="dd/mm/aaaa"
+                value={manufacturingDateDisplay}
+                onChangeText={(text) => setManufacturingDateDisplay(formatDateInput(text))}
+                keyboardType="numeric"
+                icon="calendar-outline"
+              />
+            </View>
+          </View>
+        ) : (
+          <View className="mb-4">
+            <Input
+              label="Peso (lb)"
+              placeholder="Ej: 1.5"
+              value={weight}
+              onChangeText={(t) => { setWeight(t); if (errors.weight) setErrors(prev => ({ ...prev, weight: undefined })); }}
+              keyboardType="decimal-pad"
+              icon="scale-outline"
+              error={errors.weight}
+            />
+          </View>
+        )}
 
+        {/* Cantidad debajo del Peso */}
+        <View className="mb-4">
+          <Input
+            label="Cantidad"
+            placeholder="Ej: 10"
+            value={quantity}
+            onChangeText={setQuantity}
+            keyboardType="number-pad"
+            icon="layers-outline"
+          />
+        </View>
+
+        {/* Condición de la Prenda */}
         <View className="mb-4">
           <GarmentTypeDropdown
           value={garmentType}

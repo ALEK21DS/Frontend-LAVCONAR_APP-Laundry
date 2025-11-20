@@ -24,7 +24,7 @@ export const useCreateGarment = () => {
       queryClient.invalidateQueries({ queryKey: ['garment'] });
     },
     onError: (err) => {
-      console.error('Error al crear prenda:', handleApiError(err));
+      // Error manejado en el componente que usa el hook
     },
   });
 

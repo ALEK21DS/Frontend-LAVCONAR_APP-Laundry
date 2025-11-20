@@ -90,8 +90,7 @@ export const ScanForm: React.FC<ScanFormProps> = ({
     branch_offices_id: branchOfficeId,
     branch_office_name: branchOfficeName,
     scan_type: initialRfidScan?.scan_type || 'COLLECTED',
-    scanned_quantity: scannedTags.length || 0,
-    scanned_rfid_codes: scannedTags,
+    scanned_quantity: scannedQuantity,
     differences_detected: initialRfidScan?.differences_detected || '',
     unexpected_codes: hasBaseline ? computedUnexpected : unregisteredCodes,
   });
@@ -100,11 +99,12 @@ export const ScanForm: React.FC<ScanFormProps> = ({
   useEffect(() => {
     setFormData((prev) => ({
       ...prev,
-      scanned_quantity: scannedTags.length || 0,
-      scanned_rfid_codes: scannedTags,
+      scanned_quantity: scannedQuantity,
+      scanned_rfid_codes: combinedScannedCodes,
       unexpected_codes: computedUnexpected,
     }));
   }, [scannedTags, computedUnexpected, hasBaseline, unregisteredCodes]);
+  }, [combinedScannedCodes, computedUnexpected, hasBaseline, unregisteredCodes, scannedQuantity]);
 
   // Catálogo dinámico de tipos de escaneo (scan_type) con datos frescos
   const { data: scanTypeCatalog } = useCatalogValuesByType('scan_type', true, { forceFresh: true });
@@ -115,20 +115,14 @@ export const ScanForm: React.FC<ScanFormProps> = ({
       .sort((a,b) => (a.display_order||0) - (b.display_order||0))
       .map(v => ({ label: v.label, value: v.code }));
 
-    if (catalogOptions.length > 0) return catalogOptions;
-
-    // Fallback por si el catálogo llega vacío
-    return [
-    { label: 'Recolección', value: 'COLLECTION' },
     { label: 'Recepción en Almacén', value: 'WAREHOUSE_RECEPTION' },
     { label: 'Pre-lavado', value: 'PRE_WASH' },
-    { label: 'Post-lavado', value: 'POST_WASH' },
-    { label: 'Post-secado', value: 'POST_DRY' },
-    { label: 'Conteo Final', value: 'FINAL_COUNT' },
     { label: 'Entrega', value: 'DELIVERY' },
   ];
   }, [scanTypeCatalog]);
 
+        .filter((item) => item.is_active !== false)
+        .forEach((item) => {
   const buildDiff = (prev: any, curr: any) => {
     const diff: any = {};
     if (!prev) return curr; // si no hay previo, retornar todo (para crear)
@@ -334,10 +328,12 @@ export const ScanForm: React.FC<ScanFormProps> = ({
 
           {/* Tipo de Escaneo */}
           <View className="mb-4">
+                </Text>
+              </View>
+            )}
             <Dropdown
               label="Tipo de Escaneo *"
               options={scanTypes}
-              value={formData.scan_type}
               onValueChange={(value) => setFormData(prev => ({ ...prev, scan_type: value }))}
               placeholder="Seleccionar tipo de escaneo"
               icon="scan-outline"
@@ -355,6 +351,14 @@ export const ScanForm: React.FC<ScanFormProps> = ({
             />
           </View>
 
+          {(serviceType === 'industrial' ? industrialSummary.length > 0 : personalSummary.length > 0) && (
+                {serviceType === 'industrial' ? 'Prendas Escaneadas por Tipo' : 'Prendas Escaneadas'}
+              </Text>
+              <View className="bg-white border border-gray-300 rounded-lg p-3">
+                {serviceType === 'industrial' ? (
+                  // Modo industrial: mostrar tipo y cantidad agrupada
+                  industrialSummary.map((item, index) => (
+                    <View key={item.garmentType} className={`${index > 0 ? 'mt-3 pt-3 border-t border-gray-200' : ''}`}>
           {/* Códigos RFID Escaneados */}
           <View className="mb-4">
             <Text className="text-sm font-medium text-gray-700 mb-2">Códigos RFID Escaneados *</Text>

@@ -14,6 +14,7 @@ interface ScanFormModalProps {
   initialScanType?: string;
   deferRfidScanUpdate?: boolean;
   unregisteredCodes?: string[];
+  serviceType?: 'industrial' | 'personal';
   onSuccess: (rfidScanUpdateData?: any) => void;
   onCancel: () => void;
 }
@@ -28,6 +29,7 @@ export const ScanFormModal: React.FC<ScanFormModalProps> = ({
   initialScanType,
   deferRfidScanUpdate = false,
   unregisteredCodes,
+  serviceType,
   onSuccess,
   onCancel,
 }) => {
@@ -72,6 +74,7 @@ export const ScanFormModal: React.FC<ScanFormModalProps> = ({
           initialGuide={guideToEdit}
           deferRfidScanUpdate={deferRfidScanUpdate}
           unregisteredCodes={unregisteredCodes}
+          serviceType={serviceType}
         />
         </View>
       </View>
