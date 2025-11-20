@@ -105,6 +105,7 @@ interface GarmentFormProps {
     physicalCondition?: string[];
     observations: string;
     weight?: number;
+    quantity?: number;
     serviceType?: string;
     manufacturingDate?: string;
   }) => void;
@@ -119,6 +120,7 @@ interface GarmentFormProps {
     garmentCondition?: string | string[];
     physicalCondition?: string | string[];
     weight?: string;
+    quantity?: number | string;
     observations?: string;
     serviceType?: string;
     manufacturingDate?: string;
@@ -287,6 +289,13 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
   const [showGarmentConditionList, setShowGarmentConditionList] = useState(false);
   const [showPhysicalConditionList, setShowPhysicalConditionList] = useState(false);
   const [weight, setWeight] = useState(initialValues?.weight || '');
+  const getInitialQuantityValue = () => {
+    if (initialValues?.quantity !== undefined && initialValues?.quantity !== null) {
+      return initialValues.quantity.toString();
+    }
+    return '1';
+  };
+  const [quantity, setQuantity] = useState(getInitialQuantityValue());
   const [serviceType, setServiceType] = useState(initialValues?.serviceType || '');
   
   // Función para formatear automáticamente la fecha mientras se escribe (dd/mm/aaaa)
@@ -381,6 +390,16 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
       setGarmentCondition(initialGarmentConditions);
       setPhysicalCondition(initialPhysicalConditions);
       setWeight(initialValues.weight || '');
+      // Manejar quantity tanto como string como número
+      // Si quantity tiene un valor (incluso 0), usarlo
+      if (initialValues.quantity !== undefined && initialValues.quantity !== null) {
+        const qtyValue = initialValues.quantity;
+        if (typeof qtyValue === 'string') {
+          setQuantity(qtyValue.trim() !== '' ? qtyValue : '1');
+        } else {
+          setQuantity(String(qtyValue));
+        }
+      }
       setServiceType(initialValues.serviceType || '');
       setManufacturingDateDisplay(convertDateToDisplay(initialValues.manufacturingDate || ''));
       setObservations(initialValues.observations || '');
@@ -422,10 +441,10 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
         // Si no existe en el mapa, asumir que ya es un código
         return label;
       });
-
       // Convertir fecha de fabricación de dd/mm/aaaa a YYYY-MM-DD antes de enviar
       const manufacturingDateISO = manufacturingDateDisplay ? convertDateToISO(manufacturingDateDisplay) : undefined;
-
+      const quantityValue = quantity ? parseInt(quantity) : undefined;
+      
       onSubmit({ 
         rfidCode, 
         description, 
@@ -437,6 +456,7 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
         physicalCondition: physicalCondition.length > 0 ? physicalCondition : undefined,
         observations,
         weight: weightValue,
+        quantity: quantityValue,
         serviceType: serviceType || undefined,
         manufacturingDate: manufacturingDateISO || undefined
       });
@@ -587,7 +607,6 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
 
           {/* Paleta removida para simplificar en móvil; usar autocompletado y chips */}
         </View>
-
         {/* Peso y Fecha de Fabricación debajo de Color */}
         {serviceType === 'INDUSTRIAL' ? (
           <View className="mb-4 flex-row -mx-1">
@@ -626,6 +645,18 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
             />
           </View>
         )}
+
+        {/* Cantidad debajo del Peso */}
+        <View className="mb-4">
+          <Input
+            label="Cantidad"
+            placeholder="Ej: 10"
+            value={quantity}
+            onChangeText={setQuantity}
+            keyboardType="number-pad"
+            icon="layers-outline"
+          />
+        </View>
 
         {/* Condición de la Prenda */}
         <View className="mb-4">

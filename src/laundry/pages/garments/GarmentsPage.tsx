@@ -80,13 +80,18 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
         garmentType: selectedGarment.garment_type || '',
         brand: selectedGarment.garment_brand || '',
         garmentCondition: Array.isArray(selectedGarment.garment_condition) 
-          ? selectedGarment.garment_condition 
-          : (selectedGarment.garment_condition ? [selectedGarment.garment_condition] : []),
+          ? selectedGarment.garment_condition.filter((c: any): c is string => typeof c === 'string' && c.trim() !== '').join(', ')
+          : (selectedGarment.garment_condition || ''),
         physicalCondition: Array.isArray(selectedGarment.physical_condition)
-          ? selectedGarment.physical_condition
-          : (selectedGarment.physical_condition ? [selectedGarment.physical_condition] : []),
+          ? selectedGarment.physical_condition.filter((c: any): c is string => typeof c === 'string' && c.trim() !== '').join(', ')
+          : (selectedGarment.physical_condition || ''),
         observations: selectedGarment.observations || '',
         weight: selectedGarment.weight?.toString() || '',
+        quantity: selectedGarment.quantity !== undefined && selectedGarment.quantity !== null 
+          ? selectedGarment.quantity.toString() 
+          : undefined,
+        serviceType: selectedGarment.service_type || '',
+        manufacturingDate: selectedGarment.manufacturing_date || '',
       });
       setRfidCode(selectedGarment.rfid_code || '');
       setFormOpen(true);
@@ -337,9 +342,10 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
                       physical_condition: data.physicalCondition && data.physicalCondition.length > 0 ? data.physicalCondition : undefined,
                       observations: data.observations || undefined,
                       weight: data.weight ? parseFloat(String(data.weight)) : undefined,
+                      quantity: data.quantity ? parseInt(String(data.quantity)) : undefined,
                       service_type: data.serviceType || undefined,
                       manufacturing_date: data.manufacturingDate || undefined,
-                    }
+                    } as any
                   });
                   console.log('✅ Prenda actualizada exitosamente');
                   setFormOpen(false);
@@ -378,10 +384,11 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
                   garment_condition: data.garmentCondition && data.garmentCondition.length > 0 ? data.garmentCondition : undefined,
                   physical_condition: data.physicalCondition && data.physicalCondition.length > 0 ? data.physicalCondition : undefined,
                   observations: data.observations,
-                  weight: data.weight,
+                  weight: data.weight ? parseFloat(String(data.weight)) : undefined,
+                  quantity: data.quantity ? parseInt(String(data.quantity)) : undefined,
                   service_type: data.serviceType,
                   manufacturing_date: data.manufacturingDate,
-                });
+                } as any);
                 console.log('✅ Prenda creada exitosamente');
                 setFormOpen(false);
                 setRfidCode('');
@@ -397,12 +404,14 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
                       color: data.colors && data.colors.length > 0 ? data.colors : undefined,
                       garment_type: data.garmentType,
                       garment_brand: data.brand,
-                      physical_condition: data.physicalCondition,
+                      garment_condition: data.garmentCondition && data.garmentCondition.length > 0 ? data.garmentCondition : undefined,
+                      physical_condition: data.physicalCondition && data.physicalCondition.length > 0 ? data.physicalCondition : undefined,
                       observations: data.observations,
-                      weight: data.weight,
+                      weight: data.weight ? parseFloat(String(data.weight)) : undefined,
+                      quantity: data.quantity ? parseInt(String(data.quantity)) : undefined,
                       service_type: data.serviceType,
                       manufacturing_date: data.manufacturingDate,
-                    });
+                    } as any);
                     console.log('✅ Prenda creada exitosamente');
                     setFormOpen(false);
                     setRfidCode('');

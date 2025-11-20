@@ -85,6 +85,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
     scannedTags: string[];
     deferRfidScanUpdate?: boolean;
     unregisteredCodes?: string[];
+    serviceType?: 'industrial' | 'personal';
   };
   const [scanFormContext, setScanFormContext] = useState<ScanFormContext | null>(null);
   const [pendingGuideEdit, setPendingGuideEdit] = useState<any | undefined>(undefined);
@@ -131,7 +132,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const [selectedProcessType, setSelectedProcessType] = useState<string>('');
   
   // Estados para el flujo de servicio personal (registro prenda por prenda)
-  const [registeredGarments, setRegisteredGarments] = useState<Array<{id: string, description: string, rfidCode: string, category?: string, color?: string, weight?: number}>>([]);
+  const [registeredGarments, setRegisteredGarments] = useState<Array<{id: string, description: string, rfidCode: string, category?: string, color?: string, weight?: number, quantity?: number}>>([]);
   const [showActionButtons, setShowActionButtons] = useState(false);
   
   // Estado para controlar si ya se cargaron los RFIDs iniciales
@@ -305,6 +306,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   }, [scannedTags, getGarmentByRfid]);
 
   // Agrupar tags por tipo de prenda (solo para servicio industrial)
+  // Sumar las cantidades (quantity) de las prendas en lugar de contar códigos RFID
   const groupedTagsByGarmentType = React.useMemo(() => {
     if (serviceType !== 'industrial') {
       return [];
@@ -327,10 +329,12 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           });
         }
         const group = grouped.get(garmentType)!;
-        group.count++;
+        // Sumar la cantidad de la prenda (quantity), o contar como 1 si no tiene cantidad
+        const quantity = garment.quantity;
+        group.count += (quantity && quantity > 0 ? quantity : 1);
         group.tags.push(tag);
       } else {
-        // Prenda no registrada
+        // Prenda no registrada - contar como 1 código RFID
         const unregisteredKey = 'UNREGISTERED';
         if (!grouped.has(unregisteredKey)) {
           grouped.set(unregisteredKey, {
@@ -340,7 +344,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           });
         }
         const group = grouped.get(unregisteredKey)!;
-        group.count++;
+        group.count += 1; // Prendas no registradas se cuentan como 1
         group.tags.push(tag);
       }
     });
@@ -585,6 +589,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
                 rfidCode: tag.epc,
                 color: existingGarmentData.color,
                 weight: existingGarmentData.weight,
+                quantity: existingGarmentData.quantity || 1,
               };
               
               // Verificar duplicados dentro del setState para evitar race conditions
@@ -757,6 +762,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             scannedTags: scannedTags.map(tag => tag.epc),
             deferRfidScanUpdate: true,
             unregisteredCodes: unregisteredRfids,
+            serviceType: serviceType,
           });
         } else {
           // Para otros procesos, abrir el ProcessForm
@@ -840,10 +846,11 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
               garment_condition: garmentData.garmentCondition,
               physical_condition: garmentData.physicalCondition,
               weight: garmentData.weight ? parseFloat(garmentData.weight.toString()) : undefined,
+              quantity: garmentData.quantity ? parseInt(String(garmentData.quantity)) : undefined,
               observations: garmentData.observations,
               service_type: garmentData.serviceType,
               manufacturing_date: garmentData.manufacturingDate,
-            }
+            } as any // Usar 'as any' temporalmente hasta que se actualice el tipo UpdateGarmentDto
           });
           Alert.alert('Prenda actualizada', `${garmentData.description} actualizada y agregada a la guía`);
         } else {
@@ -858,10 +865,11 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
             garment_condition: garmentData.garmentCondition,
             physical_condition: garmentData.physicalCondition,
             weight: garmentData.weight ? parseFloat(garmentData.weight.toString()) : undefined,
+            quantity: garmentData.quantity ? parseInt(String(garmentData.quantity)) : undefined,
             observations: garmentData.observations,
             service_type: garmentData.serviceType,
             manufacturing_date: garmentData.manufacturingDate,
-          });
+          } as any); // Usar 'as any' temporalmente hasta que se actualice el tipo CreateGarmentDto
           savedGarmentId = newGarmentResponse.id;
           Alert.alert('Prenda registrada', `${garmentData.description} registrada y agregada a la guía`);
         }
@@ -873,6 +881,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           category: garmentData.category,
           color: garmentData.color,
           weight: garmentData.weight,
+          quantity: garmentData.quantity || 1,
         };
         
         // Verificar duplicados dentro del setState para evitar race conditions
@@ -892,9 +901,35 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         clearAllScannedData();
         
         // Continuar en la página de escaneo, listo para escanear otra prenda
-      } catch (error) {
-        console.error('Error al guardar prenda:', error);
-        Alert.alert('Error', 'No se pudo guardar la prenda');
+      } catch (error: any) {
+        // Verificar si es un error de código RFID duplicado
+        const errorMessage = error?.response?.data?.message || error?.message || '';
+        const errorString = JSON.stringify(error?.response?.data || error || '').toLowerCase();
+        const statusCode = error?.response?.status;
+        
+        // Detectar errores relacionados con código RFID duplicado
+        // El error puede venir como "Error al agregar prendas a guía" cuando Prisma falla por restricción única
+        const isDuplicateError = 
+          statusCode === 400 && (
+            errorString.includes('unique') ||
+            errorString.includes('duplicate') ||
+            errorString.includes('duplicado') ||
+            errorString.includes('ya existe') ||
+            errorString.includes('already exists') ||
+            errorString.includes('violates unique constraint') ||
+            errorString.includes('error al agregar prendas a guía') ||
+            errorMessage.toLowerCase().includes('error al agregar prendas a guía')
+          );
+        
+        if (isDuplicateError) {
+          Alert.alert(
+            'Código RFID ya registrado',
+            'Este código RFID ya está registrado en otra sucursal. Cada código RFID debe ser único en todo el sistema.',
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert('Error', 'No se pudo guardar la prenda. Por favor, intenta de nuevo.');
+        }
         
         // Limpiar del processingRfids incluso si hay error
         processingRfidsRef.current.delete(currentTag.epc);
@@ -966,17 +1001,50 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   };
 
   // Función para actualizar una prenda existente
-  const handleUpdateExistingGarment = (updatedGarmentData: any) => {
+  const handleUpdateExistingGarment = async (updatedGarmentData: any) => {
     if (scannedTags.length > 0) {
       const currentTag = scannedTags[scannedTags.length - 1];
       const existingGarment = getExistingGarmentByRfid(currentTag.epc);
       
       if (existingGarment) {
+        // Actualizar la prenda en el backend
+        try {
+          const token = await AsyncStorage.getItem('auth-token');
+          if (!token) {
+            Alert.alert('Sesión expirada', 'Por favor, vuelve a iniciar sesión');
+            return;
+          }
+
+          await updateGarmentAsync({
+            id: existingGarment.id,
+            data: {
+              description: updatedGarmentData.description,
+              color: updatedGarmentData.colors || [],
+              garment_type: updatedGarmentData.garmentType,
+              garment_brand: updatedGarmentData.brand,
+              garment_condition: updatedGarmentData.garmentCondition,
+              physical_condition: updatedGarmentData.physicalCondition,
+              weight: updatedGarmentData.weight ? parseFloat(updatedGarmentData.weight.toString()) : undefined,
+              quantity: updatedGarmentData.quantity ? parseInt(String(updatedGarmentData.quantity)) : undefined,
+              observations: updatedGarmentData.observations,
+              service_type: updatedGarmentData.serviceType,
+              manufacturing_date: updatedGarmentData.manufacturingDate,
+            } as any // Usar 'as any' temporalmente hasta que se actualice el tipo UpdateGarmentDto para incluir quantity
+          });
+          Alert.alert('Prenda actualizada', `${updatedGarmentData.description} actualizada y agregada a la guía`);
+        } catch (error: any) {
+          console.error('Error al actualizar prenda:', error);
+          Alert.alert('Error', 'No se pudo actualizar la prenda. Intente nuevamente.');
+          return;
+        }
+
+        // Actualizar la prenda en el estado local
         const updatedGarment = {
           ...existingGarment,
           description: updatedGarmentData.description || existingGarment.description,
           category: updatedGarmentData.category || existingGarment.category,
           color: updatedGarmentData.color || existingGarment.color,
+          quantity: updatedGarmentData.quantity || existingGarment.quantity || 1,
         };
         
         setRegisteredGarments(prev => 
@@ -1193,6 +1261,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       scannedTags: scannedRfidCodes,
       initialScanType: 'COLLECTED',
       unregisteredCodes: unregisteredCodesForForm,
+      serviceType: serviceType,
     });
   };
 
@@ -1406,26 +1475,30 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
               ) : (
                 <FlatList
                   data={registeredGarments}
-                  renderItem={({ item, index }) => (
-                    <Card variant="outlined" className="mb-2">
-                      <View className="flex-row justify-between items-center">
-                        <View className="flex-1">
-                          <View className="flex-row items-center">
-                            <View className="bg-green-500 w-8 h-8 rounded-full items-center justify-center mr-3">
-                              <Text className="text-white font-bold">{index + 1}</Text>
-                            </View>
-                            <View className="flex-1">
-                              <Text className="text-base font-semibold text-gray-900">{item.description}</Text>
-                              <Text className="text-xs text-gray-500 mt-1 font-mono">RFID: {item.rfidCode}</Text>
+                  renderItem={({ item, index }) => {
+                    // Obtener la cantidad de la prenda, o usar 1 si no está definida
+                    const quantity = item.quantity || 1;
+                    return (
+                      <Card variant="outlined" className="mb-2">
+                        <View className="flex-row justify-between items-center">
+                          <View className="flex-1">
+                            <View className="flex-row items-center">
+                              <View className="bg-green-500 w-10 h-10 rounded-full items-center justify-center mr-3">
+                                <Text className="text-white font-bold text-sm">{quantity}</Text>
+                              </View>
+                              <View className="flex-1">
+                                <Text className="text-base font-semibold text-gray-900">{item.description}</Text>
+                                <Text className="text-xs text-gray-500 mt-1 font-mono">RFID: {item.rfidCode}</Text>
+                              </View>
                             </View>
                           </View>
+                          <TouchableOpacity onPress={() => removeRegisteredGarment(item.id)} className="ml-2">
+                            <Icon name="close-circle" size={24} color="#EF4444" />
+                          </TouchableOpacity>
                         </View>
-                        <TouchableOpacity onPress={() => removeRegisteredGarment(item.id)} className="ml-2">
-                          <Icon name="close-circle" size={24} color="#EF4444" />
-                        </TouchableOpacity>
-                      </View>
-                    </Card>
-                  )}
+                      </Card>
+                    );
+                  }}
                   keyExtractor={item => item.rfidCode}
                 />
               )}
@@ -1660,6 +1733,9 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
                 ? existingGarment.physical_condition
                 : (existingGarment.physical_condition ? [existingGarment.physical_condition] : []),
               weight: existingGarment.weight ? String(existingGarment.weight) : '',
+              quantity: existingGarment.quantity !== undefined && existingGarment.quantity !== null 
+                ? existingGarment.quantity.toString() 
+                : undefined,
               serviceType: existingGarment.service_type || '',
               manufacturingDate: existingGarment.manufacturing_date || '',
               observations: existingGarment.observations || '',
@@ -1735,6 +1811,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           initialScanType={scanFormContext.initialScanType || scanFormContext.processType}
           deferRfidScanUpdate={scanFormContext.deferRfidScanUpdate}
           unregisteredCodes={scanFormContext.unregisteredCodes}
+          serviceType={scanFormContext.serviceType}
           onSuccess={(data) => handleScanFormSuccess(scanFormContext, data)}
           onCancel={() => handleScanFormCancel(scanFormContext)}
         />

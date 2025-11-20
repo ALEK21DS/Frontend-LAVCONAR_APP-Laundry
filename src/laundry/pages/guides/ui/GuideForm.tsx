@@ -12,6 +12,7 @@ import { useCreateClient } from '@/laundry/hooks/clients';
 import { useBranchOffices } from '@/laundry/hooks/branch-offices';
 import { useGuideGarmentsByGuide } from '@/laundry/hooks/guides/guide-garments';
 import { useGetRfidScanByGuide } from '@/laundry/hooks/guides/rfid-scan';
+import { useGarmentsByRfidCodes } from '@/laundry/hooks/guides/garments/useGarmentsByRfidCodes';
 // Detalle de guía eliminado del flujo
 import { isValidDate, sanitizeNumericInput, isNonNegative, safeParseInt, safeParseFloat } from '@/helpers/validators.helper';
 import { useVehicles } from '@/laundry/hooks/vehicles';
@@ -268,10 +269,41 @@ export const GuideForm: React.FC<GuideFormProps> = ({
     return rfidScan.scanned_rfid_codes || [];
   }, [rfidScan]);
 
-  // En modo edición, usar el número de RFIDs existentes; en creación, usar guideItems
+  // Obtener las prendas registradas por códigos RFID en modo creación
+  const rfidCodesInCreation = useMemo(() => {
+    return guideItems.map(item => item.tagEPC).filter(Boolean);
+  }, [guideItems]);
+
+  const { data: garmentsDataInCreation, isLoading: isLoadingGarmentsInCreation } = useGarmentsByRfidCodes(
+    rfidCodesInCreation,
+    !guideToEdit && rfidCodesInCreation.length > 0 // Solo en modo creación
+  );
+
+  // Obtener las prendas registradas por códigos RFID en modo edición
+  const { data: garmentsDataInEdit, isLoading: isLoadingGarmentsInEdit } = useGarmentsByRfidCodes(
+    existingRfids,
+    !!guideToEdit && existingRfids.length > 0 // Solo en modo edición
+  );
+
+  // Calcular el total de prendas sumando las cantidades (quantity) de las prendas registradas
+  // Si una prenda no tiene cantidad definida, se cuenta como 1
   const totalGarments = useMemo(() => {
-    return guideToEdit ? existingRfids.length : guideItems.length;
-  }, [guideToEdit, existingRfids.length, guideItems.length]);
+    if (guideToEdit) {
+      // Modo edición: usar las prendas obtenidas por los códigos RFID de existingRfids
+      const garments = garmentsDataInEdit?.data || [];
+      return garments.reduce((total, garment) => {
+        const quantity = garment.quantity;
+        return total + (quantity && quantity > 0 ? quantity : 1);
+      }, 0);
+    } else {
+      // Modo creación: usar las prendas obtenidas por los códigos RFID de guideItems
+      const garments = garmentsDataInCreation?.data || [];
+      return garments.reduce((total, garment) => {
+        const quantity = garment.quantity;
+        return total + (quantity && quantity > 0 ? quantity : 1);
+      }, 0);
+    }
+  }, [guideToEdit, garmentsDataInEdit, garmentsDataInCreation]);
 
   // Cargar borrador cuando no estamos en modo edición
   useEffect(() => {
