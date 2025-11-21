@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, Modal, Alert } from 'react-na
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Button, Card } from '@/components/common';
 import { formatDateTime } from '@/helpers';
-import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
+import { useCatalogValuesByType, useCatalogLabelMap } from '@/laundry/hooks/catalogs';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { isSuperAdminUser } from '@/helpers/user.helper';
 
@@ -22,12 +22,18 @@ export const GarmentDetailsModal: React.FC<GarmentDetailsModalProps> = ({
 }) => {
   const { user } = useAuthStore();
   const { data: serviceTypeCatalog } = useCatalogValuesByType('service_type', true, { forceFresh: true });
+  const { getLabel: getGarmentTypeLabel } = useCatalogLabelMap('garment_type', { forceFresh: true });
 
   const serviceTypeLabel = useMemo(() => {
     if (!garment?.service_type) return 'N/A';
     const catalogItem = serviceTypeCatalog?.data?.find(v => v.code === garment.service_type);
     return catalogItem?.label || garment.service_type;
   }, [garment?.service_type, serviceTypeCatalog]);
+
+  const garmentTypeLabel = useMemo(() => {
+    if (!garment?.garment_type) return 'N/A';
+    return getGarmentTypeLabel(garment.garment_type, garment.garment_type_label || garment.garment_type);
+  }, [garment?.garment_type, garment?.garment_type_label, getGarmentTypeLabel]);
 
   // Determinar si se debe mostrar el botón de editar
   const shouldShowEditButton = useMemo(() => {
@@ -83,6 +89,14 @@ export const GarmentDetailsModal: React.FC<GarmentDetailsModalProps> = ({
               <Text className="text-base text-gray-900 font-medium">{garment.description || 'N/A'}</Text>
             </View>
 
+            <View className="mb-3">
+              <Text className="text-xs text-gray-500 mb-1">Tipo de Prenda</Text>
+              <View className="flex-row items-center">
+                <IonIcon name="shirt-outline" size={16} color="#4B5563" />
+                <Text className="text-sm text-gray-800 ml-2">{garmentTypeLabel}</Text>
+              </View>
+            </View>
+
             <View className="flex-row flex-wrap -mx-2">
               <View className="w-1/2 px-2 mb-3">
                 <Text className="text-xs text-gray-500 mb-1">Color</Text>
@@ -103,6 +117,15 @@ export const GarmentDetailsModal: React.FC<GarmentDetailsModalProps> = ({
             </View>
 
             <View className="flex-row flex-wrap -mx-2">
+              <View className="w-1/2 px-2 mb-3">
+                <Text className="text-xs text-gray-500 mb-1">Cantidad</Text>
+                <View className="flex-row items-center">
+                  <IonIcon name="layers-outline" size={16} color="#4B5563" />
+                  <Text className="text-sm text-gray-800 ml-2">
+                    {garment.quantity || '1'}
+                  </Text>
+                </View>
+              </View>
               <View className="w-1/2 px-2 mb-3">
                 <Text className="text-xs text-gray-500 mb-1">Tipo de Servicio</Text>
                 <View className="flex-row items-center">

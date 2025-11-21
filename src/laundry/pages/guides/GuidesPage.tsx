@@ -619,7 +619,12 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
             setShowQrScanner(false);
             try {
               const guide = await scanQrAsync(qrData);
-              setSelectedGuide(guide);
+              // Normalizar el objeto guide: si viene con client.name pero no client_name, extraerlo
+              const normalizedGuide = {
+                ...guide,
+                client_name: guide.client_name || guide.client?.name || 'N/A',
+              };
+              setSelectedGuide(normalizedGuide);
               setDetailsOpen(true);
             } catch (error: any) {
               // Mostrar alert con el mensaje del error (ya incluye "No tienes acceso a esta guía" para errores 400/403)
