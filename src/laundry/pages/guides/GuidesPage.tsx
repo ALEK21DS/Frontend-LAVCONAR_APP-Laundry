@@ -166,7 +166,21 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return base;
-    return base.filter((g: any) => [g.guide_number, g.client_name, g.status].filter(Boolean).some(v => String(v).toLowerCase().includes(q)));
+    
+    return base.filter((g: any) => {
+      const searchableFields = [
+        g.guide_number,
+        g.client_name,
+        g.client?.name,
+        g.client_acronym,
+        g.client?.acronym,
+        g.status,
+      ];
+      
+      return searchableFields
+        .filter(Boolean)
+        .some((value: any) => String(value).toLowerCase().includes(q));
+    });
   }, [base, query]);
 
   const openCreate = () => { 
@@ -386,7 +400,14 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
 
         <View className="mb-4 flex-row items-center bg-white border border-gray-200 rounded-lg px-3">
           <IonIcon name="search-outline" size={18} color="#6B7280" />
-          <TextInput className="flex-1 h-10 ml-2 text-gray-900" placeholder="Buscar por número, cliente o estado" placeholderTextColor="#9CA3AF" value={query} onChangeText={setQuery} autoCorrect={false} />
+          <TextInput
+            className="flex-1 h-10 ml-2 text-gray-900"
+            placeholder="Buscar por número, cliente, acrónimo o estado"
+            placeholderTextColor="#9CA3AF"
+            value={query}
+            onChangeText={setQuery}
+            autoCorrect={false}
+          />
           {query.length > 0 && (
             <TouchableOpacity onPress={() => setQuery('')}>
               <IonIcon name="close-circle" size={18} color="#9CA3AF" />
@@ -420,7 +441,10 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
                         </View>
                       <View className="flex-1 mr-2">
                         <Text className="text-gray-900 font-semibold">{g.guide_number}</Text>
-                        <Text className="text-gray-500 text-xs">{g.client_name}</Text>
+                        <Text className="text-gray-500 text-xs">
+                          {g.client_name || g.client?.name || 'Sin cliente'}
+                          {g.client_acronym || g.client?.acronym ? ` (${g.client_acronym || g.client?.acronym})` : ''}
+                        </Text>
                       </View>
                       {/* Badge de estado con color */}
                       <View className="flex-row items-center px-2 py-1 rounded-full" style={{ backgroundColor: statusColor + '20' }}>

@@ -10,7 +10,7 @@ import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
 import { useWashingProcesses } from '@/laundry/hooks/washing-processes';
 import { useCatalogLabelMap } from '@/laundry/hooks';
 import { ProcessDetailsModal } from './ui/ProcessDetailsModal';
-import { PROCESS_STATUS_COLORS } from '@/constants/processes';
+import { PROCESS_STATUS_COLORS, PROCESS_TYPES, GUIDE_STATUS_COLORS } from '@/constants/processes';
 
 type ProcessesPageProps = { navigation: NativeStackNavigationProp<any> };
 
@@ -43,6 +43,16 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
 
   const { getLabel: getProcessTypeLabel } = useCatalogLabelMap('process_type', { forceFresh: true });
   const { getLabel: getProcessStatusLabel } = useCatalogLabelMap('process_status', { forceFresh: true });
+  const { getLabel: getServiceTypeLabel } = useCatalogLabelMap('service_type', { forceFresh: true });
+
+  const PROCESS_TYPE_COLORS = useMemo(() => {
+    return PROCESS_TYPES.reduce<Record<string, string>>((acc, item) => {
+      if (item.value && item.color) {
+        acc[item.value.toUpperCase()] = item.color;
+      }
+      return acc;
+    }, {});
+  }, []);
 
   // Refrescar al entrar a la pantalla
   useFocusEffect(
@@ -117,8 +127,31 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
 
               <View className="-mx-1 flex-row flex-wrap">
                 {filtered.map(p => {
-                  const statusColor = PROCESS_STATUS_COLORS[p.status as keyof typeof PROCESS_STATUS_COLORS] || '#6B7280';
+                  // Usar GUIDE_STATUS_COLORS porque los procesos usan los mismos estados que las guías
+                  const statusColor = GUIDE_STATUS_COLORS[p.status as keyof typeof GUIDE_STATUS_COLORS] || PROCESS_STATUS_COLORS[p.status as keyof typeof PROCESS_STATUS_COLORS] || '#6B7280';
                   const statusLabel = getProcessStatusLabel(p.status, (p as any).status_label || p.status || 'Sin estado');
+
+                  const guideData = (p as any).guide || {};
+                  const guideClient = guideData.client || {};
+                  const serviceTypeCode = (guideData.service_type || (p as any).service_type || '').toUpperCase();
+                  const processTypeCode = (p.process_type || '').toUpperCase();
+                  const processTypeLabel = getProcessTypeLabel(
+                    p.process_type,
+                    (p as any).process_type_label || p.process_type || 'Sin tipo'
+                  );
+                  const processTypeColor = PROCESS_TYPE_COLORS[processTypeCode] || '#6B7280';
+                  const serviceTypeLabel = serviceTypeCode
+                    ? getServiceTypeLabel(serviceTypeCode, serviceTypeCode)
+                    : 'Sin tipo';
+                  const clientName =
+                    guideClient.name ||
+                    guideData.client_name ||
+                    (p as any).client_name ||
+                    'Sin cliente';
+                  const clientAcronym =
+                    guideClient.acronym ||
+                    guideData.client_acronym ||
+                    (p as any).client_acronym;
                   
                   return (
                     <View key={p.id} className="w-full px-1 mb-2">
@@ -135,20 +168,19 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
                               <Text className="text-gray-900 font-semibold">
                                 {p.guide?.guide_number || p.machine_code || 'Sin código'}
                               </Text>
-                              <Text className="text-gray-500 text-xs">
-                                {getProcessTypeLabel(p.process_type, (p as any).process_type_label || p.process_type || 'Sin tipo')}
+                              <Text className="text-gray-400 text-xs mt-1">
+                                Cliente: {clientName}
+                                {clientAcronym ? ` (${clientAcronym})` : ''}
                               </Text>
-                              {p.guide?.client?.name && (
-                                <Text className="text-gray-400 text-xs mt-1">
-                                  Cliente: {p.guide.client.name}
-                                </Text>
-                              )}
+                              <Text className="text-gray-400 text-xs">
+                                Tipo de servicio: {serviceTypeLabel}
+                              </Text>
                             </View>
                             <View className="items-end">
                               {/* Badge de estado con color */}
-                              <View className="flex-row items-center px-2 py-1 rounded-full" style={{ backgroundColor: statusColor + '20' }}>
-                                <View className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: statusColor }} />
-                                <Text className="text-xs font-medium" numberOfLines={1} style={{ color: statusColor }}>
+                             <View className="flex-row items-center px-2 py-1 rounded-full" style={{ backgroundColor: statusColor + '20' }}>
+                               <View className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: statusColor }} />
+                               <Text className="text-xs font-medium" numberOfLines={1} style={{ color: statusColor }}>
                                   {statusLabel}
                                 </Text>
                               </View>

@@ -261,6 +261,8 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
   const [brand, setBrand] = useState(initialValues?.brand || '');
   const [description, setDescription] = useState(initialValues?.description || '');
   const [branchOfficeId, setBranchOfficeId] = useState(initialValues?.branchOfficeId || userBranchId);
+  const [serviceType, setServiceType] = useState(initialValues?.serviceType || '');
+  const isPersonalService = serviceType === 'PERSONAL';
   // Normalizar condiciones iniciales a arrays
   const initialGarmentConditions = useMemo(() => {
     if (!initialValues?.garmentCondition) return [];
@@ -286,8 +288,9 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
 
   const [garmentCondition, setGarmentCondition] = useState<string[]>(initialGarmentConditions);
   const [physicalCondition, setPhysicalCondition] = useState<string[]>(initialPhysicalConditions);
-  const [showGarmentConditionList, setShowGarmentConditionList] = useState(false);
-  const [showPhysicalConditionList, setShowPhysicalConditionList] = useState(false);
+  // Estados para controlar qué categorías están expandidas
+  const [expandedGarmentCategories, setExpandedGarmentCategories] = useState<Record<string, boolean>>({});
+  const [expandedPhysicalCategories, setExpandedPhysicalCategories] = useState<Record<string, boolean>>({});
   const [weight, setWeight] = useState(initialValues?.weight || '');
   const getInitialQuantityValue = () => {
     if (initialValues?.quantity !== undefined && initialValues?.quantity !== null) {
@@ -296,7 +299,11 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
     return '1';
   };
   const [quantity, setQuantity] = useState(getInitialQuantityValue());
-  const [serviceType, setServiceType] = useState(initialValues?.serviceType || '');
+  useEffect(() => {
+    if (isPersonalService) {
+      setQuantity(prev => (prev === '1' ? prev : '1'));
+    }
+  }, [isPersonalService]);
   
   // Función para formatear automáticamente la fecha mientras se escribe (dd/mm/aaaa)
   const formatDateInput = (input: string): string => {
@@ -650,58 +657,35 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
         <View className="mb-4">
           <Input
             label="Cantidad"
-            placeholder="Ej: 10"
+            placeholder={isPersonalService ? 'Cantidad fija: 1' : 'Ej: 10'}
             value={quantity}
-            onChangeText={setQuantity}
+            onChangeText={text => {
+              if (!isPersonalService) {
+                setQuantity(text);
+              }
+            }}
             keyboardType="number-pad"
             icon="layers-outline"
+            editable={!isPersonalService}
+            selectTextOnFocus={!isPersonalService}
+            className={isPersonalService ? 'text-gray-500' : ''}
+            containerClassName={isPersonalService ? 'opacity-80' : ''}
           />
+          {isPersonalService && (
+            <Text className="text-xs text-gray-500 -mt-2 mb-2">
+              Para servicio personal la cantidad siempre es 1.
+            </Text>
+          )}
         </View>
 
         {/* Condición de la Prenda */}
         <View className="mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-2">Condición de la Prenda</Text>
-          <TouchableOpacity
-            onPress={() => setShowGarmentConditionList(prev => !prev)}
-            className="bg-white border border-gray-300 rounded-lg px-4 py-3 flex-row items-center justify-between"
-          >
-            <View className="flex-1 flex-row items-center">
-              <IonIcon name="create-outline" size={20} color="#6B7280" style={{ marginRight: 8 }} />
-              <View className="flex-1">
-                {garmentCondition.length > 0 ? (
-                  <Text className="text-gray-900 text-base">
-                    {garmentCondition.length} {garmentCondition.length === 1 ? 'opción seleccionada' : 'opciones seleccionadas'}
+          <Text className="text-sm font-semibold text-gray-700 mb-1">Condición de la Prenda</Text>
+          <Text className="text-xs text-gray-500 mb-2">
+            {garmentCondition.length > 0
+              ? `${garmentCondition.length} ${garmentCondition.length === 1 ? 'opción seleccionada' : 'opciones seleccionadas'}`
+              : 'Selecciona una o varias condiciones'}
                   </Text>
-                ) : (
-                  <Text className="text-gray-400 text-base">Seleccionar condiciones...</Text>
-                )}
-              </View>
-            </View>
-            <IonIcon
-              name={showGarmentConditionList ? 'chevron-up-outline' : 'chevron-down-outline'}
-              size={20}
-              color="#6B7280"
-            />
-          </TouchableOpacity>
-          {garmentCondition.length > 0 && (
-            <View className="mt-2 flex-row flex-wrap">
-              {garmentCondition.slice(0, 3).map((code) => (
-                <View key={code} className="mr-2 mb-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full">
-                  <Text className="text-xs text-blue-800">
-                    {garmentConditionCodeToLabel[code] || code}
-                  </Text>
-                </View>
-              ))}
-              {garmentCondition.length > 3 && (
-                <View className="mr-2 mb-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full">
-                  <Text className="text-xs text-blue-800">
-                    +{garmentCondition.length - 3} más
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-          {showGarmentConditionList && (
             <View className="mt-3 bg-white border border-gray-200 rounded-2xl p-3">
               {isLoadingGarmentConditions ? (
                 <View className="py-6 items-center">
@@ -718,15 +702,46 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
                   <Text className="text-sm text-gray-500 mt-2 text-center">Sin valores disponibles.</Text>
                 </View>
               ) : (
-                groupedGarmentConditionOptions.map(section => (
-                  <View key={section.category} className="mb-3">
-                    <Text className="text-xs font-semibold text-gray-500 mb-1 uppercase">{section.category}</Text>
+                groupedGarmentConditionOptions.map(section => {
+                    const isExpanded = expandedGarmentCategories[section.category] ?? false;
+                    const selectedInCategory = section.values.filter((v: any) =>
+                      garmentCondition.includes(v.code)
+                    ).length;
+                    
+                    return (
+                      <View key={section.category} className="mb-2">
+                        <TouchableOpacity
+                          onPress={() => setExpandedGarmentCategories(prev => ({
+                            ...prev,
+                            [section.category]: !isExpanded
+                          }))}
+                          className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex-row items-center justify-between"
+                        >
+                          <View className="flex-1 flex-row items-center">
+                            <IonIcon 
+                              name={isExpanded ? 'chevron-down-outline' : 'chevron-forward-outline'} 
+                              size={18} 
+                              color="#3B82F6" 
+                              style={{ marginRight: 8 }} 
+                            />
+                            <Text className="text-sm font-medium text-gray-900 flex-1">
+                              {section.category}
+                            </Text>
+                            {selectedInCategory > 0 && (
+                              <Text className="text-xs text-gray-500 ml-2">
+                                ({selectedInCategory})
+                              </Text>
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                        {isExpanded && (
+                          <View className="mt-2 bg-white border border-gray-200 rounded-lg p-2">
                     {section.values.map((value: any) => {
                       const isSelected = garmentCondition.includes(value.code);
                       return (
                         <TouchableOpacity
                           key={value.code}
-                          className="flex-row items-center py-2"
+                                  className="flex-row items-center py-2 px-2"
                           onPress={() => toggleGarmentConditionSelection(value.code)}
                         >
                           <View
@@ -736,63 +751,29 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
                           >
                             {isSelected && <IonIcon name="checkmark" size={14} color="#ffffff" />}
                           </View>
-                          <Text className={`text-sm ${isSelected ? 'text-[#0b1f36] font-semibold' : 'text-gray-700'}`}>
+                                  <Text className={`text-sm flex-1 ${isSelected ? 'text-[#0b1f36] font-semibold' : 'text-gray-700'}`}>
                             {value.label}
                           </Text>
                         </TouchableOpacity>
                       );
                     })}
                   </View>
-                ))
               )}
             </View>
+                    );
+                  })
           )}
+          </View>
         </View>
 
         {/* Condición Física */}
         <View className="mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-2">Condición Física</Text>
-          <TouchableOpacity
-            onPress={() => setShowPhysicalConditionList(prev => !prev)}
-            className="bg-white border border-gray-300 rounded-lg px-4 py-3 flex-row items-center justify-between"
-          >
-            <View className="flex-1 flex-row items-center">
-              <IonIcon name="pulse-outline" size={20} color="#6B7280" style={{ marginRight: 8 }} />
-              <View className="flex-1">
-                {physicalCondition.length > 0 ? (
-                  <Text className="text-gray-900 text-base">
-                    {physicalCondition.length} {physicalCondition.length === 1 ? 'opción seleccionada' : 'opciones seleccionadas'}
+          <Text className="text-sm font-semibold text-gray-700 mb-1">Condición Física</Text>
+          <Text className="text-xs text-gray-500 mb-2">
+            {physicalCondition.length > 0
+              ? `${physicalCondition.length} ${physicalCondition.length === 1 ? 'opción seleccionada' : 'opciones seleccionadas'}`
+              : 'Selecciona una o varias condiciones físicas'}
                   </Text>
-                ) : (
-                  <Text className="text-gray-400 text-base">Seleccionar condiciones...</Text>
-                )}
-              </View>
-            </View>
-            <IonIcon
-              name={showPhysicalConditionList ? 'chevron-up-outline' : 'chevron-down-outline'}
-              size={20}
-              color="#6B7280"
-            />
-          </TouchableOpacity>
-          {physicalCondition.length > 0 && (
-            <View className="mt-2 flex-row flex-wrap">
-              {physicalCondition.slice(0, 3).map((code) => (
-                <View key={code} className="mr-2 mb-2 px-3 py-1 bg-green-50 border border-green-200 rounded-full">
-                  <Text className="text-xs text-green-800">
-                    {physicalConditionCodeToLabel[code] || code}
-                  </Text>
-                </View>
-              ))}
-              {physicalCondition.length > 3 && (
-                <View className="mr-2 mb-2 px-3 py-1 bg-green-50 border border-green-200 rounded-full">
-                  <Text className="text-xs text-green-800">
-                    +{physicalCondition.length - 3} más
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-          {showPhysicalConditionList && (
             <View className="mt-3 bg-white border border-gray-200 rounded-2xl p-3">
               {isLoadingPhysicalConditions ? (
                 <View className="py-6 items-center">
@@ -809,15 +790,46 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
                   <Text className="text-sm text-gray-500 mt-2 text-center">Sin valores disponibles.</Text>
                 </View>
               ) : (
-                groupedPhysicalConditionOptions.map(section => (
-                  <View key={section.category} className="mb-3">
-                    <Text className="text-xs font-semibold text-gray-500 mb-1 uppercase">{section.category}</Text>
+                groupedPhysicalConditionOptions.map(section => {
+                    const isExpanded = expandedPhysicalCategories[section.category] ?? false;
+                    const selectedInCategory = section.values.filter((v: any) =>
+                      physicalCondition.includes(v.code)
+                    ).length;
+                    
+                    return (
+                      <View key={section.category} className="mb-2">
+                        <TouchableOpacity
+                          onPress={() => setExpandedPhysicalCategories(prev => ({
+                            ...prev,
+                            [section.category]: !isExpanded
+                          }))}
+                          className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex-row items-center justify-between"
+                        >
+                          <View className="flex-1 flex-row items-center">
+                            <IonIcon 
+                              name={isExpanded ? 'chevron-down-outline' : 'chevron-forward-outline'} 
+                              size={18} 
+                              color="#3B82F6" 
+                              style={{ marginRight: 8 }} 
+                            />
+                            <Text className="text-sm font-medium text-gray-900 flex-1">
+                              {section.category}
+                            </Text>
+                            {selectedInCategory > 0 && (
+                              <Text className="text-xs text-gray-500 ml-2">
+                                ({selectedInCategory})
+                              </Text>
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                        {isExpanded && (
+                          <View className="mt-2 bg-white border border-gray-200 rounded-lg p-2">
                     {section.values.map((value: any) => {
                       const isSelected = physicalCondition.includes(value.code);
                       return (
                         <TouchableOpacity
                           key={value.code}
-                          className="flex-row items-center py-2"
+                                  className="flex-row items-center py-2 px-2"
                           onPress={() => togglePhysicalConditionSelection(value.code)}
                         >
                           <View
@@ -827,17 +839,19 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
                           >
                             {isSelected && <IonIcon name="checkmark" size={14} color="#ffffff" />}
                           </View>
-                          <Text className={`text-sm ${isSelected ? 'text-emerald-700 font-semibold' : 'text-gray-700'}`}>
+                                  <Text className={`text-sm flex-1 ${isSelected ? 'text-emerald-700 font-semibold' : 'text-gray-700'}`}>
                             {value.label}
                           </Text>
                         </TouchableOpacity>
                       );
                     })}
                   </View>
-                ))
               )}
             </View>
+                    );
+                  })
           )}
+          </View>
         </View>
 
         <Input
