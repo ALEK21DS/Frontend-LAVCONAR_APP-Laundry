@@ -10,6 +10,7 @@ import { GarmentDetailsModal } from './ui/GarmentDetailsModal';
 import { rfidModule } from '@/lib/rfid/rfid.module';
 import { ScannedTag } from '@/laundry/interfaces/tags/tags.interface';
 import { useGarments, useCreateGarment, useUpdateGarment, useScanGarmentQr } from '@/laundry/hooks/guides';
+import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
 import { garmentsApi } from '@/laundry/api/garments/garments.api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QrScanner } from '@/laundry/components';
@@ -22,6 +23,7 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
   
   // Hooks modulares
   const { garments, isLoading, refetch, total, totalPages, currentPage } = useGarments({ page, limit });
+  const { data: garmentTypeCatalog } = useCatalogValuesByType('garment_type', true, { forceFresh: true });
   const { createGarmentAsync, isCreating } = useCreateGarment();
   const { updateGarmentAsync, isUpdating } = useUpdateGarment();
   const [query, setQuery] = useState('');
@@ -52,11 +54,27 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
 
   const base = garments && garments.length > 0 ? garments : demoGarments;
 
+  const garmentTypeLabelMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (garmentTypeCatalog?.data) {
+      garmentTypeCatalog.data.forEach(item => {
+        map[item.code] = item.label;
+      });
+    }
+    return map;
+  }, [garmentTypeCatalog]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return base;
-    return base.filter(g => [g.description, g.rfid_code].filter(Boolean).some(v => String(v).toLowerCase().includes(q)));
-  }, [query, base]);
+    return base.filter(g => {
+      const typeCode = g.garment_type || g.garmentType || '';
+      const typeLabel = typeCode ? garmentTypeLabelMap[typeCode] : '';
+      return [g.description, g.rfid_code, typeCode, typeLabel]
+        .filter(Boolean)
+        .some(value => String(value).toLowerCase().includes(q));
+    });
+  }, [query, base, garmentTypeLabelMap]);
 
   const openCreate = () => {
     setEditingGarment(null);
@@ -124,7 +142,7 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
           <IonIcon name="search-outline" size={18} color="#6B7280" />
           <TextInput
             className="flex-1 h-10 ml-2 text-gray-900"
-            placeholder="Buscar por descripción, EPC o guía"
+            placeholder="Buscar por descripción, EPC o tipo de prenda"
             placeholderTextColor="#9CA3AF"
             value={query}
             onChangeText={setQuery}

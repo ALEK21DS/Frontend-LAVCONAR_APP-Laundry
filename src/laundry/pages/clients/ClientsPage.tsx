@@ -221,7 +221,14 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
         <View className="mb-4 flex-row items-center">
           <View className="flex-1 flex-row items-center bg-white border border-gray-200 rounded-lg px-3">
             <IonIcon name="search-outline" size={18} color="#6B7280" />
-            <TextInput className="flex-1 h-10 ml-2 text-gray-900" placeholder="Nombre, cédula o email" placeholderTextColor="#9CA3AF" value={query} onChangeText={setQuery} autoCorrect={false} />
+            <TextInput
+              className="flex-1 h-10 ml-2 text-gray-900"
+              placeholder="Nombre, cédula, email o acrónimo"
+              placeholderTextColor="#9CA3AF"
+              value={query}
+              onChangeText={setQuery}
+              autoCorrect={false}
+            />
             {query.length > 0 && (
               <TouchableOpacity onPress={() => setQuery('')}>
                 <IonIcon name="close-circle" size={18} color="#9CA3AF" />
@@ -262,7 +269,10 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
                       </View>
                       <View className="flex-1">
                         <View className="flex-row items-center justify-between mb-1">
-                          <Text className="text-gray-900 flex-1">{client.name}</Text>
+                          <Text className="text-gray-900 flex-1">
+                            {client.name}
+                            {client.acronym ? ` (${client.acronym})` : ''}
+                          </Text>
                           {(() => { const active = (typeof client.status === 'string' ? client.status === 'ACTIVE' : client.is_active); return (
                           <View className={`px-2 py-1 rounded-full ${active ? 'bg-green-100' : 'bg-gray-100'}`}>
                             <Text className={`text-xs font-medium ${active ? 'text-green-700' : 'text-gray-600'}`}>
