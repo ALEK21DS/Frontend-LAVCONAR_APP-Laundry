@@ -174,13 +174,13 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
                               </Text>
                               <Text className="text-gray-400 text-xs">
                                 Tipo de servicio: {serviceTypeLabel}
-                              </Text>
+                                </Text>
                             </View>
                             <View className="items-end">
                               {/* Badge de estado con color */}
-                             <View className="flex-row items-center px-2 py-1 rounded-full" style={{ backgroundColor: statusColor + '20' }}>
-                               <View className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: statusColor }} />
-                               <Text className="text-xs font-medium" numberOfLines={1} style={{ color: statusColor }}>
+                              <View className="flex-row items-center px-2 py-1 rounded-full" style={{ backgroundColor: statusColor + '20' }}>
+                                <View className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: statusColor }} />
+                                <Text className="text-xs font-medium" numberOfLines={1} style={{ color: statusColor }}>
                                   {statusLabel}
                                 </Text>
                               </View>

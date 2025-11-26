@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, ScrollView, Alert, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { View, Text, ScrollView, Alert, KeyboardAvoidingView, Platform, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { Button, Input, Card, Dropdown } from '@/components/common';
 import { useBranchOffices } from '@/laundry/hooks/branch-offices';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
 import { isSuperAdminUser } from '@/helpers/user.helper';
 import IonIcon from 'react-native-vector-icons/Ionicons';
+import { DatePickerModal } from '@/laundry/components/DatePickerModal';
 
 // Paleta de colores (como en la web)
 const COLOR_SUGGESTIONS = [
@@ -311,13 +312,61 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
     const numbersOnly = input.replace(/\D/g, '');
     
     // Limitar a 8 dígitos (dd/mm/aaaa = 8 dígitos)
-    const limited = numbersOnly.slice(0, 8);
+    let limited = numbersOnly.slice(0, 8);
     
-    // Agregar slashes automáticamente
     if (limited.length === 0) return '';
-    if (limited.length <= 2) return limited;
-    if (limited.length <= 4) return `${limited.slice(0, 2)}/${limited.slice(2)}`;
-    return `${limited.slice(0, 2)}/${limited.slice(2, 4)}/${limited.slice(4)}`;
+    
+    // Si solo hay 1 dígito y es > 3, formatear día a 0X
+    if (limited.length === 1 && parseInt(limited) > 3) {
+      return '0' + limited;
+    }
+    
+    // Si tenemos al menos 2 dígitos, procesar día
+    if (limited.length >= 2) {
+      const dayPart = limited.slice(0, 2);
+      const rest = limited.slice(2);
+      
+      // Si tenemos más dígitos después del día, procesar mes
+      if (rest.length > 0) {
+        // Si el mes empieza con "2" y tiene un segundo dígito
+        if (rest.length >= 2) {
+          const monthPart = rest.slice(0, 2);
+          const monthNum = parseInt(monthPart);
+          
+          // Si el mes es > 12, formatear a 02 y pasar el segundo dígito al año
+          if (monthNum > 12) {
+            const yearPart = rest.slice(1); // Tomar desde el segundo dígito del mes
+            return `${dayPart}/02/${yearPart}`;
+          }
+        }
+        
+        // Si el mes tiene un solo dígito y es "2", esperar el siguiente dígito
+        // pero si es > 1 y no es "2", formatear
+        if (rest.length === 1) {
+          const monthDigit = parseInt(rest);
+          if (monthDigit > 1 && monthDigit !== 2) {
+            return `${dayPart}/0${rest}`;
+          }
+        }
+        
+        // Formatear con slashes
+        if (rest.length <= 2) {
+          return `${dayPart}/${rest}`;
+        }
+        return `${dayPart}/${rest.slice(0, 2)}/${rest.slice(2)}`;
+      }
+      
+      return dayPart;
+    }
+    
+    return limited;
+  };
+  
+  const handleDatePickerConfirm = (day: number, month: number, year: number, hour?: number, minute?: number) => {
+    const formatted = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+    setManufacturingDateDisplay(formatted);
+    setIsOpeningDatePicker(false);
+    setShowDatePicker(false);
   };
 
   // Funciones para convertir entre dd/mm/aaaa y YYYY-MM-DD
@@ -358,6 +407,9 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
   }, [initialValues?.manufacturingDate]);
 
   const [manufacturingDateDisplay, setManufacturingDateDisplay] = useState(initialManufacturingDateDisplay);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [isOpeningDatePicker, setIsOpeningDatePicker] = useState(false);
+  const datePickerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [observations, setObservations] = useState(initialValues?.observations || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const filteredColorSuggestions = useMemo(() => {
@@ -629,14 +681,45 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
               />
             </View>
             <View className="flex-1 px-1">
-              <Input
-                label="Fecha de Fabricación"
-                placeholder="dd/mm/aaaa"
-                value={manufacturingDateDisplay}
-                onChangeText={(text) => setManufacturingDateDisplay(formatDateInput(text))}
-                keyboardType="numeric"
-                icon="calendar-outline"
-              />
+                <Text className="text-sm font-medium mb-1" style={{ color: '#374151' }}>
+                  Fecha de Fabricación
+                </Text>
+                <View className="flex-row items-center border rounded-lg px-3 py-2 bg-white" style={{ borderColor: '#3B82F6', minHeight: 48 }}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (isOpeningDatePicker || showDatePicker) return;
+                      setIsOpeningDatePicker(true);
+                      // Mostrar primero el spinner y luego abrir el modal con un pequeño delay
+                      datePickerTimeoutRef.current = setTimeout(() => {
+                        setShowDatePicker(true);
+                      }, 0.005);
+                    }}
+                    activeOpacity={0.8}
+                    className="mr-3 items-center justify-center"
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 999,
+                      backgroundColor: '#DBEAFE',
+                    }}
+                  >
+                    {isOpeningDatePicker ? (
+                      <ActivityIndicator size="small" color="#1D4ED8" />
+                    ) : (
+                      <IonIcon name="calendar-outline" size={20} color="#1D4ED8" />
+                    )}
+                  </TouchableOpacity>
+                  <View className="flex-1">
+                    <TextInput
+                      className="flex-1 text-gray-900 text-sm"
+                      placeholder="dd/mm/aaaa"
+                      placeholderTextColor="#9CA3AF"
+                      value={manufacturingDateDisplay}
+                      editable={false}
+                      style={{ paddingVertical: 8, fontSize: 14 }}
+                    />
+                  </View>
+                </View>
             </View>
           </View>
         ) : (
@@ -874,6 +957,22 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
         />
       </ScrollView>
 
+      {/* Modal de Selector de Fecha */}
+      {serviceType === 'INDUSTRIAL' && (
+        <DatePickerModal
+          visible={showDatePicker}
+          onClose={() => {
+            if (datePickerTimeoutRef.current) {
+              clearTimeout(datePickerTimeoutRef.current);
+              datePickerTimeoutRef.current = null;
+            }
+            setShowDatePicker(false);
+            setIsOpeningDatePicker(false);
+          }}
+          onConfirm={handleDatePickerConfirm}
+          initialDate={manufacturingDateDisplay}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 };
