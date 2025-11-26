@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useRef, useState, useMemo } from 'react';
-import { View, Text, FlatList, Alert, NativeModules, NativeEventEmitter, Modal, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, Alert, NativeModules, NativeEventEmitter, Modal, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Container, Button, Card } from '@/components/common';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -201,12 +201,13 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   
   // Determinar si debemos verificar prendas:
   // - mode === 'garment' (registrar prenda): siempre verificar
-  // - mode === 'process' (procesos): siempre verificar
+  // - mode === 'process' con serviceType === 'industrial': verificar
+  // - mode === 'process' con serviceType === 'personal': NO verificar (usa registeredGarments, igual que guide personal)
   // - mode === 'guide' con serviceType === 'industrial': verificar
   // - mode === 'guide' con serviceType === 'personal': NO verificar (usa registeredGarments)
   const shouldCheckGarments = (
     mode === 'garment' || 
-    mode === 'process' || 
+    (mode === 'process' && serviceType === 'industrial') ||
     (mode === 'guide' && serviceType === 'industrial')
   ) && rfidCodes.length > 0;
 
@@ -312,7 +313,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       return [];
     }
 
-    const grouped = new Map<string, { garmentType: string; count: number; tags: ScannedTag[] }>();
+    const grouped = new Map<string, { garmentType: string; count: number; totalWeight: number; tags: ScannedTag[] }>();
     
     scannedTags.forEach(tag => {
       const garment = getGarmentByRfid(tag.epc);
@@ -325,6 +326,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           grouped.set(garmentType, {
             garmentType,
             count: 0,
+            totalWeight: 0,
             tags: []
           });
         }
@@ -332,6 +334,11 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         // Sumar la cantidad de la prenda (quantity), o contar como 1 si no tiene cantidad
         const quantity = garment.quantity;
         group.count += (quantity && quantity > 0 ? quantity : 1);
+        // Sumar el peso de la prenda (weight); si no tiene, no suma nada
+        const weight = garment.weight;
+        if (typeof weight === 'number' && !Number.isNaN(weight) && weight > 0) {
+          group.totalWeight += weight;
+        }
         group.tags.push(tag);
       } else {
         // Prenda no registrada - contar como 1 código RFID
@@ -340,6 +347,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           grouped.set(unregisteredKey, {
             garmentType: 'UNREGISTERED',
             count: 0,
+            totalWeight: 0,
             tags: []
           });
         }
@@ -351,6 +359,24 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
 
     return Array.from(grouped.values());
   }, [scannedTags, getGarmentByRfid, serviceType, mode]);
+
+  // Estado para modal de detalles de escaneos por tipo de prenda (solo servicio industrial)
+  const [scanDetailsModalOpen, setScanDetailsModalOpen] = React.useState(false);
+  const [selectedScanGroup, setSelectedScanGroup] = React.useState<{
+    title: string;
+    items: { epc: string; description: string; quantity: number; weight?: number }[];
+  } | null>(null);
+
+  // Estado para modal de edición de cantidad
+  const [quantityEditModalOpen, setQuantityEditModalOpen] = useState(false);
+  const [selectedGarmentForEdit, setSelectedGarmentForEdit] = useState<{
+    id: string;
+    epc: string;
+    description: string;
+    currentQuantity: number;
+    serviceType?: string;
+  } | null>(null);
+  const [editingQuantity, setEditingQuantity] = useState<string>('');
 
   // Calcular peso total de las prendas registradas
   const calculateTotalWeight = useCallback(() => {
@@ -549,7 +575,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           return;
         }
 
-        // En modo "guide" con servicio personal, lógica especial
+        // En modo "guide" con servicio personal, lógica especial (con botones de registro)
         if (mode === 'guide' && serviceType === 'personal') {
           // PRIMERO: Verificar si ya está en la lista de registradas (duplicado local)
           if (isRfidCodeAlreadyRegistered(tag.epc)) {
@@ -624,6 +650,58 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
               addScannedTag(tag);
               setShowActionButtons(true);
             }
+          } finally {
+            // Remover de processingRfids después de completar
+            processingRfidsRef.current.delete(tag.epc);
+          }
+          return;
+        }
+
+        // En modo "process" con servicio personal, lógica especial (solo visualización, sin botones)
+        if (mode === 'process' && serviceType === 'personal') {
+          // PRIMERO: Verificar si ya está siendo procesado (race condition)
+          if (processingRfidsRef.current.has(tag.epc)) {
+            return; // Ya se está procesando, ignorar
+          }
+          
+          // SEGUNDO: Verificar deduplicación en seenSet
+          if (seenSetRef.current.has(tag.epc)) {
+            return;
+          }
+          
+          seenSetRef.current.add(tag.epc);
+          processingRfidsRef.current.add(tag.epc); // Marcar como procesando
+          
+          stopScanning();
+          
+          try {
+            // TERCERO: Verificar si existe en el backend
+            const existingGarmentData = await checkRfidInBackend(tag.epc);
+            
+            // SIEMPRE agregar a scannedTags para mostrarlo en la lista
+            addScannedTag(tag);
+            
+            if (existingGarmentData) {
+              // Si existe en BD, también agregar a registeredGarments para mostrar datos
+              const newGarment = {
+                id: existingGarmentData.id,
+                description: existingGarmentData.description || 'Sin descripción',
+                rfidCode: tag.epc,
+                color: existingGarmentData.color,
+                weight: existingGarmentData.weight,
+                quantity: existingGarmentData.quantity || 1,
+              };
+              
+              // Verificar duplicados dentro del setState para evitar race conditions
+              setRegisteredGarments(prev => {
+                const isDuplicate = prev.some(g => g.rfidCode === newGarment.rfidCode);
+                if (isDuplicate) {
+                  return prev; // Retornar el estado anterior sin cambios
+                }
+                return [...prev, newGarment];
+              });
+            }
+            // Si NO existe, solo queda en scannedTags y se mostrará como "Prenda no registrada"
           } finally {
             // Remover de processingRfids después de completar
             processingRfidsRef.current.delete(tag.epc);
@@ -1078,9 +1156,30 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   };
 
   const renderScannedTag = ({ item, index }: { item: ScannedTag; index: number }) => {
-    // En modo garment o servicio industrial, verificar si la prenda está registrada
-    const garment = (serviceType === 'industrial' || mode === 'garment' || mode === 'process') ? getGarmentByRfid(item.epc) : null;
+    // En modo garment, servicio industrial, o process (cualquier serviceType), verificar si la prenda está registrada
+    const shouldCheckGarment = mode === 'garment' || serviceType === 'industrial' || mode === 'process';
+    let garment = shouldCheckGarment ? getGarmentByRfid(item.epc) : null;
+    
+    // En modo process personal, también buscar en registeredGarments
+    if (mode === 'process' && serviceType === 'personal' && !garment) {
+      const registeredGarment = registeredGarments.find(g => g.rfidCode === item.epc);
+      if (registeredGarment) {
+        // Convertir registeredGarment al formato de garment para compatibilidad
+        garment = {
+          id: registeredGarment.id,
+          rfid_code: registeredGarment.rfidCode,
+          description: registeredGarment.description,
+          garment_type: registeredGarment.category,
+          weight: registeredGarment.weight,
+          quantity: registeredGarment.quantity || 1,
+        } as any;
+      }
+    }
+    
     const isRegistered = !!garment;
+    const weight = garment?.weight ?? 0;
+    // Obtener la cantidad de la prenda para servicio personal
+    const quantity = (serviceType === 'personal' && garment) ? (garment.quantity || 1) : null;
     
     // Función para eliminar una prenda específica de la lista
     const handleRemoveTag = () => {
@@ -1089,55 +1188,203 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       updatedTags.forEach(tag => addScannedTag(tag));
       seenSetRef.current.delete(item.epc);
       scannedTagsCountRef.current = updatedTags.length;
+      
+      // En modo process personal, también eliminar de registeredGarments si está ahí
+      if (mode === 'process' && serviceType === 'personal') {
+        setRegisteredGarments(prev => prev.filter(g => g.rfidCode !== item.epc));
+      }
     };
     
     return (
-      <Card variant="outlined" className="mb-2">
-        <View className="flex-row justify-between items-center">
-          <View className="flex-1">
-            <View className="flex-row items-center">
-              <View 
-                className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${
-                  mode === 'garment'
-                    ? (isRegistered ? 'bg-green-500' : 'bg-orange-500')
-                    : (serviceType === 'industrial'
-                        ? (isRegistered ? 'bg-green-500' : 'bg-orange-500')
-                        : 'bg-primary-DEFAULT')
-                }`}
-              >
-                {mode !== 'garment' && (
-                  <Text className="text-white font-bold">{index + 1}</Text>
-                )}
-              </View>
-              <View className="flex-1">
-                <Text className="text-sm font-mono text-gray-900">{item.epc}</Text>
-                {(serviceType === 'industrial' || mode === 'garment' || mode === 'process') && (
-                  <Text className={`text-xs mt-1 ${isRegistered ? 'text-gray-600' : 'text-orange-600 font-medium'}`}>
-                    {isRegistered ? garment?.description || garment?.garment_type || 'Sin nombre' : 'Prenda no registrada'}
-                  </Text>
-                )}
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => {
+          // Solo permitir editar cantidad si: serviceType === 'industrial' y (mode === 'guide' o mode === 'process')
+          if (isRegistered && garment?.id && serviceType === 'industrial' && (mode === 'guide' || mode === 'process')) {
+            handleOpenQuantityEdit(item.epc);
+          }
+        }}
+        disabled={!isRegistered || !garment?.id || !(serviceType === 'industrial' && (mode === 'guide' || mode === 'process'))}
+      >
+        <Card variant="outlined" className="mb-2">
+          <View className="flex-row justify-between items-center">
+            <View className="flex-1">
+              <View className="flex-row items-center">
+                <View 
+                  className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${
+                    mode === 'garment'
+                      ? (isRegistered ? 'bg-green-500' : 'bg-orange-500')
+                      : (serviceType === 'industrial'
+                          ? (isRegistered ? 'bg-green-500' : 'bg-orange-500')
+                          : serviceType === 'personal'
+                            ? (isRegistered ? 'bg-green-500' : 'bg-orange-500')
+                            : 'bg-primary-DEFAULT')
+                  }`}
+                >
+                  {serviceType === 'personal' && quantity !== null ? (
+                    <Text className="text-white font-bold text-sm">{quantity}</Text>
+                  ) : mode !== 'garment' ? (
+                    <Text className="text-white font-bold">{index + 1}</Text>
+                  ) : null}
+                </View>
+                <View className="flex-1">
+                  <Text className="text-sm font-mono text-gray-900">{item.epc}</Text>
+                  {(serviceType === 'industrial' || mode === 'garment' || mode === 'process') && (
+                    <Text className={`text-xs mt-1 ${isRegistered ? 'text-gray-600' : 'text-orange-600 font-medium'}`}>
+                      {isRegistered ? garment?.description || garment?.garment_type || 'Sin nombre' : 'Prenda no registrada'}
+                    </Text>
+                  )}
+                </View>
               </View>
             </View>
+
+            {/* Peso registrado a la derecha (si existe) */}
+            {(serviceType === 'industrial' || mode === 'garment' || mode === 'process') && weight > 0 && (
+              <View className="items-end ml-3">
+                <Text className="text-xs text-gray-500">Peso</Text>
+                <View className="flex-row items-center mt-1">
+                  <Icon name="scale-outline" size={14} color="#4B5563" />
+                  <Text className="text-sm text-gray-800 ml-1">
+                    {weight} lb
+                  </Text>
+                </View>
+              </View>
+            )}
+            
+            {/* Botón X para eliminar prenda (servicio industrial y modo garment/process, incluyendo process personal) */}
+            {(serviceType === 'industrial' || mode === 'garment' || mode === 'process') && (
+              <TouchableOpacity 
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleRemoveTag();
+                }} 
+                className="ml-2"
+              >
+                <Icon name="close-circle" size={24} color="#EF4444" />
+              </TouchableOpacity>
+            )}
+            
+            {/* Checkmark solo para modos que no tienen botón X */}
+            {serviceType !== 'industrial' && mode !== 'garment' && mode !== 'process' && (
+              <Icon name="checkmark-circle" size={24} color="#10B981" />
+            )}
           </View>
-          
-          {/* Botón X para eliminar prenda (servicio industrial y modo garment/process) */}
-          {(serviceType === 'industrial' || mode === 'garment' || mode === 'process') && (
-            <TouchableOpacity onPress={handleRemoveTag} className="ml-2">
-              <Icon name="close-circle" size={24} color="#EF4444" />
-            </TouchableOpacity>
-          )}
-          
-          {/* Checkmark solo para modos que no tienen botón X */}
-          {serviceType !== 'industrial' && mode !== 'garment' && mode !== 'process' && (
-            <Icon name="checkmark-circle" size={24} color="#10B981" />
-          )}
-        </View>
-      </Card>
+        </Card>
+      </TouchableOpacity>
     );
   };
 
+  // Función para abrir modal de edición de cantidad
+  const handleOpenQuantityEdit = (epc: string) => {
+    const garment = getGarmentByRfid(epc);
+    if (!garment || !garment.id) {
+      Alert.alert('Error', 'No se pudo encontrar la prenda para editar.');
+      return;
+    }
+    
+    setSelectedGarmentForEdit({
+      id: garment.id,
+      epc: garment.rfid_code || epc,
+      description: garment.description || garment.garment_type || 'Sin descripción',
+      currentQuantity: garment.quantity || 1,
+      serviceType: garment.service_type,
+    });
+    setEditingQuantity(String(garment.quantity || 1));
+    setQuantityEditModalOpen(true);
+  };
+
+  // Función para confirmar actualización de cantidad
+  const handleConfirmQuantityUpdate = async () => {
+    if (!selectedGarmentForEdit) return;
+    
+    const quantityNum = parseInt(editingQuantity, 10);
+    if (isNaN(quantityNum) || quantityNum <= 0) {
+      Alert.alert('Error', 'La cantidad debe ser un número mayor a 0.');
+      return;
+    }
+
+    try {
+      await updateGarmentAsync({
+        id: selectedGarmentForEdit.id,
+        data: {
+          quantity: quantityNum,
+        } as any,
+      });
+
+      // Invalidar queries para recargar datos
+      queryClient.invalidateQueries({ queryKey: ['garments'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['garment'], exact: false });
+      
+      // Recargar prendas por RFID
+      if (shouldCheckGarments && rfidCodes.length > 0) {
+        // Forzar refetch de las prendas
+        setTimeout(() => {
+          queryClient.invalidateQueries({ 
+            queryKey: ['garments-by-rfid-codes'],
+            exact: false 
+          });
+        }, 300);
+      }
+
+      // Si el modal de detalles está abierto, actualizar el grupo seleccionado
+      if (scanDetailsModalOpen && selectedScanGroup) {
+        const updatedItems = selectedScanGroup.items.map(item => {
+          if (item.epc === selectedGarmentForEdit.epc) {
+            return { ...item, quantity: quantityNum };
+          }
+          return item;
+        });
+        setSelectedScanGroup({
+          ...selectedScanGroup,
+          items: updatedItems,
+        });
+      }
+
+      Alert.alert('Éxito', 'Cantidad actualizada correctamente.');
+      setQuantityEditModalOpen(false);
+      setSelectedGarmentForEdit(null);
+      setEditingQuantity('');
+    } catch (error: any) {
+      console.error('Error al actualizar cantidad:', error);
+      Alert.alert('Error', 'No se pudo actualizar la cantidad. Intente nuevamente.');
+    }
+  };
+
+  // Función para abrir modal de detalles de escaneo por tipo de prenda
+  const handleOpenScanDetails = (
+    item: { garmentType: string; count: number; totalWeight: number; tags: ScannedTag[] },
+    title: string,
+    isUnregistered: boolean,
+  ) => {
+    const detailedItems = item.tags.map(tag => {
+      const garment = getGarmentByRfid(tag.epc);
+      const quantity =
+        !garment || isUnregistered
+          ? 1
+          : garment.quantity && garment.quantity > 0
+          ? garment.quantity
+          : 1;
+      const weight = garment?.weight;
+
+      return {
+        epc: tag.epc,
+        description: garment
+          ? garment.description || garment.garment_type || title
+          : (isUnregistered ? 'Prenda no registrada' : title),
+        quantity,
+        weight,
+      };
+    });
+
+    setSelectedScanGroup({
+      title,
+      items: detailedItems,
+    });
+    setScanDetailsModalOpen(true);
+  };
+
   // Función para renderizar grupos de prendas por tipo (solo servicio industrial)
-  const renderGarmentTypeGroup = ({ item }: { item: { garmentType: string; count: number; tags: ScannedTag[] } }) => {
+  const renderGarmentTypeGroup = ({ item }: { item: { garmentType: string; count: number; totalWeight: number; tags: ScannedTag[] } }) => {
     const isUnregistered = item.garmentType === 'UNREGISTERED';
     
     // Función para eliminar todos los tags de este grupo
@@ -1186,10 +1433,17 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       return typeName;
     };
 
+    const groupLabel = getGarmentTypeLabel();
+
     return (
       <Card variant="outlined" className="mb-2">
         <View className="flex-row justify-between items-center">
-          <View className="flex-1">
+          {/* Zona clickable para abrir detalles */}
+          <TouchableOpacity
+            className="flex-1"
+            activeOpacity={0.8}
+            onPress={() => handleOpenScanDetails(item, groupLabel, isUnregistered)}
+          >
             <View className="flex-row items-center">
               <View 
                 className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
@@ -1200,7 +1454,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
               </View>
               <View className="flex-1">
                 <Text className="text-base font-semibold text-gray-900">
-                  {getGarmentTypeLabel()}
+                  {groupLabel}
                 </Text>
                 {isUnregistered && (
                   <Text className="text-xs text-orange-600 font-medium mt-1">
@@ -1209,12 +1463,22 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
                 )}
               </View>
             </View>
-          </View>
-          
-          {/* Botón X para eliminar todo el grupo */}
-          <TouchableOpacity onPress={handleRemoveGroup} className="ml-2">
-            <Icon name="close-circle" size={24} color="#EF4444" />
           </TouchableOpacity>
+          
+          {/* Peso total del grupo y botón X */}
+          <View className="items-end ml-2">
+            {item.totalWeight > 0 && (
+              <View className="flex-row items-center mb-1">
+                <Icon name="scale-outline" size={14} color="#4B5563" />
+                <Text className="text-xs text-gray-800 ml-1">
+                  {item.totalWeight.toFixed(2)} lb
+                </Text>
+              </View>
+            )}
+            <TouchableOpacity onPress={handleRemoveGroup}>
+              <Icon name="close-circle" size={24} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
         </View>
       </Card>
     );
@@ -1584,6 +1848,183 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           )}
         </View>
       )}
+
+      {/* Modal de detalles de escaneos por tipo de prenda (solo servicio industrial) */}
+      {serviceType === 'industrial' && (
+        <Modal
+          visible={scanDetailsModalOpen}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setScanDetailsModalOpen(false)}
+        >
+          <View className="flex-1 bg-black/40">
+            <View className="absolute inset-x-0 bottom-0 top-24 bg-white rounded-t-3xl p-4" style={{ elevation: 8 }}>
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-lg font-bold text-gray-900 flex-1">
+                  {selectedScanGroup?.title || 'Detalles de escaneo'}
+                </Text>
+                <TouchableOpacity onPress={() => setScanDetailsModalOpen(false)}>
+                  <Icon name="close" size={22} color="#111827" />
+                </TouchableOpacity>
+              </View>
+
+              {selectedScanGroup && selectedScanGroup.items.length > 0 ? (
+                <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+                  {selectedScanGroup.items.map((detail, index) => {
+                    const garment = getGarmentByRfid(detail.epc);
+                    const isRegistered = !!garment && !!garment.id;
+                    
+                    return (
+                      <TouchableOpacity
+                        key={detail.epc + index}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          // Solo permitir editar cantidad si: serviceType === 'industrial' y (mode === 'guide' o mode === 'process')
+                          if (isRegistered && serviceType === 'industrial' && (mode === 'guide' || mode === 'process')) {
+                            handleOpenQuantityEdit(detail.epc);
+                          }
+                        }}
+                        disabled={!isRegistered || !(serviceType === 'industrial' && (mode === 'guide' || mode === 'process'))}
+                      >
+                        <Card variant="outlined" className="mb-2">
+                          <View className="flex-row justify-between items-center">
+                            <View className="flex-row items-center flex-1">
+                              <View className="w-8 h-8 rounded-full bg-green-500 items-center justify-center mr-3">
+                                <Text className="text-white font-bold text-sm">
+                                  {detail.quantity}
+                                </Text>
+                              </View>
+                              <View className="flex-1">
+                                <Text className="text-xs font-mono text-gray-800" numberOfLines={1}>
+                                  {detail.epc}
+                                </Text>
+                                <Text className="text-xs text-gray-600 mt-1" numberOfLines={2}>
+                                  {detail.description}
+                                </Text>
+                              </View>
+                            </View>
+                            {detail.weight && detail.weight > 0 && (
+                              <View className="items-end ml-2">
+                                <View className="flex-row items-center">
+                                  <Icon name="scale-outline" size={14} color="#4B5563" />
+                                  <Text className="text-xs text-gray-800 ml-1">
+                                    {detail.weight} lb
+                                  </Text>
+                                </View>
+                              </View>
+                            )}
+                          </View>
+                        </Card>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              ) : (
+                <View className="flex-1 items-center justify-center">
+                  <Text className="text-sm text-gray-500">
+                    No hay detalles de escaneo para este grupo.
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Modal de edición de cantidad */}
+      <Modal
+        visible={quantityEditModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setQuantityEditModalOpen(false);
+          setSelectedGarmentForEdit(null);
+          setEditingQuantity('');
+        }}
+      >
+        <View className="flex-1 bg-black/50 items-center justify-center px-4">
+          <View className="bg-white rounded-2xl p-6 w-full max-w-sm" style={{ elevation: 8 }}>
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-lg font-bold text-gray-900">Ingresar Cantidad</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setQuantityEditModalOpen(false);
+                  setSelectedGarmentForEdit(null);
+                  setEditingQuantity('');
+                }}
+              >
+                <Icon name="close" size={24} color="#111827" />
+              </TouchableOpacity>
+            </View>
+
+            {selectedGarmentForEdit && (
+              <>
+                <View className="mb-4">
+                  <Text className="text-sm font-medium text-gray-700 mb-2">Prenda</Text>
+                  <View className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <Text className="text-sm font-mono text-blue-700 mb-1">
+                      {selectedGarmentForEdit.epc}
+                    </Text>
+                    <Text className="text-sm text-gray-800">
+                      {selectedGarmentForEdit.description}
+                    </Text>
+                  </View>
+                </View>
+
+                <View className="mb-4">
+                  <Text className="text-sm font-medium text-gray-700 mb-2">
+                    Cantidad <Text className="text-red-500">*</Text>
+                  </Text>
+                  <TextInput
+                    value={editingQuantity}
+                    onChangeText={(text) => {
+                      const onlyNums = text.replace(/\D/g, '');
+                      if (onlyNums === '' || parseInt(onlyNums, 10) > 0) {
+                        setEditingQuantity(onlyNums);
+                      }
+                    }}
+                    keyboardType="number-pad"
+                    className="border border-blue-300 rounded-lg px-3 py-2 bg-white text-base font-semibold text-gray-900"
+                    style={{ paddingVertical: 8 }}
+                    placeholder="Ingrese la cantidad"
+                    placeholderTextColor="#9CA3AF"
+                  />
+                  <Text className="text-xs text-gray-500 mt-2">
+                    Cantidad actual: {selectedGarmentForEdit.currentQuantity}
+                  </Text>
+                </View>
+
+                <View className="flex-row gap-3">
+                  <TouchableOpacity
+                    onPress={() => {
+                      setQuantityEditModalOpen(false);
+                      setSelectedGarmentForEdit(null);
+                      setEditingQuantity('');
+                    }}
+                    className="flex-1 py-3 rounded-lg border border-gray-300 items-center"
+                  >
+                    <Text className="text-gray-700 font-medium">Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleConfirmQuantityUpdate}
+                    disabled={!editingQuantity || parseInt(editingQuantity, 10) <= 0 || isUpdating}
+                    className="flex-1 py-3 rounded-lg items-center"
+                    style={{
+                      backgroundColor: (!editingQuantity || parseInt(editingQuantity, 10) <= 0 || isUpdating) ? '#D1D5DB' : '#0b1f36',
+                    }}
+                  >
+                    {isUpdating ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text className="text-white font-medium">Confirmar</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
       
       {/* En modo edición ya no mostramos botones secundarios; se usa solo el botón inferior "Continuar a Guía" */}
 
@@ -1606,7 +2047,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         </View>
       )}
 
-      {/* Botón para continuar a guía (solo servicio personal con prendas registradas) */}
+      {/* Botón para continuar a guía (solo modo guide personal con prendas registradas) */}
       {mode === 'guide' && serviceType === 'personal' && !showActionButtons && registeredGarments.length > 0 && scannedTags.length === 0 && (
         <View className="space-y-2">
           <Button

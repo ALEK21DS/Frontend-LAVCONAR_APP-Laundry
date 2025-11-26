@@ -668,13 +668,13 @@ export const GuideForm: React.FC<GuideFormProps> = ({
                 <View className="flex-1">
                   <TextInput
                     className="flex-1 text-gray-900 text-sm"
-                    placeholder="dd/mm/aaaa"
+                placeholder="dd/mm/aaaa"
                     placeholderTextColor="#9CA3AF"
-                    value={collectionDate}
+                value={collectionDate}
                     editable={false}
                     style={{ paddingVertical: 8, fontSize: 14 }}
-                  />
-                </View>
+              />
+            </View>
               </View>
 
               {/* Hora de Recolección (solo visual + botón para abrir modal ligero) */}
@@ -737,9 +737,9 @@ export const GuideForm: React.FC<GuideFormProps> = ({
                 <View className="flex-1">
                   <TextInput
                     className="flex-1 text-gray-900 text-sm"
-                    placeholder="dd/mm/aaaa"
+                placeholder="dd/mm/aaaa"
                     placeholderTextColor="#9CA3AF"
-                    value={deliveryDate}
+                value={deliveryDate}
                     editable={false}
                     style={{ paddingVertical: 8, fontSize: 14 }}
                   />

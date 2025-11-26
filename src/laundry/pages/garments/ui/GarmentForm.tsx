@@ -712,12 +712,12 @@ export const GarmentForm: React.FC<GarmentFormProps> = ({
                   <View className="flex-1">
                     <TextInput
                       className="flex-1 text-gray-900 text-sm"
-                      placeholder="dd/mm/aaaa"
+                placeholder="dd/mm/aaaa"
                       placeholderTextColor="#9CA3AF"
-                      value={manufacturingDateDisplay}
+                value={manufacturingDateDisplay}
                       editable={false}
                       style={{ paddingVertical: 8, fontSize: 14 }}
-                    />
+              />
                   </View>
                 </View>
             </View>
