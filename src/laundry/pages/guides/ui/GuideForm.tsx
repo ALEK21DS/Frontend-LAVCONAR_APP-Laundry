@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Modal, Alert } from 'react-native';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Modal, Alert, TextInput, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Button, Card, Dropdown, Input } from '@/components/common';
 import { GuideItem } from '@/laundry/interfaces/guides/guides.interface';
@@ -16,7 +16,7 @@ import { useGarmentsByRfidCodes } from '@/laundry/hooks/guides/garments/useGarme
 // Detalle de guía eliminado del flujo
 import { isValidDate, sanitizeNumericInput, isNonNegative, safeParseInt, safeParseFloat } from '@/helpers/validators.helper';
 import { useVehicles } from '@/laundry/hooks/vehicles';
-import { VehicleSelectionModal } from '@/laundry/components';
+import { VehicleSelectionModal, DatePickerModal, TimePickerModal } from '@/laundry/components';
 import { isSuperAdminUser } from '@/helpers/user.helper';
 
 type Option = { label: string; value: string; serviceType?: string; acronym?: string };
@@ -112,6 +112,13 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   };
   const [collectionDate, setCollectionDate] = useState<string>(draftValues?.collectionDate || formatDateToDisplay(new Date()));
   const [deliveryDate, setDeliveryDate] = useState<string>(draftValues?.deliveryDate || formatDateToDisplay(new Date()));
+  // Hora asociada a cada fecha (formato HH:mm)
+  const getCurrentTimeString = () => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  };
+  const [collectionTime, setCollectionTime] = useState<string>(draftValues?.collectionTime || getCurrentTimeString());
+  const [deliveryTime, setDeliveryTime] = useState<string>(draftValues?.deliveryTime || getCurrentTimeString());
   const [totalWeight, setTotalWeight] = useState<string>(
     draftValues?.totalWeight ?? (initialTotalWeight > 0 ? initialTotalWeight.toFixed(2) : '')
   );
@@ -420,6 +427,57 @@ export const GuideForm: React.FC<GuideFormProps> = ({
     }
   };
 
+  // Estado para modal de fechas (recolección y entrega)
+  const [datePickerState, setDatePickerState] = useState<{
+    visible: boolean;
+    mode: 'collection' | 'delivery' | null;
+  }>({
+    visible: false,
+    mode: null,
+  });
+
+  // Indicadores y timers para mostrar spinner al abrir los modales de fecha
+  const [isOpeningCollectionDate, setIsOpeningCollectionDate] = useState(false);
+  const [isOpeningDeliveryDate, setIsOpeningDeliveryDate] = useState(false);
+  const collectionDateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const deliveryDateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Modal ligero para hora (recolección / entrega)
+  const [timePickerState, setTimePickerState] = useState<{
+    visible: boolean;
+    mode: 'collection' | 'delivery' | null;
+  }>({
+    visible: false,
+    mode: null,
+  });
+
+  const handleDatePickerConfirm = (day: number, month: number, year: number, hour?: number, minute?: number) => {
+    const formatted = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+    const timeStr =
+      typeof hour === 'number' && typeof minute === 'number'
+        ? `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+        : getCurrentTimeString();
+    if (datePickerState.mode === 'collection') {
+      setCollectionDate(formatted);
+      setCollectionTime(timeStr);
+    } else if (datePickerState.mode === 'delivery') {
+      setDeliveryDate(formatted);
+      setDeliveryTime(timeStr);
+    }
+    setDatePickerState({ visible: false, mode: null });
+    // Al cerrar por confirmación, limpiar spinners y timers
+    if (collectionDateTimeoutRef.current) {
+      clearTimeout(collectionDateTimeoutRef.current);
+      collectionDateTimeoutRef.current = null;
+    }
+    if (deliveryDateTimeoutRef.current) {
+      clearTimeout(deliveryDateTimeoutRef.current);
+      deliveryDateTimeoutRef.current = null;
+    }
+    setIsOpeningCollectionDate(false);
+    setIsOpeningDeliveryDate(false);
+  };
+
   // Función para convertir dd/mm/yyyy a Date para validación
   const parseDateFromDisplay = (dateStr: string): Date | null => {
     if (!dateStr || dateStr.length < 10) return null;
@@ -450,16 +508,24 @@ export const GuideForm: React.FC<GuideFormProps> = ({
     return cleaned;
   };
 
-  // Función para convertir dd/mm/yyyy a ISO string para el backend
-  // Usa la hora actual para la fecha de recolección
-  const formatDateToISO = (dateStr: string, useCurrentTime: boolean = true): string => {
+  // Función para convertir dd/mm/yyyy y hora (HH:mm) a ISO string para el backend
+  // Si no se pasa hora, puede usar la hora actual o 00:00 según bandera
+  const formatDateToISO = (dateStr: string, timeStr?: string, useCurrentTime: boolean = true): string => {
     const dateObj = parseDateFromDisplay(dateStr);
     if (!dateObj) return '';
 
-    if (useCurrentTime) {
-      // Usar la hora actual para la fecha
+    if (timeStr && /^\d{2}:\d{2}$/.test(timeStr)) {
+      const [h, m] = timeStr.split(':').map(Number);
+      if (!isNaN(h) && !isNaN(m) && h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+        dateObj.setHours(h, m, 0, 0);
+      }
+    } else if (useCurrentTime) {
+      // Usar la hora actual para la fecha si no tenemos hora específica
       const now = new Date();
       dateObj.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+    } else {
+      // Sin hora específica ni hora actual: dejar a medianoche
+      dateObj.setHours(0, 0, 0, 0);
     }
 
     return dateObj.toISOString();
@@ -564,27 +630,142 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             <Input label="Sucursal" value={branchOfficeName} editable={false} className="mt-1" />
           )}
           <View className="flex-row mt-1 -mx-1">
+            {/* Fecha de Recolección */}
             <View className="flex-1 px-1">
-              <Input
-                label="Fecha Recolección *"
-                placeholder="dd/mm/aaaa"
-                value={collectionDate}
-                onChangeText={(text) => setCollectionDate(formatDateInput(text))}
-                keyboardType="numeric"
-                maxLength={10}
-                editable={isSuperAdmin}
-                className={isSuperAdmin ? undefined : "bg-gray-50"}
-              />
+              <Text className="text-sm font-medium mb-1" style={{ color: '#374151' }}>
+                Fecha Recolección *
+              </Text>
+              <View
+                className={`flex-row items-center border rounded-lg px-3 py-2 bg-white ${!isSuperAdmin ? 'bg-gray-50' : ''}`}
+                style={{ borderColor: isSuperAdmin ? '#3B82F6' : '#D1D5DB', minHeight: 44 }}
+              >
+                <TouchableOpacity
+                  disabled={!isSuperAdmin}
+                  onPress={() => {
+                    if (!isSuperAdmin || isOpeningCollectionDate) return;
+                    setIsOpeningCollectionDate(true);
+                    // Mostrar spinner inmediatamente y abrir el modal con un pequeño delay (~50ms)
+                    collectionDateTimeoutRef.current = setTimeout(() => {
+                      setDatePickerState({ visible: true, mode: 'collection' });
+                    }, 0.05);
+                  }}
+                  activeOpacity={isSuperAdmin ? 0.8 : 1}
+                  className="mr-3 items-center justify-center"
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 999,
+                    backgroundColor: isSuperAdmin ? '#DBEAFE' : '#E5E7EB',
+                    opacity: isSuperAdmin ? 1 : 0.6,
+                  }}
+                >
+                  {isOpeningCollectionDate ? (
+                    <ActivityIndicator size="small" color={isSuperAdmin ? '#1D4ED8' : '#9CA3AF'} />
+                  ) : (
+                    <Icon name="calendar-outline" size={18} color={isSuperAdmin ? '#1D4ED8' : '#9CA3AF'} />
+                  )}
+                </TouchableOpacity>
+                <View className="flex-1">
+                  <TextInput
+                    className="flex-1 text-gray-900 text-sm"
+                    placeholder="dd/mm/aaaa"
+                    placeholderTextColor="#9CA3AF"
+                    value={collectionDate}
+                    editable={false}
+                    style={{ paddingVertical: 8, fontSize: 14 }}
+                  />
+                </View>
+              </View>
+
+              {/* Hora de Recolección (solo visual + botón para abrir modal ligero) */}
+              <View className="mt-1 flex-row items-center">
+                <Text className="text-xs text-gray-500 mr-2">Hora:</Text>
+                <TouchableOpacity
+                  disabled={!isSuperAdmin}
+                  onPress={() => {
+                    if (!isSuperAdmin) return;
+                    setTimePickerState({ visible: true, mode: 'collection' });
+                  }}
+                  className="flex-row items-center px-2 py-1 rounded-full bg-gray-50 border border-gray-200"
+                  activeOpacity={isSuperAdmin ? 0.8 : 1}
+                >
+                  <Icon
+                    name="time-outline"
+                    size={14}
+                    color={isSuperAdmin ? '#1D4ED8' : '#9CA3AF'}
+                  />
+                  <Text className="text-xs text-gray-800 ml-1">
+                    {collectionTime || '--:--'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
+
+            {/* Fecha de Entrega */}
             <View className="flex-1 px-1">
-              <Input
-                label="Fecha Entrega"
-                placeholder="dd/mm/aaaa"
-                value={deliveryDate}
-                onChangeText={(text) => setDeliveryDate(formatDateInput(text))}
-                keyboardType="numeric"
-                maxLength={10}
-              />
+              <Text className="text-sm font-medium mb-1" style={{ color: '#374151' }}>
+                Fecha Entrega
+              </Text>
+              <View
+                className="flex-row items-center border rounded-lg px-3 py-2 bg-white"
+                style={{ borderColor: '#3B82F6', minHeight: 44 }}
+              >
+                <TouchableOpacity
+                  onPress={() => {
+                    if (isOpeningDeliveryDate) return;
+                    setIsOpeningDeliveryDate(true);
+                    // Mostrar spinner inmediatamente y abrir el modal con un pequeño delay (~50ms)
+                    deliveryDateTimeoutRef.current = setTimeout(() => {
+                      setDatePickerState({ visible: true, mode: 'delivery' });
+                    }, 0.05);
+                  }}
+                  activeOpacity={0.8}
+                  className="mr-3 items-center justify-center"
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 999,
+                    backgroundColor: '#DBEAFE',
+                  }}
+                >
+                  {isOpeningDeliveryDate ? (
+                    <ActivityIndicator size="small" color="#1D4ED8" />
+                  ) : (
+                    <Icon name="calendar-outline" size={18} color="#1D4ED8" />
+                  )}
+                </TouchableOpacity>
+                <View className="flex-1">
+                  <TextInput
+                    className="flex-1 text-gray-900 text-sm"
+                    placeholder="dd/mm/aaaa"
+                    placeholderTextColor="#9CA3AF"
+                    value={deliveryDate}
+                    editable={false}
+                    style={{ paddingVertical: 8, fontSize: 14 }}
+                  />
+                </View>
+              </View>
+
+              {/* Hora de Entrega */}
+              <View className="mt-1 flex-row items-center">
+                <Text className="text-xs text-gray-500 mr-2">Hora:</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setTimePickerState({ visible: true, mode: 'delivery' });
+                  }}
+                  className="flex-row items-center px-2 py-1 rounded-full bg-gray-50 border border-gray-200"
+                  activeOpacity={0.8}
+                >
+                  <Icon
+                    name="time-outline"
+                    size={14}
+                    color="#1D4ED8"
+                  />
+                  <Text className="text-xs text-gray-800 ml-1">
+                    {deliveryTime || '--:--'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
@@ -942,8 +1123,8 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               branch_office_id: branchOfficeId && branchOfficeId.trim() !== '' ? branchOfficeId : undefined,
               service_type: serviceType as any,
               supplier_guide_number: serviceType === 'INDUSTRIAL' ? (supplierGuideNumber || undefined) : undefined,
-              collection_date: formatDateToISO(collectionDate, true),
-              delivery_date: deliveryDate ? formatDateToISO(deliveryDate, true) : undefined,
+              collection_date: formatDateToISO(collectionDate, collectionTime, true),
+              delivery_date: deliveryDate ? formatDateToISO(deliveryDate, deliveryTime, true) : undefined,
               general_condition: condition as any,
               status: status as any,
               total_weight: safeParseFloat(totalWeight),
@@ -1055,6 +1236,62 @@ export const GuideForm: React.FC<GuideFormProps> = ({
         />
 
       </ScrollView>
+
+      {/* Modal de selección de fecha (Recolección / Entrega) */}
+      <DatePickerModal
+        visible={datePickerState.visible}
+        onClose={() => {
+          setDatePickerState({ visible: false, mode: null });
+          // Limpiar spinners y timers al cerrar sin confirmar
+          if (collectionDateTimeoutRef.current) {
+            clearTimeout(collectionDateTimeoutRef.current);
+            collectionDateTimeoutRef.current = null;
+          }
+          if (deliveryDateTimeoutRef.current) {
+            clearTimeout(deliveryDateTimeoutRef.current);
+            deliveryDateTimeoutRef.current = null;
+          }
+          setIsOpeningCollectionDate(false);
+          setIsOpeningDeliveryDate(false);
+        }}
+        onConfirm={handleDatePickerConfirm}
+        initialDate={
+          datePickerState.mode === 'collection'
+            ? collectionDate
+            : datePickerState.mode === 'delivery'
+            ? deliveryDate
+            : undefined
+        }
+        minDate={datePickerState.mode === 'delivery' ? new Date() : undefined}
+        minDateErrorMessage="La fecha de entrega no puede ser anterior a hoy"
+      />
+
+      {/* Modal ligero para hora (Recolección / Entrega) */}
+      <TimePickerModal
+        visible={timePickerState.visible}
+        onClose={() => setTimePickerState({ visible: false, mode: null })}
+        initialTime={
+          timePickerState.mode === 'collection'
+            ? collectionTime
+            : timePickerState.mode === 'delivery'
+            ? deliveryTime
+            : undefined
+        }
+        title={
+          timePickerState.mode === 'collection'
+            ? 'Hora de Recolección'
+            : timePickerState.mode === 'delivery'
+            ? 'Hora de Entrega'
+            : 'Seleccionar Hora'
+        }
+        onConfirm={(time) => {
+          if (timePickerState.mode === 'collection') {
+            setCollectionTime(time);
+          } else if (timePickerState.mode === 'delivery') {
+            setDeliveryTime(time);
+          }
+        }}
+      />
     </KeyboardAvoidingView>
   );
 };

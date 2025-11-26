@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Alert, TextInput, Modal, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Button, Input, Dropdown } from '@/components/common';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -10,7 +10,7 @@ import { useCreateWashingProcess, useUpdateWashingProcess, useWashingProcessByGu
 import { useUpdateRfidScan } from '@/laundry/hooks/guides/rfid-scan';
 import { useGarmentsByRfidCodes } from '@/laundry/hooks/guides/garments';
 import { safeParseFloat, safeParseInt } from '@/helpers/validators.helper';
-import { MachineSelectionModal } from '@/laundry/components';
+import { MachineSelectionModal, DatePickerModal, TimePickerModal } from '@/laundry/components';
 import { guidesApi } from '@/laundry/api/guides/guides.api';
 
 interface WashingProcessFormProps {
@@ -197,6 +197,23 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
   const [guideDetails, setGuideDetails] = useState<any | null>(null);
   const [isLoadingGuideDetails, setIsLoadingGuideDetails] = useState(false);
 
+  // Estado para modales de fecha/hora
+  const [datePickerState, setDatePickerState] = useState<{
+    visible: boolean;
+    mode: 'start' | 'end' | null;
+  }>({ visible: false, mode: null });
+
+  const [timePickerState, setTimePickerState] = useState<{
+    visible: boolean;
+    mode: 'start' | 'end' | null;
+  }>({ visible: false, mode: null });
+
+  // Indicadores de carga para los iconos de calendario
+  const [isOpeningStartDate, setIsOpeningStartDate] = useState(false);
+  const [isOpeningEndDate, setIsOpeningEndDate] = useState(false);
+  const startDateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const endDateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Actualizar fechas a fecha/hora actual cada vez que se abre el formulario (tanto para crear como para editar)
   useEffect(() => {
     if (visible) {
@@ -208,6 +225,59 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
       }));
     }
   }, [visible]);
+
+  const applyDateToField = (mode: 'start' | 'end', day: number, month: number, year: number) => {
+    const currentValue = mode === 'start' ? formData.start_time : formData.end_time;
+    // Extraer hora/minuto actuales si existen
+    let hours = 0;
+    let minutes = 0;
+    if (currentValue && currentValue.includes(' ')) {
+      const timePart = currentValue.split(' ')[1];
+      const [h, m] = timePart.split(':');
+      hours = Number(h) || 0;
+      minutes = Number(m) || 0;
+    }
+    const newDate = new Date(year, month - 1, day, hours, minutes);
+    const formatted = formatDateForInput(newDate);
+    setFormData(prev => ({
+      ...prev,
+      [mode === 'start' ? 'start_time' : 'end_time']: formatted,
+    }));
+  };
+
+  const handleDatePickerConfirm = (day: number, month: number, year: number) => {
+    if (!datePickerState.mode) return;
+    applyDateToField(datePickerState.mode, day, month, year);
+    setDatePickerState({ visible: false, mode: null });
+  };
+
+  const applyTimeToField = (mode: 'start' | 'end', time: string) => {
+    const [hStr, mStr] = time.split(':');
+    const hours = Number(hStr) || 0;
+    const minutes = Number(mStr) || 0;
+
+    const currentValue = mode === 'start' ? formData.start_time : formData.end_time;
+    // Si no hay fecha aún, usar la fecha actual
+    let baseDate: Date;
+    if (currentValue && currentValue.includes(' ')) {
+      const [datePart] = currentValue.split(' ');
+      const [yearStr, monthStr, dayStr] = datePart.split('-');
+      baseDate = new Date(
+        Number(yearStr) || new Date().getFullYear(),
+        (Number(monthStr) || 1) - 1,
+        Number(dayStr) || new Date().getDate(),
+      );
+    } else {
+      baseDate = new Date();
+    }
+
+    baseDate.setHours(hours, minutes, 0, 0);
+    const formatted = formatDateForInput(baseDate);
+    setFormData(prev => ({
+      ...prev,
+      [mode === 'start' ? 'start_time' : 'end_time']: formatted,
+    }));
+  };
 
   const renderBooleanToggle = (
     label: string,
@@ -607,27 +677,101 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
 
           {/* Fecha y hora de inicio */}
           <View className="mb-4">
-            <Input
-              label="Fecha y hora de inicio *"
-              value={formData.start_time}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, start_time: text }))}
-              placeholder="AAAA-MM-DD HH:mm"
-              icon="calendar-outline"
-              error={errors.start_time}
-            />
-            <Text className="text-xs text-gray-500 mt-1">Formato: AAAA-MM-DD HH:mm</Text>
+            <Text className="text-sm font-medium text-gray-700 mb-1">Fecha y hora de inicio *</Text>
+            <View className="flex-row items-center border rounded-lg px-3 py-2 bg-white" style={{ borderColor: errors.start_time ? '#EF4444' : '#D1D5DB', minHeight: 44 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (isOpeningStartDate) return;
+                  setIsOpeningStartDate(true);
+                  startDateTimeoutRef.current = setTimeout(() => {
+                    setDatePickerState({ visible: true, mode: 'start' });
+                  }, 0.05);
+                }}
+                activeOpacity={0.8}
+                className="mr-3 items-center justify-center"
+                style={{ width: 34, height: 34, borderRadius: 999, backgroundColor: '#DBEAFE' }}
+              >
+                {isOpeningStartDate ? (
+                  <ActivityIndicator size="small" color="#1D4ED8" />
+                ) : (
+                  <Icon name="calendar-outline" size={20} color="#1D4ED8" />
+                )}
+              </TouchableOpacity>
+              <TextInput
+                value={formData.start_time}
+                editable={false}
+                placeholder="AAAA-MM-DD HH:mm"
+                placeholderTextColor="#9CA3AF"
+                className="flex-1 text-sm text-gray-900"
+              />
+            </View>
+
+            {/* Hora de inicio como botón pequeño */}
+            <View className="mt-1 flex-row items-center">
+              <Text className="text-xs text-gray-500 mr-2">Hora inicio:</Text>
+              <TouchableOpacity
+                onPress={() => setTimePickerState({ visible: true, mode: 'start' })}
+                className="flex-row items-center px-2 py-1 rounded-full bg-gray-50 border border-gray-200"
+                activeOpacity={0.8}
+              >
+                <Icon name="time-outline" size={14} color="#1D4ED8" />
+                <Text className="text-xs text-gray-800 ml-1">
+                  {formData.start_time.split(' ')[1] || '--:--'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {errors.start_time && (
+              <Text className="text-xs mt-1" style={{ color: '#EF4444' }}>
+                {errors.start_time}
+              </Text>
+            )}
           </View>
 
           {/* Fecha y hora de fin */}
           <View className="mb-4">
-            <Input
-              label="Fecha y hora de fin"
-              value={formData.end_time}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, end_time: text }))}
-              placeholder="AAAA-MM-DD HH:mm"
-              icon="calendar-outline"
-            />
-            <Text className="text-xs text-gray-500 mt-1">Formato: AAAA-MM-DD HH:mm</Text>
+            <Text className="text-sm font-medium text-gray-700 mb-1">Fecha y hora de fin</Text>
+            <View className="flex-row items-center border rounded-lg px-3 py-2 bg-white" style={{ borderColor: '#D1D5DB', minHeight: 44 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (isOpeningEndDate) return;
+                  setIsOpeningEndDate(true);
+                  endDateTimeoutRef.current = setTimeout(() => {
+                    setDatePickerState({ visible: true, mode: 'end' });
+                  }, 0.05);
+                }}
+                activeOpacity={0.8}
+                className="mr-3 items-center justify-center"
+                style={{ width: 34, height: 34, borderRadius: 999, backgroundColor: '#DBEAFE' }}
+              >
+                {isOpeningEndDate ? (
+                  <ActivityIndicator size="small" color="#1D4ED8" />
+                ) : (
+                  <Icon name="calendar-outline" size={20} color="#1D4ED8" />
+                )}
+              </TouchableOpacity>
+              <TextInput
+                value={formData.end_time}
+                editable={false}
+                placeholder="AAAA-MM-DD HH:mm"
+                placeholderTextColor="#9CA3AF"
+                className="flex-1 text-sm text-gray-900"
+              />
+            </View>
+
+            {/* Hora de fin como botón pequeño */}
+            <View className="mt-1 flex-row items-center">
+              <Text className="text-xs text-gray-500 mr-2">Hora fin:</Text>
+              <TouchableOpacity
+                onPress={() => setTimePickerState({ visible: true, mode: 'end' })}
+                className="flex-row items-center px-2 py-1 rounded-full bg-gray-50 border border-gray-200"
+                activeOpacity={0.8}
+              >
+                <Icon name="time-outline" size={14} color="#1D4ED8" />
+                <Text className="text-xs text-gray-800 ml-1">
+                  {formData.end_time.split(' ')[1] || '--:--'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Máquina (opcional para todos los procesos) */}
@@ -780,6 +924,57 @@ export const WashingProcessForm: React.FC<WashingProcessFormProps> = ({
           setMachineModalOpen(false);
         }}
         machines={availableMachines}
+      />
+
+      {/* Modal de selección de fecha (inicio / fin) */}
+      <DatePickerModal
+        visible={datePickerState.visible}
+        onClose={() => {
+          setDatePickerState({ visible: false, mode: null });
+          if (startDateTimeoutRef.current) {
+            clearTimeout(startDateTimeoutRef.current);
+            startDateTimeoutRef.current = null;
+          }
+          if (endDateTimeoutRef.current) {
+            clearTimeout(endDateTimeoutRef.current);
+            endDateTimeoutRef.current = null;
+          }
+          setIsOpeningStartDate(false);
+          setIsOpeningEndDate(false);
+        }}
+        onConfirm={handleDatePickerConfirm}
+        initialDate={
+          datePickerState.mode === 'start'
+            ? formData.start_time.split(' ')[0]?.replace(/-/g, '-') // AAAA-MM-DD
+            : datePickerState.mode === 'end'
+            ? formData.end_time.split(' ')[0]?.replace(/-/g, '-')
+            : undefined
+        }
+      />
+
+      {/* Modal de selección de hora (inicio / fin) */}
+      <TimePickerModal
+        visible={timePickerState.visible}
+        onClose={() => setTimePickerState({ visible: false, mode: null })}
+        initialTime={
+          timePickerState.mode === 'start'
+            ? formData.start_time.split(' ')[1]
+            : timePickerState.mode === 'end'
+            ? formData.end_time.split(' ')[1]
+            : undefined
+        }
+        title={
+          timePickerState.mode === 'start'
+            ? 'Hora de inicio'
+            : timePickerState.mode === 'end'
+            ? 'Hora de fin'
+            : 'Seleccionar hora'
+        }
+        onConfirm={(time) => {
+          if (!timePickerState.mode) return;
+          applyTimeToField(timePickerState.mode, time);
+          setTimePickerState({ visible: false, mode: null });
+        }}
       />
     </Modal>
   );
