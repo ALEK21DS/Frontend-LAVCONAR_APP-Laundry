@@ -29,6 +29,7 @@ type ScanFormProps = {
   deferRfidScanUpdate?: boolean;
   unregisteredCodes?: string[];
   serviceType?: 'industrial' | 'personal';
+  disableScanType?: boolean;
 };
 
 export const ScanForm: React.FC<ScanFormProps> = ({
@@ -45,6 +46,7 @@ export const ScanForm: React.FC<ScanFormProps> = ({
   deferRfidScanUpdate = false,
   unregisteredCodes = [],
   serviceType = 'industrial',
+  disableScanType = false,
 }) => {
   const { user } = useAuthStore();
   const { sucursales } = useBranchOffices();
@@ -500,10 +502,13 @@ export const ScanForm: React.FC<ScanFormProps> = ({
               label="Tipo de Escaneo *"
               options={scanTypes}
               value={hasScanTypeOptions ? formData.scan_type : ''}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, scan_type: value }))}
+            onValueChange={(value) => {
+              if (disableScanType) return;
+              setFormData(prev => ({ ...prev, scan_type: value }));
+            }}
               placeholder={hasScanTypeOptions ? "Seleccionar tipo de escaneo" : "Catálogo vacío"}
               icon="scan-outline"
-              disabled={!hasScanTypeOptions}
+            disabled={!hasScanTypeOptions || disableScanType}
             />
           </View>
 

@@ -1620,13 +1620,19 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           <Icon name="arrow-back-outline" size={22} color="#111827" />
         </TouchableOpacity>
         <Text className="text-lg font-bold text-gray-900 ml-3">
-          {isEditMode 
+          {isEditMode && mode === 'guide'
             ? 'EDITAR PRENDAS DE GUÍA'
-            : mode === 'process'
-              ? 'ESCANEO DE PROCESO'
-              : mode === 'guide' && serviceType === 'personal' 
-                ? 'REGISTRAR PRENDA' 
-                : 'ESCANEAR PRENDAS'}
+            : mode === 'garment'
+              ? 'REGISTRAR PRENDA'
+              : mode === 'guide'
+                ? serviceType === 'industrial'
+                  ? 'ESCANER GUÍAS - I'
+                  : 'ESCANER GUÍAS - P'
+                : mode === 'process'
+                  ? serviceType === 'industrial'
+                    ? 'ESCANER PROCESO - I'
+                    : 'ESCANER PROCESO - P'
+                  : 'ESCANEAR PRENDAS'}
         </Text>
       </View>
 
@@ -2244,6 +2250,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       {scanFormContext && (
         <ScanFormModal
           visible={true}
+          origin={scanFormContext.origin}
           guideId={scanFormContext.guideId}
           rfidScanId={scanFormContext.rfidScanId}
           guideToEdit={scanFormContext.guide}

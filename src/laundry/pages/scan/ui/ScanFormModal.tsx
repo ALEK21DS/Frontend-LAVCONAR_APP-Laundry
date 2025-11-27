@@ -15,6 +15,7 @@ interface ScanFormModalProps {
   deferRfidScanUpdate?: boolean;
   unregisteredCodes?: string[];
   serviceType?: 'industrial' | 'personal';
+  origin?: 'guide' | 'process';
   onSuccess: (rfidScanUpdateData?: any) => void;
   onCancel: () => void;
 }
@@ -30,6 +31,7 @@ export const ScanFormModal: React.FC<ScanFormModalProps> = ({
   deferRfidScanUpdate = false,
   unregisteredCodes,
   serviceType,
+  origin,
   onSuccess,
   onCancel,
 }) => {
@@ -61,21 +63,22 @@ export const ScanFormModal: React.FC<ScanFormModalProps> = ({
           </TouchableOpacity>
         </View>
         <View className="flex-1">
-        <ScanForm
-          guideData={guideData || guideToEdit || { id: guideId }}
-          scannedTags={scannedTags}
-          onSubmit={onSuccess}
-          onCancel={onCancel}
-          editContext={editContext}
-          initialRfidScan={{
-            scan_type: initialScanType || 'COLLECTED',
-          }}
-          initialRfidScanFull={fullRfidScan}
-          initialGuide={guideToEdit}
-          deferRfidScanUpdate={deferRfidScanUpdate}
-          unregisteredCodes={unregisteredCodes}
-          serviceType={serviceType}
-        />
+          <ScanForm
+            guideData={guideData || guideToEdit || { id: guideId }}
+            scannedTags={scannedTags}
+            onSubmit={onSuccess}
+            onCancel={onCancel}
+            editContext={editContext}
+            initialRfidScan={{
+              scan_type: initialScanType || 'COLLECTED',
+            }}
+            initialRfidScanFull={fullRfidScan}
+            initialGuide={guideToEdit}
+            deferRfidScanUpdate={deferRfidScanUpdate}
+            unregisteredCodes={unregisteredCodes}
+            serviceType={serviceType}
+            disableScanType={origin === 'process'}
+          />
         </View>
       </View>
     </Modal>
