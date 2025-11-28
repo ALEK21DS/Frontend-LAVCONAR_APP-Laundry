@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Card } from '@/components/common';
 import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
@@ -18,7 +18,7 @@ export const ServiceTypeModal: React.FC<ServiceTypeModalProps> = ({
   title = 'Seleccionar Tipo de Servicio'
 }) => {
   // Traer tipos de servicio desde catálogo (fresco)
-  const { data: serviceTypeCatalog } = useCatalogValuesByType('service_type', true, { forceFresh: true });
+  const { data: serviceTypeCatalog, isLoading: isLoadingServiceType } = useCatalogValuesByType('service_type', true, { forceFresh: true });
 
   // Mapear catálogo a opciones visuales con fallback
   const serviceOptions = useMemo(() => {
@@ -70,7 +70,13 @@ export const ServiceTypeModal: React.FC<ServiceTypeModalProps> = ({
         <View className="flex-1 p-4">
           {/* Service Options desde catálogo */}
           <View className="space-y-3">
-            {serviceOptions.map(opt => (
+            {isLoadingServiceType ? (
+              <View className="py-8 items-center">
+                <ActivityIndicator size="large" color="#3B82F6" />
+                <Text className="text-gray-500 text-sm mt-3">Cargando opciones...</Text>
+              </View>
+            ) : (
+              serviceOptions.map(opt => (
               <TouchableOpacity key={opt.code} activeOpacity={0.7} onPress={() => handleSelectCode(opt.code)}>
                 <Card padding="md" className={`${opt.bg}`}>
                   <View className="flex-row items-center">
@@ -85,7 +91,8 @@ export const ServiceTypeModal: React.FC<ServiceTypeModalProps> = ({
                   </View>
                 </Card>
               </TouchableOpacity>
-            ))}
+              ))
+            )}
           </View>
         </View>
       </View>

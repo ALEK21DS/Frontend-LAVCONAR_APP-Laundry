@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Input, Button, Dropdown } from '@/components/common';
 import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
@@ -158,9 +158,9 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
 
 
   // Catálogos dinámicos (frescos)
-  const { data: incidentTypeCatalog } = useCatalogValuesByType('incident_type', true, { forceFresh: true });
-  const { data: actionTakenCatalog } = useCatalogValuesByType('action_taken', true, { forceFresh: true });
-  const { data: incidentStatusCatalog } = useCatalogValuesByType('incident_status', true, { forceFresh: true });
+  const { data: incidentTypeCatalog, isLoading: isLoadingIncidentType } = useCatalogValuesByType('incident_type', true, { forceFresh: true });
+  const { data: actionTakenCatalog, isLoading: isLoadingActionTaken } = useCatalogValuesByType('action_taken', true, { forceFresh: true });
+  const { data: incidentStatusCatalog, isLoading: isLoadingIncidentStatus } = useCatalogValuesByType('incident_status', true, { forceFresh: true });
 
   const incidentTypes: { label: string; value: IncidentType }[] = useMemo(() => {
     const opts = (incidentTypeCatalog?.data || [])
@@ -400,26 +400,33 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
           {showIncidentTypeDropdown && (
             <View className="bg-white rounded-lg border border-gray-300 mt-1" style={{ maxHeight: 200 }}>
               <ScrollView nestedScrollEnabled>
-                {incidentTypes.map((type) => (
-                  <TouchableOpacity
-                    key={type.value}
-                    onPress={() => {
-                      setFormData(prev => ({ ...prev, incident_type: type.value }));
-                      validateField('incident_type', type.value);
-                      setShowIncidentTypeDropdown(false);
-                    }}
-                    className={`px-4 py-3 border-b border-gray-200 last:border-b-0 flex-row items-center justify-between ${
-                      formData.incident_type === type.value ? 'bg-blue-50' : ''
-                    }`}
-                  >
-                    <Text className={`${formData.incident_type === type.value ? 'text-blue-600 font-semibold' : 'text-gray-900'}`}>
-                      {type.label}
-                    </Text>
-                    {formData.incident_type === type.value && (
-                      <IonIcon name="checkmark-circle" size={20} color="#3B82F6" />
-                    )}
-                  </TouchableOpacity>
-                ))}
+                {isLoadingIncidentType ? (
+                  <View className="py-4 items-center">
+                    <ActivityIndicator size="small" color="#1D4ED8" />
+                    <Text className="text-gray-500 text-sm mt-2">Cargando opciones...</Text>
+                  </View>
+                ) : (
+                  incidentTypes.map((type) => (
+                    <TouchableOpacity
+                      key={type.value}
+                      onPress={() => {
+                        setFormData(prev => ({ ...prev, incident_type: type.value }));
+                        validateField('incident_type', type.value);
+                        setShowIncidentTypeDropdown(false);
+                      }}
+                      className={`px-4 py-3 border-b border-gray-200 last:border-b-0 flex-row items-center justify-between ${
+                        formData.incident_type === type.value ? 'bg-blue-50' : ''
+                      }`}
+                    >
+                      <Text className={`${formData.incident_type === type.value ? 'text-blue-600 font-semibold' : 'text-gray-900'}`}>
+                        {type.label}
+                      </Text>
+                      {formData.incident_type === type.value && (
+                        <IonIcon name="checkmark-circle" size={20} color="#3B82F6" />
+                      )}
+                    </TouchableOpacity>
+                  ))
+                )}
               </ScrollView>
             </View>
           )}
@@ -478,25 +485,32 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
           {showActionTakenDropdown && (
             <View className="bg-white rounded-lg border border-gray-300 mt-1" style={{ maxHeight: 200 }}>
               <ScrollView nestedScrollEnabled>
-                {actionTakenOptions.map((action) => (
-                  <TouchableOpacity
-                    key={action.value}
-                    onPress={() => {
-                      setFormData(prev => ({ ...prev, action_taken: action.value }));
-                      setShowActionTakenDropdown(false);
-                    }}
-                    className={`px-4 py-3 border-b border-gray-200 last:border-b-0 flex-row items-center justify-between ${
-                      formData.action_taken === action.value ? 'bg-blue-50' : ''
-                    }`}
-                  >
-                    <Text className={formData.action_taken === action.value ? 'text-blue-600 font-semibold' : 'text-gray-900'}>
-                      {action.label}
-                    </Text>
-                    {formData.action_taken === action.value && (
-                      <IonIcon name="checkmark-circle" size={20} color="#3B82F6" />
-                    )}
-                  </TouchableOpacity>
-                ))}
+                {isLoadingActionTaken ? (
+                  <View className="py-4 items-center">
+                    <ActivityIndicator size="small" color="#1D4ED8" />
+                    <Text className="text-gray-500 text-sm mt-2">Cargando opciones...</Text>
+                  </View>
+                ) : (
+                  actionTakenOptions.map((action) => (
+                    <TouchableOpacity
+                      key={action.value}
+                      onPress={() => {
+                        setFormData(prev => ({ ...prev, action_taken: action.value }));
+                        setShowActionTakenDropdown(false);
+                      }}
+                      className={`px-4 py-3 border-b border-gray-200 last:border-b-0 flex-row items-center justify-between ${
+                        formData.action_taken === action.value ? 'bg-blue-50' : ''
+                      }`}
+                    >
+                      <Text className={formData.action_taken === action.value ? 'text-blue-600 font-semibold' : 'text-gray-900'}>
+                        {action.label}
+                      </Text>
+                      {formData.action_taken === action.value && (
+                        <IonIcon name="checkmark-circle" size={20} color="#3B82F6" />
+                      )}
+                    </TouchableOpacity>
+                  ))
+                )}
               </ScrollView>
             </View>
           )}
@@ -534,7 +548,13 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
           {showStatusDropdown && (
             <View className="bg-white rounded-lg border border-gray-300 mt-1" style={{ maxHeight: 200 }}>
               <ScrollView nestedScrollEnabled>
-                {statusOptions.map((status) => (
+                {isLoadingIncidentStatus ? (
+                  <View className="py-4 items-center">
+                    <ActivityIndicator size="small" color="#1D4ED8" />
+                    <Text className="text-gray-500 text-sm mt-2">Cargando opciones...</Text>
+                  </View>
+                ) : (
+                  statusOptions.map((status) => (
                   <TouchableOpacity
                     key={status.value}
                     onPress={() => {
@@ -552,7 +572,8 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
                       <IonIcon name="checkmark-circle" size={20} color="#3B82F6" />
                     )}
                   </TouchableOpacity>
-                ))}
+                  ))
+                )}
               </ScrollView>
             </View>
           )}

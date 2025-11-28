@@ -21,19 +21,21 @@ export const GarmentDetailsModal: React.FC<GarmentDetailsModalProps> = ({
   onEdit,
 }) => {
   const { user } = useAuthStore();
-  const { data: serviceTypeCatalog } = useCatalogValuesByType('service_type', true, { forceFresh: true });
-  const { getLabel: getGarmentTypeLabel } = useCatalogLabelMap('garment_type', { forceFresh: true });
+  const { data: serviceTypeCatalog, isLoading: isLoadingServiceType } = useCatalogValuesByType('service_type', true, { forceFresh: true });
+  const { getLabel: getGarmentTypeLabel, isLoading: isLoadingGarmentType } = useCatalogLabelMap('garment_type', { forceFresh: true });
 
   const serviceTypeLabel = useMemo(() => {
+    if (isLoadingServiceType) return 'Cargando...';
     if (!garment?.service_type) return 'N/A';
     const catalogItem = serviceTypeCatalog?.data?.find(v => v.code === garment.service_type);
     return catalogItem?.label || garment.service_type;
-  }, [garment?.service_type, serviceTypeCatalog]);
+  }, [garment?.service_type, serviceTypeCatalog, isLoadingServiceType]);
 
   const garmentTypeLabel = useMemo(() => {
+    if (isLoadingGarmentType) return 'Cargando...';
     if (!garment?.garment_type) return 'N/A';
     return getGarmentTypeLabel(garment.garment_type, garment.garment_type_label || garment.garment_type);
-  }, [garment?.garment_type, garment?.garment_type_label, getGarmentTypeLabel]);
+  }, [garment?.garment_type, garment?.garment_type_label, getGarmentTypeLabel, isLoadingGarmentType]);
 
   // Determinar si se debe mostrar el botón de editar
   const shouldShowEditButton = useMemo(() => {

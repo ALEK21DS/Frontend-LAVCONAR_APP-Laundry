@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Button, Dropdown, Card, Input } from '@/components/common';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from '@/auth/store/auth.store';
+import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
 
 type Option = { label: string; value: string };
 
@@ -32,13 +33,12 @@ export const ProcessForm: React.FC<ProcessFormProps> = ({
 
   // Estado del formulario
   const [machineCode, setMachineCode] = useState<string>('M-001');
-  const [selectedProcessType, setSelectedProcessType] = useState<string>('WASH');
+  const [selectedProcessType, setSelectedProcessType] = useState<string>('WASHING');
   const [loadWeight, setLoadWeight] = useState<string>('0');
   const [garmentQty, setGarmentQty] = useState<string>('0');
-  const [specialTreatment, setSpecialTreatment] = useState<string>('NORMAL');
+  const [specialTreatment, setSpecialTreatment] = useState<string>('NONE');
   const [washTemperature, setWashTemperature] = useState<string>('COLD');
   const [detergentType, setDetergentType] = useState<string>('Detergente líquido');
-  const [status, setStatus] = useState<string>('PENDING');
   const [softenerUsed, setSoftenerUsed] = useState<boolean>(false);
   const [bleachUsed, setBleachUsed] = useState<boolean>(false);
 
@@ -48,34 +48,44 @@ export const ProcessForm: React.FC<ProcessFormProps> = ({
     return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
   }, []);
 
-  // Opciones
-  const PROCESS_TYPES: Option[] = [
-    { label: 'Lavado', value: 'WASH' },
-    { label: 'Secado', value: 'DRY' },
-    { label: 'Planchado', value: 'IRON' },
-    { label: 'Lavado en Seco', value: 'DRY_CLEAN' },
-  ];
+  // Catálogos dinámicos
+  const { data: processStatusCatalog, isLoading: isLoadingProcessStatus } = useCatalogValuesByType('process_status', true, { forceFresh: true });
+  const { data: specialTreatmentCatalog, isLoading: isLoadingSpecialTreatment } = useCatalogValuesByType('special_treatment', true, { forceFresh: true });
+  const { data: washTemperatureCatalog, isLoading: isLoadingWashTemperature } = useCatalogValuesByType('wash_temperature', true, { forceFresh: true });
 
-  const SPECIAL_TREATMENTS: Option[] = [
-    { label: 'Ninguno', value: 'NONE' },
-    { label: 'Remoción de manchas', value: 'STAIN_REMOVAL' },
-    { label: 'Desinfección', value: 'DISINFECTION' },
-    { label: 'Delicado', value: 'DELICATE' },
-    { label: 'Uso pesado', value: 'HEAVY_DUTY' }
-  ];
+  // Opciones desde catálogos
+  // PROCESS_TYPES: filtrar solo los tipos de proceso relevantes (WASHING, DRYING, IRONING, DRY_CLEANING si existe)
+  const PROCESS_TYPES = useMemo(() => {
+    if (!processStatusCatalog?.data) return [];
+    const processTypeCodes = ['WASHING', 'DRYING', 'IRONING', 'DRY_CLEANING'];
+    return processStatusCatalog.data
+      .filter(v => v.is_active && processTypeCodes.includes(v.code))
+      .sort((a, b) => {
+        const orderA = processTypeCodes.indexOf(a.code);
+        const orderB = processTypeCodes.indexOf(b.code);
+        return orderA - orderB;
+      })
+      .map(v => ({ label: v.label, value: v.code }));
+  }, [processStatusCatalog]);
 
-  const WASH_TEMPERATURES: Option[] = [
-    { label: 'Fría (20°C)', value: 'COLD' },
-    { label: 'Tibia (40°C)', value: 'WARM' },
-    { label: 'Caliente (60°C)', value: 'HOT' },
-    { label: 'Muy caliente (90°C)', value: 'VERY_HOT' },
-  ];
+  const SPECIAL_TREATMENTS = useMemo(() => {
+    if (!specialTreatmentCatalog?.data) return [];
+    return specialTreatmentCatalog.data
+      .filter(v => v.is_active)
+      .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+      .map(v => ({ label: v.label, value: v.code }));
+  }, [specialTreatmentCatalog]);
 
-  const STATUS_OPTIONS: Option[] = [
-    { label: 'En progreso', value: 'IN_PROGRESS' },
-    { label: 'Completado', value: 'COMPLETED' },
-    { label: 'Fallido', value: 'FAILED' },
-  ];
+  const WASH_TEMPERATURES = useMemo(() => {
+    if (!washTemperatureCatalog?.data) return [];
+    return washTemperatureCatalog.data
+      .filter(v => v.is_active)
+      .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+      .map(v => ({ label: v.label, value: v.code }));
+  }, [washTemperatureCatalog]);
+
+  // Estados de carga combinados
+  const isLoadingCatalogs = isLoadingProcessStatus || isLoadingSpecialTreatment || isLoadingWashTemperature;
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
@@ -165,11 +175,12 @@ export const ProcessForm: React.FC<ProcessFormProps> = ({
 
         <Dropdown
           label="Tipo de Proceso *"
-          placeholder="Selecciona el tipo"
+          placeholder={isLoadingProcessStatus ? "Cargando..." : "Selecciona el tipo"}
           options={PROCESS_TYPES}
           value={selectedProcessType}
           onValueChange={setSelectedProcessType}
           icon="construct-outline"
+          disabled={isLoadingProcessStatus || PROCESS_TYPES.length === 0}
         />
 
         {/* Sucursal (solo lectura desde el usuario) */}
@@ -207,20 +218,22 @@ export const ProcessForm: React.FC<ProcessFormProps> = ({
 
         <Dropdown
           label="Tratamiento Especial"
-          placeholder="Selecciona un tratamiento"
+          placeholder={isLoadingSpecialTreatment ? "Cargando..." : "Selecciona un tratamiento"}
           options={SPECIAL_TREATMENTS}
           value={specialTreatment}
           onValueChange={setSpecialTreatment}
           icon="flask-outline"
+          disabled={isLoadingSpecialTreatment || SPECIAL_TREATMENTS.length === 0}
         />
 
         <Dropdown
           label="Temperatura de Lavado"
-          placeholder="Selecciona la temperatura"
+          placeholder={isLoadingWashTemperature ? "Cargando..." : "Selecciona la temperatura"}
           options={WASH_TEMPERATURES}
           value={washTemperature}
           onValueChange={setWashTemperature}
           icon="thermometer-outline"
+          disabled={isLoadingWashTemperature || WASH_TEMPERATURES.length === 0}
         />
 
         <Dropdown
@@ -237,7 +250,7 @@ export const ProcessForm: React.FC<ProcessFormProps> = ({
         />
       </View>
 
-      {/* Fechas y estado */}
+      {/* Fechas */}
       <View className="mb-6">
         <View className="flex-row">
           <View className="flex-1 mr-2">
@@ -247,15 +260,6 @@ export const ProcessForm: React.FC<ProcessFormProps> = ({
             <Input label="Hora de Fin" placeholder="dd/mm/aaaa" value={''} editable={false} />
           </View>
         </View>
-
-        <Dropdown
-          label="Estado"
-          placeholder="Selecciona el estado"
-          options={STATUS_OPTIONS}
-          value={status}
-          onValueChange={setStatus}
-          icon="radio-button-on-outline"
-        />
       </View>
 
       {/* Insumos usados */}

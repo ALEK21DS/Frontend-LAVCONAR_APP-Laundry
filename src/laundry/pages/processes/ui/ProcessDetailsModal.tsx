@@ -26,26 +26,28 @@ const formatDate = (date?: string | Date) => {
 };
 
 export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({ visible, process, onClose }) => {
-  const { getLabel: getSpecialTreatmentLabel } = useCatalogLabelMap('special_treatment');
-  const { getLabel: getProcessStatusLabel } = useCatalogLabelMap('process_status');
+  const { getLabel: getSpecialTreatmentLabel, isLoading: isLoadingSpecialTreatment } = useCatalogLabelMap('special_treatment');
+  const { getLabel: getProcessStatusLabel, isLoading: isLoadingProcessStatus } = useCatalogLabelMap('process_status');
   const { deleteWashingProcessAsync, isDeletingProcess } = useDeleteWashingProcess();
   const [confirmVisible, setConfirmVisible] = useState(false);
 
   const specialTreatmentLabel = useMemo(() => {
+    if (isLoadingSpecialTreatment) return 'Cargando...';
     if (!process?.special_treatment) return 'Ninguno';
     return getSpecialTreatmentLabel(
       process.special_treatment,
       (process as any).special_treatment_label || process.special_treatment || 'Ninguno'
     );
-  }, [process, getSpecialTreatmentLabel]);
+  }, [process, getSpecialTreatmentLabel, isLoadingSpecialTreatment]);
 
   const statusLabel = useMemo(() => {
+    if (isLoadingProcessStatus) return 'Cargando...';
     if (!process?.status) return '—';
     return getProcessStatusLabel(
       process.status,
       (process as any).status_label || process.status
     );
-  }, [process, getProcessStatusLabel]);
+  }, [process, getProcessStatusLabel, isLoadingProcessStatus]);
 
   const handleDelete = async () => {
     if (!process?.id) return;

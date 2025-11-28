@@ -43,13 +43,14 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
   const { deleteClientAsync, isDeleting } = useDeleteClient();
 
   // Obtener catálogo de tipos de servicio para mostrar la etiqueta
-  const { data: serviceTypeCatalog } = useCatalogValuesByType('service_type', true, { forceFresh: true });
+  const { data: serviceTypeCatalog, isLoading: isLoadingServiceType } = useCatalogValuesByType('service_type', true, { forceFresh: true });
 
   const serviceTypeLabel = useMemo(() => {
+    if (isLoadingServiceType) return 'Cargando...';
     if (!client?.service_type) return 'N/A';
     const catalogItem = serviceTypeCatalog?.data?.find(v => v.code === client.service_type);
     return catalogItem?.label || client.service_type;
-  }, [client?.service_type, serviceTypeCatalog]);
+  }, [client?.service_type, serviceTypeCatalog, isLoadingServiceType]);
 
   useEffect(() => {
     if (checkingAuth && authStatus) {

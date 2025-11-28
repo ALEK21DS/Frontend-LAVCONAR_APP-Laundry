@@ -47,12 +47,7 @@ export const GarmentsPage: React.FC<GarmentsPageProps> = ({ navigation }) => {
     }, [refetch])
   );
 
-  const demoGarments = [
-    { id: 'gm-001', rfid_code: 'E280-...-01', description: 'Camisa blanca', color: 'Blanco', weight: 0.3, is_active: true, created_at: '', updated_at: '' },
-    { id: 'gm-002', rfid_code: 'E280-...-02', description: 'Sábana king', color: 'Blanco', weight: 1.2, is_active: true, created_at: '', updated_at: '' },
-  ];
-
-  const base = garments && garments.length > 0 ? garments : demoGarments;
+  const base = garments || [];
 
   const garmentTypeLabelMap = useMemo(() => {
     const map: Record<string, string> = {};

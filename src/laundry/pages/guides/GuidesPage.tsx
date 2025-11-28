@@ -58,7 +58,7 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const [scannedTags, setScannedTags] = useState<ScannedTag[]>([]);
   const [isScanning, setIsScanning] = useState(false);
 
-  const { getLabel: getGuideStatusLabel } = useCatalogLabelMap('guide_status', { forceFresh: true });
+  const { getLabel: getGuideStatusLabel, isLoading: isLoadingGuideStatus } = useCatalogLabelMap('guide_status', { forceFresh: true });
 
   // Recargar la lista de guías y manejar el regreso del escáner
   useFocusEffect(
@@ -102,33 +102,7 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const seenSetRef = useRef<Set<string>>(new Set());
   const MIN_RSSI = -65; // Sensibilidad mínima para tags RFID
 
-  const demoGuides = [
-    { 
-      id: 'g-001', 
-      guide_number: 'G-0001', 
-      client_name: 'Juan Pérez', 
-      status: 'IN_PROCESS',
-      created_at: '21 de octubre de 2025, 10:30',
-      total_garments: 15
-    },
-    { 
-      id: 'g-002', 
-      guide_number: 'G-0002', 
-      client_name: 'María García', 
-      status: 'COMPLETED',
-      created_at: '20 de octubre de 2025, 14:15',
-      total_garments: 8
-    },
-    { 
-      id: 'g-003', 
-      guide_number: 'G-0003', 
-      client_name: 'Comercial Andes S.A.', 
-      status: 'WASHING',
-      created_at: '19 de octubre de 2025, 09:45',
-      total_garments: 25
-    },
-  ];
-  const base = guides && guides.length > 0 ? guides : (demoGuides as any[]);
+  const base = guides || [];
 
   const clientOptions = useMemo(() => {
     const normalizedType = selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL';
@@ -426,7 +400,9 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
             <View className="-mx-1 flex-row flex-wrap">
             {filtered.map((g: any) => {
               const statusColor = GUIDE_STATUS_COLORS[g.status as keyof typeof GUIDE_STATUS_COLORS] || '#6B7280';
-              const statusLabel = getGuideStatusLabel(g.status, g.status_label || g.status || '—');
+              const statusLabel = isLoadingGuideStatus 
+                ? 'Cargando...' 
+                : getGuideStatusLabel(g.status, g.status_label || g.status || '—');
               
               return (
                 <View key={g.id} className="w-full px-1 mb-2">

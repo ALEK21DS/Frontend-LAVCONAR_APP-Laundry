@@ -20,7 +20,7 @@ const DEFAULT_PROCESS_CONFIG: Record<string, { icon: string; color: string; desc
   'PACKAGING': { icon: 'cube-outline', color: '#8B5CF6', description: 'Guías secas para empacar' },
   'SHIPPING': { icon: 'boat-outline', color: '#EF4444', description: 'Guías empacadas para embarcar' },
   'LOADING': { icon: 'car-outline', color: '#84CC16', description: 'Guías embarcadas para cargar' },
-  'DELIVERY': { icon: 'checkmark-circle-outline', color: '#22C55E', description: 'Guías cargadas para entregar' },
+  'DELIVERED': { icon: 'checkmark-circle-outline', color: '#22C55E', description: 'Guías cargadas para entregar' },
 };
 
 // Icono y color por defecto para procesos nuevos

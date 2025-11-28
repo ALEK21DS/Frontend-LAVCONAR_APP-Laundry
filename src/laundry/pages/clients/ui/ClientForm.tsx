@@ -51,7 +51,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
   }, [sucursales]);
   
   // Obtener catálogo de tipos de servicio
-  const { data: serviceTypeCatalog } = useCatalogValuesByType('service_type', true, { forceFresh: true });
+  const { data: serviceTypeCatalog, isLoading: isLoadingServiceType } = useCatalogValuesByType('service_type', true, { forceFresh: true });
   
   const SERVICE_TYPE_OPTIONS = useMemo(() => {
     return (serviceTypeCatalog?.data || [])
@@ -256,7 +256,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
 
             <Dropdown
               label="Tipo de Servicio *"
-              placeholder="Selecciona un tipo de servicio"
+              placeholder={isLoadingServiceType ? "Cargando..." : "Selecciona un tipo de servicio"}
               options={SERVICE_TYPE_OPTIONS}
               value={formData.service_type}
               onValueChange={value => {
@@ -264,6 +264,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                 validateField('service_type', value);
               }}
               error={errors.service_type}
+              disabled={isLoadingServiceType || SERVICE_TYPE_OPTIONS.length === 0}
             />
 
             <Input
