@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, TextInput, ActivityIndicator, Alert } from 'react-native';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { Button, Card } from '@/components/common';
-import { GUIDE_STATUS_LABELS, GUIDE_STATUS_COLORS } from '@/constants/processes';
+import { GUIDE_STATUS_COLORS } from '@/constants/processes';
 import { formatDateTime } from '@/helpers/formatters.helper';
 import { usePrintGuide } from '@/laundry/hooks/guides';
 import { useCreateAuthorizationRequest, useGetAuthorizationById } from '@/laundry/hooks/authorizations';
@@ -50,10 +50,10 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
     checkingAuth && !!currentRequestId
   );
 
-  const { getLabel: getGuideStatusLabel } = useCatalogLabelMap('guide_status', { forceFresh: true, fallbackLabel: '—' });
-  const { getLabel: getGeneralConditionLabel } = useCatalogLabelMap('general_condition', { forceFresh: true, fallbackLabel: '—' });
-  const { getLabel: getServicePriorityLabel } = useCatalogLabelMap('service_priority', { forceFresh: true, fallbackLabel: '—' });
-  const { getLabel: getRequestedServiceLabel } = useCatalogLabelMap('requested_service', { forceFresh: true, fallbackLabel: '—' });
+  const { getLabel: getGuideStatusLabel, isLoading: isLoadingGuideStatus } = useCatalogLabelMap('guide_status', { forceFresh: true, fallbackLabel: '—' });
+  const { getLabel: getGeneralConditionLabel, isLoading: isLoadingGeneralCondition } = useCatalogLabelMap('general_condition', { forceFresh: true, fallbackLabel: '—' });
+  const { getLabel: getServicePriorityLabel, isLoading: isLoadingServicePriority } = useCatalogLabelMap('service_priority', { forceFresh: true, fallbackLabel: '—' });
+  const { getLabel: getRequestedServiceLabel, isLoading: isLoadingRequestedServices } = useCatalogLabelMap('requested_services', { forceFresh: true, fallbackLabel: '—' });
 
   // Efecto para monitorear el estado de autorización
   useEffect(() => {
@@ -171,7 +171,8 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
   };
 
   const getStatusLabel = (status: string) => {
-    return GUIDE_STATUS_LABELS[status as keyof typeof GUIDE_STATUS_LABELS] || status;
+    // Usar el hook de catálogo que ya está definido arriba
+    return isLoadingGuideStatus ? 'Cargando...' : getGuideStatusLabel(status, status || 'Sin estado');
   };
 
   const handleDeleteConfirm = async () => {
@@ -232,7 +233,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
                 <Text className="text-xs text-gray-500 mb-1">Estado</Text>
                 <View className={`px-3 py-1.5 rounded-full self-start`} style={{ backgroundColor: getStatusColor(guide.status) + '20' }}>
                   <Text className={`text-sm font-medium`} style={{ color: getStatusColor(guide.status) }}>
-                    {getGuideStatusLabel(guide.status, guide.status_label || GUIDE_STATUS_LABELS[guide.status as keyof typeof GUIDE_STATUS_LABELS] || guide.status || '—')}
+                    {isLoadingGuideStatus ? 'Cargando...' : getGuideStatusLabel(guide.status, guide.status_label || guide.status || '—')}
                   </Text>
                 </View>
               </View>
@@ -293,14 +294,14 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
             <View className="mb-3">
               <Text className="text-xs text-gray-500 mb-1">Condición General</Text>
               <View className="px-3 py-1 rounded-full self-start bg-gray-100">
-                <Text className="text-sm text-gray-800">{getGeneralConditionLabel(guide.general_condition, guide.general_condition_label || '—')}</Text>
+                <Text className="text-sm text-gray-800">{isLoadingGeneralCondition ? 'Cargando...' : getGeneralConditionLabel(guide.general_condition, guide.general_condition_label || '—')}</Text>
               </View>
                   </View>
 
             <View className="mb-3">
               <Text className="text-xs text-gray-500 mb-1">Prioridad del Servicio</Text>
               <View className="px-3 py-1 rounded-full self-start bg-gray-100">
-                <Text className="text-sm text-gray-800">{getServicePriorityLabel(guide.service_priority, guide.service_priority_label || '—')}</Text>
+                <Text className="text-sm text-gray-800">{isLoadingServicePriority ? 'Cargando...' : getServicePriorityLabel(guide.service_priority, guide.service_priority_label || '—')}</Text>
               </View>
                 </View>
 
@@ -309,7 +310,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
               <View className="flex-row flex-wrap -m-1">
                 {(Array.isArray(guide.requested_services) ? guide.requested_services : []).map((srv: string) => (
                   <View key={srv} className="m-1 px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
-                  <Text className="text-xs text-blue-800">{getRequestedServiceLabel(srv, guide.requested_services_labels?.[srv] || srv)}</Text>
+                  <Text className="text-xs text-blue-800">{isLoadingRequestedServices ? 'Cargando...' : getRequestedServiceLabel(srv, guide.requested_services_labels?.[srv] || srv)}</Text>
                   </View>
                 ))}
                 {(!guide.requested_services || guide.requested_services.length === 0) && (
@@ -508,7 +509,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
               <View className="flex-row mt-3">
                 <View className="flex-1 mr-2">
                   <Text className="text-xs text-gray-500 uppercase">Estado</Text>
-                  <Text className="text-sm text-gray-800 mt-1">{getGuideStatusLabel(guide?.status, guide?.status_label || '—')}</Text>
+                  <Text className="text-sm text-gray-800 mt-1">{isLoadingGuideStatus ? 'Cargando...' : getGuideStatusLabel(guide?.status, guide?.status_label || '—')}</Text>
                 </View>
                 <View className="flex-1">
                   <Text className="text-xs text-gray-500 uppercase">Prendas</Text>

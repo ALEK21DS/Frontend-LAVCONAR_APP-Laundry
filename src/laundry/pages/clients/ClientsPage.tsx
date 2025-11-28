@@ -47,51 +47,6 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
     setPage(1);
   }, [query, statusFilter]);
 
-  const demoClients = [
-    { 
-      id: 'demo-1', 
-      name: 'Juan Pérez', 
-      email: 'juan.perez@example.com', 
-      identification_number: '0102030405', 
-      acronym: 'JP', 
-      phone: '+593 99 123 4567',
-      address: 'Av. Amazonas N24-03, Quito',
-      branch_office_id: 'Sucursal Centro',
-      branch_id: '99e24613-45dc-4e84-ac5b-7b898275c989',
-      is_active: true,
-      created_at: '21 de octubre de 2025, 07:34',
-      updated_at: '21 de octubre de 2025, 07:34'
-    },
-    { 
-      id: 'demo-2', 
-      name: 'María García', 
-      email: 'maria.garcia@example.com', 
-      identification_number: '0911223344', 
-      acronym: 'MG', 
-      phone: '+593 98 765 4321',
-      address: 'Calle Loja 456, Guayaquil',
-      branch_office_id: 'Sucursal Norte',
-      branch_id: '88d13524-36cb-3d73-bc4a-6a787164b878',
-      is_active: true,
-      created_at: '20 de octubre de 2025, 15:22',
-      updated_at: '21 de octubre de 2025, 09:15'
-    },
-    { 
-      id: 'demo-3', 
-      name: 'Comercial Andes S.A.', 
-      email: 'contacto@andes.com', 
-      identification_number: '1790012345001', 
-      acronym: 'ANDES', 
-      phone: '+593 2 234 5678',
-      address: 'Av. Naciones Unidas E4-29, Quito',
-      branch_office_id: 'Sucursal Sur',
-      branch_id: '77c02413-27ba-2c62-ab3a-5a676053a767',
-      is_active: false,
-      created_at: '19 de octubre de 2025, 11:45',
-      updated_at: '20 de octubre de 2025, 14:30'
-    },
-  ];
-
   const base = clients || [];
 
   const filtered = useMemo(() => {

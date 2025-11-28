@@ -46,7 +46,7 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
   const [scannedGuide, setScannedGuide] = useState<Guide | null>(null);
   const { scanQrAsync, isScanning } = useScanQr();
 
-  const { getLabel: getGuideStatusLabel } = useCatalogLabelMap('guide_status', { forceFresh: true });
+  const { getLabel: getGuideStatusLabel, isLoading: isLoadingGuideStatus } = useCatalogLabelMap('guide_status', { forceFresh: true });
 
   const filteredGuides = useMemo(() => {
     if (!searchQuery.trim()) return guides;
@@ -128,7 +128,7 @@ export const GuideSelectionModal: React.FC<GuideSelectionModalProps> = ({
                   className="text-xs font-medium"
                   style={{ color: getStatusColor(item.status) }}
                 >
-                  {getGuideStatusLabel(item.status, item.status_label || item.status || '—')}
+                  {isLoadingGuideStatus ? 'Cargando...' : getGuideStatusLabel(item.status, item.status_label || item.status || '—')}
                 </Text>
               </View>
             </View>

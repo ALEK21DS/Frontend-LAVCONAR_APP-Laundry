@@ -17,6 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { getPreferredBranchOfficeId, isSuperAdminUser } from '@/helpers/user.helper';
+import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
 
 interface MainLayoutProps {
   activeTab: 'Dashboard' | 'Clients' | 'ScanClothes' | 'Guides' | 'Processes' | 'Incidents';
@@ -103,11 +104,47 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
     return processType;
   };
 
+  // Obtener procesos del catálogo para determinar si requieren escaneo obligatorio
+  const { data: processCatalog, isLoading: isLoadingProcessCatalog } = useCatalogValuesByType('process_status', true, { forceFresh: true });
+  
   // Procesos con escaneo opcional (preguntan si quieren escanear)
+  // Estos son procesos que tradicionalmente permiten saltarse el escaneo
   const processesWithOptionalScan = ['WASHING', 'DRYING', 'IRONING', 'FOLDING'];
   
-  // Procesos con escaneo obligatorio (abren escáner directamente)
-  const processesWithRequiredScan = ['IN_PROCESS', 'PACKAGING', 'SHIPPING', 'LOADING', 'DELIVERY'];
+  // Función para determinar si un proceso requiere escaneo obligatorio
+  // Basado en: 1) metadata del catálogo, 2) código conocido, 3) por defecto: obligatorio si no está en opcionales
+  const isProcessRequiringScan = useCallback((processType: string | undefined | null): boolean => {
+    if (!processType) return false;
+    
+    const normalizedType = processType.toUpperCase();
+    
+    // Si está en la lista de opcionales, no requiere escaneo obligatorio
+    if (processesWithOptionalScan.includes(normalizedType)) {
+      return false;
+    }
+    
+    // Si el catálogo está cargando, asumir que requiere escaneo (por seguridad)
+    if (isLoadingProcessCatalog) {
+      return true;
+    }
+    
+    // Verificar en el catálogo si tiene metadata que indique si requiere escaneo
+    if (processCatalog?.data) {
+      const catalogItem = processCatalog.data.find(
+        item => item.code?.toUpperCase() === normalizedType && item.is_active !== false
+      );
+      
+      if (catalogItem?.metadata) {
+        // Si el catálogo tiene metadata con requires_scan, usarlo
+        if (typeof catalogItem.metadata === 'object' && 'requires_scan' in catalogItem.metadata) {
+          return catalogItem.metadata.requires_scan === true;
+        }
+      }
+    }
+    
+    // Por defecto: si no está en opcionales, requiere escaneo obligatorio
+    return true;
+  }, [processCatalog, processesWithOptionalScan, isLoadingProcessCatalog]);
   
   // Mapear el tipo de servicio seleccionado al valor del backend
   const serviceTypeMap: Record<'industrial' | 'personal', 'INDUSTRIAL' | 'PERSONAL'> = {
@@ -213,14 +250,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
           // Usar el guideId directamente para continuar
           const guideServiceType = selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL';
           
-          // Manejar procesos especiales (DELIVERY, PACKAGING, LOADING) que van a validación
-          if (selectedProcessType === 'PACKAGING' || selectedProcessType === 'LOADING' || selectedProcessType === 'DELIVERY') {
+          // Si el proceso requiere escaneo obligatorio, navegar al escáner
+          if (isProcessRequiringScan(selectedProcessType)) {
             setGuideSelectionModalOpen(false);
             setSelectedGuideForProcess({
               id: rfidScanId,
-              guide_number: 'Guía escaneada', // Se actualizará cuando se obtenga la guía
+              guide_number: 'Guía escaneada',
+              waitingForScan: true,
             });
-            // Navegar directamente a la página de validación
             onNavigate('ScanClothes', {
               mode: 'process',
               processType: selectedProcessType,
@@ -230,7 +267,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
             return;
           }
           
-          // Para otros procesos sin rfidScan, mostrar el formulario directamente
+          // Para procesos sin rfidScan y sin escaneo obligatorio, mostrar el formulario directamente
           setGuideSelectionModalOpen(false);
           const newScanType = getNewScanTypeFromProcess(selectedProcessType);
           setSelectedGuideForProcess({
@@ -243,15 +280,16 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
         }
         
         // Si se encontró en filteredGuides, usar esa guía
-        // Manejar procesos especiales (DELIVERY, PACKAGING, LOADING) que van a validación
-        if (selectedProcessType === 'PACKAGING' || selectedProcessType === 'LOADING' || selectedProcessType === 'DELIVERY') {
+        const guideServiceType = guideFromQR.service_type || (selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL');
+        
+        // Si el proceso requiere escaneo obligatorio, navegar al escáner
+        if (isProcessRequiringScan(selectedProcessType)) {
           setGuideSelectionModalOpen(false);
           setSelectedGuideForProcess({
             id: guideFromQR.id,
             guide_number: guideFromQR.guide_number || 'Sin número',
+            waitingForScan: true,
           });
-          // Navegar directamente a la página de validación
-          const guideServiceType = guideFromQR.service_type || (selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL');
           onNavigate('ScanClothes', {
             mode: 'process',
             processType: selectedProcessType,
@@ -261,7 +299,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
           return;
         }
         
-        // Para otros procesos sin rfidScan, mostrar el formulario directamente
+        // Para procesos sin rfidScan y sin escaneo obligatorio, mostrar el formulario directamente
         setGuideSelectionModalOpen(false);
         const newScanType = getNewScanTypeFromProcess(selectedProcessType);
         setSelectedGuideForProcess({
@@ -281,7 +319,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
     }
     
     // Procesos con escaneo obligatorio: abrir escáner directamente
-    if (processesWithRequiredScan.includes(selectedProcessType)) {
+    if (isProcessRequiringScan(selectedProcessType)) {
       setGuideSelectionModalOpen(false);
       setSelectedRfidScan(rfidScan);
       setSelectedGuideForProcess({

@@ -5,7 +5,7 @@ import { Button, Card, Dropdown, Input } from '@/components/common';
 import { GuideItem } from '@/laundry/interfaces/guides/guides.interface';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { SUCURSALES } from '@/constants';
-import { GUIDE_STATUS, GUIDE_STATUS_LABELS, SERVICE_PRIORITIES, WASHING_TYPES } from '@/constants/processes';
+// GUIDE_STATUS, GUIDE_STATUS_LABELS, SERVICE_PRIORITIES, WASHING_TYPES ahora vienen de catálogos
 import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
 import { ClientForm } from '@/laundry/pages/clients/ui/ClientForm';
 import { useCreateClient } from '@/laundry/hooks/clients';
@@ -128,19 +128,35 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       ? String(guideToEdit.missing_garments)
       : '')
   );
-  // Estado inicial: COLLECTED para ambos tipos de servicio (PERSONAL e INDUSTRIAL)
-  const getInitialStatus = () => {
-    return GUIDE_STATUS.COLLECTED;
-  };
-  const [status, setStatus] = useState<string>(draftValues?.status || getInitialStatus());
+  // Estado inicial: obtener del catálogo (primer estado activo, o 'COLLECTED' como fallback)
+  const getInitialStatus = useMemo(() => {
+    if (guideStatusCatalog?.data && guideStatusCatalog.data.length > 0) {
+      const firstActiveStatus = guideStatusCatalog.data
+        .filter(v => v.is_active)
+        .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))[0];
+      return firstActiveStatus?.code || 'COLLECTED';
+    }
+    return 'COLLECTED'; // Fallback si no hay catálogo
+  }, [guideStatusCatalog]);
+  
+  const [status, setStatus] = useState<string>(draftValues?.status || getInitialStatus);
+  
+  // Actualizar estado inicial cuando el catálogo esté disponible y no haya draftValues
+  useEffect(() => {
+    if (!draftValues?.status && !guideToEdit?.status && getInitialStatus !== 'COLLECTED') {
+      setStatus(getInitialStatus);
+    }
+  }, [getInitialStatus, draftValues, guideToEdit]);
   // Catálogos dinámicos (frescos) para condiciones, estados y tipos de servicio
-  const { data: generalConditionCatalog } = useCatalogValuesByType('general_condition', true, { forceFresh: true });
-  const { data: guideStatusCatalog } = useCatalogValuesByType('guide_status', true, { forceFresh: true });
-  const { data: serviceTypeCatalog } = useCatalogValuesByType('service_type', true, { forceFresh: true });
-  const { data: servicePriorityCatalog } = useCatalogValuesByType('service_priority', true, { forceFresh: true });
-  const { data: washingTypeCatalog } = useCatalogValuesByType('washing_type', true, { forceFresh: true });
-  const { data: shiftCatalog } = useCatalogValuesByType('shift', true, { forceFresh: true });
-  const { data: requestedServicesCatalog } = useCatalogValuesByType('requested_services', true, { forceFresh: true });
+  const { data: generalConditionCatalog, isLoading: isLoadingGeneralCondition } = useCatalogValuesByType('general_condition', true, { forceFresh: true });
+  const { data: guideStatusCatalog, isLoading: isLoadingGuideStatus } = useCatalogValuesByType('guide_status', true, { forceFresh: true });
+  const { data: serviceTypeCatalog, isLoading: isLoadingServiceType } = useCatalogValuesByType('service_type', true, { forceFresh: true });
+  const { data: servicePriorityCatalog, isLoading: isLoadingServicePriority } = useCatalogValuesByType('service_priority', true, { forceFresh: true });
+  const { data: washingTypeCatalog, isLoading: isLoadingWashingType } = useCatalogValuesByType('washing_type', true, { forceFresh: true });
+  const { data: shiftCatalog, isLoading: isLoadingShift } = useCatalogValuesByType('shift', true, { forceFresh: true });
+  const { data: requestedServicesCatalog, isLoading: isLoadingRequestedServices } = useCatalogValuesByType('requested_services', true, { forceFresh: true });
+  
+  const isLoadingCatalogs = isLoadingGeneralCondition || isLoadingGuideStatus || isLoadingServiceType || isLoadingServicePriority || isLoadingWashingType || isLoadingShift || isLoadingRequestedServices;
 
   const GENERAL_CONDITION_OPTIONS = useMemo(() => {
     return (generalConditionCatalog?.data || [])
@@ -158,7 +174,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
 
   const statusLabelFromCatalog = useMemo(() => {
     const found = (guideStatusCatalog?.data || []).find(v => v.code === status);
-    return found?.label || (GUIDE_STATUS_LABELS[status as keyof typeof GUIDE_STATUS_LABELS] || 'Recibida');
+    return found?.label || status || 'Sin estado';
   }, [guideStatusCatalog, status]);
 
   const SERVICE_PRIORITY_OPTIONS_DYNAMIC = useMemo(() => {
@@ -616,11 +632,12 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               <View className="mt-3">
                 <Dropdown
                   label="Turno"
-                  placeholder="Selecciona un turno"
+                  placeholder={isLoadingShift ? "Cargando..." : "Selecciona un turno"}
                   options={SHIFT_OPTIONS}
                   value={shift}
                   onValueChange={setShift}
                   icon="time-outline"
+                  disabled={isLoadingShift || SHIFT_OPTIONS.length === 0}
                 />
               </View>
             </>
@@ -796,7 +813,12 @@ export const GuideForm: React.FC<GuideFormProps> = ({
               </TouchableOpacity>
               {showRequestedServices && (
                 <View className="mt-2 bg-white border border-gray-200 rounded-lg p-3">
-                  {REQUESTED_SERVICES_OPTIONS.length > 0 ? (
+                  {isLoadingRequestedServices ? (
+                    <View className="py-4 items-center">
+                      <ActivityIndicator size="small" color="#1D4ED8" />
+                      <Text className="text-gray-500 text-sm mt-2">Cargando opciones...</Text>
+                    </View>
+                  ) : REQUESTED_SERVICES_OPTIONS.length > 0 ? (
                     REQUESTED_SERVICES_OPTIONS.map(opt => (
                       <TouchableOpacity
                         key={opt.value}
@@ -841,11 +863,12 @@ export const GuideForm: React.FC<GuideFormProps> = ({
           <View className="mt-2">
             <Dropdown
               label="Condición General"
-              placeholder="Selecciona la condición"
+              placeholder={isLoadingGeneralCondition ? "Cargando..." : "Selecciona la condición"}
               options={GENERAL_CONDITION_OPTIONS}
               value={condition}
               onValueChange={setCondition}
               icon="checkmark-circle-outline"
+              disabled={isLoadingGeneralCondition || GENERAL_CONDITION_OPTIONS.length === 0}
             />
           </View>
 
@@ -910,11 +933,12 @@ export const GuideForm: React.FC<GuideFormProps> = ({
             <Text className="text-base text-blue-800 font-semibold mb-3">Detalles de Servicio</Text>
             <Dropdown
               label="Prioridad"
-              placeholder="Seleccionar prioridad"
-              options={SERVICE_PRIORITY_OPTIONS_DYNAMIC.length > 0 ? SERVICE_PRIORITY_OPTIONS_DYNAMIC : SERVICE_PRIORITIES}
+              placeholder={isLoadingServicePriority ? "Cargando..." : "Seleccionar prioridad"}
+              options={SERVICE_PRIORITY_OPTIONS_DYNAMIC}
               value={servicePriority}
               onValueChange={setServicePriority}
               icon="flag-outline"
+              disabled={isLoadingServicePriority || SERVICE_PRIORITY_OPTIONS_DYNAMIC.length === 0}
             />
           </View>
         )}

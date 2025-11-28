@@ -23,9 +23,9 @@ export const IncidentDetailsModal: React.FC<IncidentDetailsModalProps> = ({
   onEdit,
   onDelete,
 }) => {
-  const { getLabel: getIncidentTypeLabel } = useCatalogLabelMap('incident_type', { forceFresh: true });
-  const { getLabel: getIncidentStatusLabel } = useCatalogLabelMap('incident_status', { forceFresh: true });
-  const { getLabel: getActionTakenLabel } = useCatalogLabelMap('action_taken', { forceFresh: true, fallbackLabel: '—' });
+  const { getLabel: getIncidentTypeLabel, isLoading: isLoadingIncidentType } = useCatalogLabelMap('incident_type', { forceFresh: true });
+  const { getLabel: getIncidentStatusLabel, isLoading: isLoadingIncidentStatus } = useCatalogLabelMap('incident_status', { forceFresh: true });
+  const { getLabel: getActionTakenLabel, isLoading: isLoadingActionTaken } = useCatalogLabelMap('action_taken', { forceFresh: true, fallbackLabel: '—' });
 
   const { deleteIncidentAsync, isDeletingIncident } = useDeleteIncident();
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -87,7 +87,7 @@ export const IncidentDetailsModal: React.FC<IncidentDetailsModalProps> = ({
                   className="text-sm font-medium"
                   style={{ color: getTypeColor(incident.incident_type) }}
                 >
-                  {getIncidentTypeLabel(incident.incident_type, incident.incident_type_label || incident.incident_type || '—')}
+                  {isLoadingIncidentType ? 'Cargando...' : getIncidentTypeLabel(incident.incident_type, incident.incident_type_label || incident.incident_type || '—')}
                 </Text>
               </View>
               <View
@@ -98,7 +98,7 @@ export const IncidentDetailsModal: React.FC<IncidentDetailsModalProps> = ({
                   className="text-sm font-medium"
                   style={{ color: getStatusColor(incident.status) }}
                 >
-                  {getIncidentStatusLabel(incident.status, incident.status_label || incident.status || '—')}
+                  {isLoadingIncidentStatus ? 'Cargando...' : getIncidentStatusLabel(incident.status, incident.status_label || incident.status || '—')}
                 </Text>
               </View>
             </View>
@@ -178,7 +178,7 @@ export const IncidentDetailsModal: React.FC<IncidentDetailsModalProps> = ({
                     <View className="flex-row items-center">
                       <IonIcon name="construct-outline" size={16} color="#4B5563" />
                       <Text className="text-sm text-gray-800 ml-2">
-                        {getActionTakenLabel(incident.action_taken, incident.action_taken_label || incident.action_taken || '—')}
+                        {isLoadingActionTaken ? 'Cargando...' : getActionTakenLabel(incident.action_taken, incident.action_taken_label || incident.action_taken || '—')}
                       </Text>
                     </View>
                   </View>
@@ -275,11 +275,11 @@ export const IncidentDetailsModal: React.FC<IncidentDetailsModalProps> = ({
             <View className="flex-row mt-3">
               <View className="flex-1 mr-2">
                 <Text className="text-xs text-gray-500 uppercase">Tipo</Text>
-                <Text className="text-sm text-gray-800 mt-1">{getIncidentTypeLabel(incident.incident_type, incident.incident_type_label || incident.incident_type || '—')}</Text>
+                <Text className="text-sm text-gray-800 mt-1">{isLoadingIncidentType ? 'Cargando...' : getIncidentTypeLabel(incident.incident_type, incident.incident_type_label || incident.incident_type || '—')}</Text>
               </View>
               <View className="flex-1">
                 <Text className="text-xs text-gray-500 uppercase">Estado</Text>
-                <Text className="text-sm text-gray-800 mt-1">{getIncidentStatusLabel(incident.status, incident.incident_status_label || incident.status || '—')}</Text>
+                <Text className="text-sm text-gray-800 mt-1">{isLoadingIncidentStatus ? 'Cargando...' : getIncidentStatusLabel(incident.status, incident.incident_status_label || incident.status || '—')}</Text>
               </View>
             </View>
             <View className="mt-3">

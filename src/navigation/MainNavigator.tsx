@@ -6,7 +6,6 @@ import { GuidesPage } from '@/laundry/pages/guides/GuidesPage';
 import { ProcessesPage } from '@/laundry/pages/processes/ProcessesPage';
 import { GarmentsPage } from '@/laundry/pages/garments/GarmentsPage';
 import { ScanClothesPage, ScanProcessesPage } from '@/laundry/pages/scan';
-import { GarmentValidationPage } from '@/laundry/pages/processes/GarmentValidationPage';
 import { IncidentsPage } from '@/laundry/pages/incidents/IncidentsPage';
 import { MainStackParamList } from './types';
 
@@ -27,7 +26,6 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen name="Incidents" component={IncidentsPage} />
       <Stack.Screen name="ScanClothes" component={ScanClothesPage} />
       <Stack.Screen name="ScanProcesses" component={ScanProcessesPage} />
-      <Stack.Screen name="GarmentValidation" component={GarmentValidationPage} />
     </Stack.Navigator>
   );
 };

@@ -202,12 +202,13 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   // Determinar si debemos verificar prendas:
   // - mode === 'garment' (registrar prenda): siempre verificar
   // - mode === 'process' con serviceType === 'industrial': verificar
-  // - mode === 'process' con serviceType === 'personal': NO verificar (usa registeredGarments, igual que guide personal)
+  // - mode === 'process' con serviceType === 'personal': verificar (para tener fallback en getGarmentByRfid)
   // - mode === 'guide' con serviceType === 'industrial': verificar
   // - mode === 'guide' con serviceType === 'personal': NO verificar (usa registeredGarments)
   const shouldCheckGarments = (
     mode === 'garment' || 
     (mode === 'process' && serviceType === 'industrial') ||
+    (mode === 'process' && serviceType === 'personal') ||
     (mode === 'guide' && serviceType === 'industrial')
   ) && rfidCodes.length > 0;
 
@@ -495,33 +496,172 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   // Cargar RFIDs iniciales cuando estamos en modo edición (solo una vez)
   useEffect(() => {
     // Solo cargar si:
-    // 1. Estamos en modo edición
+    // 1. Estamos en modo edición o modo proceso
     // 2. Hay RFIDs para cargar
     // 3. NO se han cargado ya
-    if (isEditMode && initialRfids.length > 0 && !initialRfidsLoaded) {
+    if ((isEditMode || mode === 'process') && initialRfids.length > 0 && !initialRfidsLoaded) {
       // Limpiar tags previos
       clearScannedTags();
       seenSetRef.current.clear();
       
       // Usar setTimeout para asegurar que clearScannedTags terminó
-      setTimeout(() => {
-        // En modo edición NO poblar scannedTags; solo lista de registradas
+      setTimeout(async () => {
         scannedTagsCountRef.current = 0;
-        if (serviceType === 'personal') {
-          const garments = initialRfids.map((rfid, index) => ({
-            id: `edit-${rfid}`,
-            rfidCode: rfid,
-            description: `Prenda ${index + 1}`,
-            category: undefined,
-            color: undefined,
-            weight: undefined,
-          }));
-          setRegisteredGarments(garments);
+        
+        // En modo proceso, NO agregar initialRfids a scannedTags
+        // El escáner solo debe mostrar los nuevos códigos que detecta
+        // Los códigos iniciales se validan en el formulario, no en el escáner
+        if (mode === 'process') {
+          // En modo proceso, solo cargar datos en registeredGarments para modo personal
+          // pero NO agregarlos a scannedTags (no se muestran en la lista del escáner)
+          if (serviceType === 'personal') {
+            try {
+              const normalizedRfids = initialRfids.map(rfid => rfid.trim().toUpperCase());
+              const response = await guidesApi.post<ApiResponse<any[]>>('/get-garment-by-rfid-codes', {
+                rfid_codes: normalizedRfids
+              });
+              
+              const garmentsData = response.data?.data || [];
+              
+              // Crear un mapa de RFID -> Prenda para búsqueda rápida
+              const garmentsMap = new Map<string, any>();
+              garmentsData.forEach((garment: any) => {
+                if (garment.rfid_code) {
+                  const normalizedRfid = garment.rfid_code.trim().toUpperCase();
+                  garmentsMap.set(normalizedRfid, garment);
+                }
+              });
+              
+              // Mapear initialRfids a registeredGarments con datos reales
+              const garments = initialRfids.map((rfid) => {
+                const normalizedRfid = rfid.trim().toUpperCase();
+                const garmentData = garmentsMap.get(normalizedRfid);
+                
+                if (garmentData) {
+                  return {
+                    id: garmentData.id,
+                    rfidCode: rfid,
+                    description: garmentData.description || 'Sin descripción',
+                    category: garmentData.garment_type,
+                    color: garmentData.color,
+                    weight: garmentData.weight,
+                    quantity: garmentData.quantity || 1,
+                  };
+                } else {
+                  // Si no existe en el backend, usar placeholder
+                  return {
+                    id: `edit-${rfid}`,
+                    rfidCode: rfid,
+                    description: 'Prenda no registrada',
+                    category: undefined,
+                    color: undefined,
+                    weight: undefined,
+                    quantity: 1,
+                  };
+                }
+              });
+              
+              setRegisteredGarments(garments);
+              // NO agregar a scannedTags - el escáner solo muestra nuevos códigos detectados
+            } catch (error: any) {
+              console.error('Error al cargar prendas iniciales:', error);
+              // En caso de error, usar placeholders
+              const garments = initialRfids.map((rfid, index) => ({
+                id: `edit-${rfid}`,
+                rfidCode: rfid,
+                description: 'Prenda no registrada',
+                category: undefined,
+                color: undefined,
+                weight: undefined,
+                quantity: 1,
+              }));
+              setRegisteredGarments(garments);
+              // NO agregar a scannedTags
+            }
+          }
+          // Para servicio industrial en modo proceso, no hacer nada
+          // El escáner solo mostrará los nuevos códigos que detecte
+        } else if (isEditMode) {
+          // Solo en modo edición (no proceso), agregar a scannedTags si es necesario
+          if (serviceType === 'personal') {
+            try {
+              const normalizedRfids = initialRfids.map(rfid => rfid.trim().toUpperCase());
+              const response = await guidesApi.post<ApiResponse<any[]>>('/get-garment-by-rfid-codes', {
+                rfid_codes: normalizedRfids
+              });
+              
+              const garmentsData = response.data?.data || [];
+              
+              const garmentsMap = new Map<string, any>();
+              garmentsData.forEach((garment: any) => {
+                if (garment.rfid_code) {
+                  const normalizedRfid = garment.rfid_code.trim().toUpperCase();
+                  garmentsMap.set(normalizedRfid, garment);
+                }
+              });
+              
+              const garments = initialRfids.map((rfid) => {
+                const normalizedRfid = rfid.trim().toUpperCase();
+                const garmentData = garmentsMap.get(normalizedRfid);
+                
+                if (garmentData) {
+                  return {
+                    id: garmentData.id,
+                    rfidCode: rfid,
+                    description: garmentData.description || 'Sin descripción',
+                    category: garmentData.garment_type,
+                    color: garmentData.color,
+                    weight: garmentData.weight,
+                    quantity: garmentData.quantity || 1,
+                  };
+                } else {
+                  return {
+                    id: `edit-${rfid}`,
+                    rfidCode: rfid,
+                    description: 'Prenda no registrada',
+                    category: undefined,
+                    color: undefined,
+                    weight: undefined,
+                    quantity: 1,
+                  };
+                }
+              });
+              
+              setRegisteredGarments(garments);
+              // En modo edición, agregar a scannedTags para mostrar en la lista
+              initialRfids.forEach(rfid => {
+                addScannedTag({ epc: rfid, rssi: -50, timestamp: Date.now() });
+                seenSetRef.current.add(rfid);
+              });
+            } catch (error: any) {
+              console.error('Error al cargar prendas iniciales:', error);
+              const garments = initialRfids.map((rfid, index) => ({
+                id: `edit-${rfid}`,
+                rfidCode: rfid,
+                description: 'Prenda no registrada',
+                category: undefined,
+                color: undefined,
+                weight: undefined,
+                quantity: 1,
+              }));
+              setRegisteredGarments(garments);
+              initialRfids.forEach(rfid => {
+                addScannedTag({ epc: rfid, rssi: -50, timestamp: Date.now() });
+                seenSetRef.current.add(rfid);
+              });
+            }
+          } else {
+            // Para servicio industrial en modo edición, agregar a scannedTags
+            initialRfids.forEach(rfid => {
+              addScannedTag({ epc: rfid, rssi: -50, timestamp: Date.now() });
+              seenSetRef.current.add(rfid);
+            });
+          }
         }
         setInitialRfidsLoaded(true); // Marcar como cargados
       }, 100);
     }
-  }, [isEditMode, initialRfids.length, initialRfidsLoaded, serviceType]); // Incluir serviceType
+  }, [isEditMode, mode, initialRfids.length, initialRfidsLoaded, serviceType, checkRfidInBackend, addScannedTag, clearScannedTags]); // Incluir serviceType y dependencias
 
   // Ya no se requiere proceso ni descripción para este flujo
 
@@ -565,6 +705,10 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         );
         return;
       }
+      
+      // NO sincronizar seenSetRef con códigos existentes
+      // El escáner debe agregar cualquier código que detecte, sin validar contra códigos previos
+      // La deduplicación solo previene que el mismo código se agregue múltiples veces en la misma sesión de escaneo
       
       setIsScanning(true);
       isScanningRef.current = true;
@@ -659,19 +803,21 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
 
         // En modo "process" con servicio personal, lógica especial (solo visualización, sin botones)
         if (mode === 'process' && serviceType === 'personal') {
-          // PRIMERO: Verificar si ya está siendo procesado (race condition)
+          // PRIMERO: Verificar deduplicación en seenSet (antes de procesar)
+          if (seenSetRef.current.has(tag.epc)) {
+            return; // Ya está en la lista, ignorar
+          }
+          
+          // SEGUNDO: Verificar si ya está siendo procesado (race condition)
           if (processingRfidsRef.current.has(tag.epc)) {
             return; // Ya se está procesando, ignorar
           }
           
-          // SEGUNDO: Verificar deduplicación en seenSet
-          if (seenSetRef.current.has(tag.epc)) {
-            return;
-          }
-          
+          // TERCERO: Agregar a seenSet y processingRfids INMEDIATAMENTE para prevenir duplicados
           seenSetRef.current.add(tag.epc);
           processingRfidsRef.current.add(tag.epc); // Marcar como procesando
           
+          // CUARTO: Detener el escaneo INMEDIATAMENTE para evitar que detecte más tags
           stopScanning();
           
           try {
@@ -819,18 +965,9 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       const guideId = route?.params?.guideId;
       const rfidScanId = route?.params?.rfidScanId;
       
-      // Procesos especiales que siempre van a validación (incluso si tienen rfidScanId)
-      if (processType === 'PACKAGING' || processType === 'LOADING' || processType === 'DELIVERY') {
-        // Para EMPAQUE, CARGA y ENTREGA, ir siempre a la página de validación
-        navigation.navigate('GarmentValidation', {
-          guideId: guideId || selectedGuideId,
-          processType: processType,
-          scannedTags: scannedTags.map(tag => tag.epc),
-          serviceType: serviceType,
-        });
-      } else if (processType && rfidScanId && guideId) {
-        // Procesos con escaneo opcional u obligatorio: abrir ScanForm para actualizar RFID scan
-        const processesWithScan = ['WASHING', 'DRYING', 'IRONING', 'FOLDING', 'IN_PROCESS', 'SHIPPING'];
+      // Procesos con escaneo opcional u obligatorio: abrir ScanForm para actualizar RFID scan
+      if (processType && rfidScanId && guideId) {
+        const processesWithScan = ['WASHING', 'DRYING', 'IRONING', 'FOLDING', 'IN_PROCESS', 'SHIPPING', 'PACKAGING', 'LOADING', 'DELIVERED'];
         if (processesWithScan.includes(processType)) {
           setScanFormContext({
             origin: 'process',
@@ -1156,12 +1293,10 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   };
 
   const renderScannedTag = ({ item, index }: { item: ScannedTag; index: number }) => {
-    // En modo garment, servicio industrial, o process (cualquier serviceType), verificar si la prenda está registrada
-    const shouldCheckGarment = mode === 'garment' || serviceType === 'industrial' || mode === 'process';
-    let garment = shouldCheckGarment ? getGarmentByRfid(item.epc) : null;
+    // En modo process personal, buscar primero en registeredGarments (datos más actualizados)
+    let garment = null;
     
-    // En modo process personal, también buscar en registeredGarments
-    if (mode === 'process' && serviceType === 'personal' && !garment) {
+    if (mode === 'process' && serviceType === 'personal') {
       const registeredGarment = registeredGarments.find(g => g.rfidCode === item.epc);
       if (registeredGarment) {
         // Convertir registeredGarment al formato de garment para compatibilidad
@@ -1173,7 +1308,14 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
           weight: registeredGarment.weight,
           quantity: registeredGarment.quantity || 1,
         } as any;
+      } else {
+        // Si no está en registeredGarments, buscar en el backend
+        garment = getGarmentByRfid(item.epc);
       }
+    } else {
+      // Para otros modos, buscar directamente en el backend
+      const shouldCheckGarment = mode === 'garment' || serviceType === 'industrial' || mode === 'process';
+      garment = shouldCheckGarment ? getGarmentByRfid(item.epc) : null;
     }
     
     const isRegistered = !!garment;

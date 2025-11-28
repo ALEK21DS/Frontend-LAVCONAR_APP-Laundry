@@ -10,7 +10,7 @@ import { ProcessTypeModal } from '@/laundry/components/ProcessTypeModal';
 import { useWashingProcesses } from '@/laundry/hooks/washing-processes';
 import { useCatalogLabelMap } from '@/laundry/hooks';
 import { ProcessDetailsModal } from './ui/ProcessDetailsModal';
-import { PROCESS_STATUS_COLORS, PROCESS_TYPES, GUIDE_STATUS_COLORS } from '@/constants/processes';
+import { PROCESS_STATUS_COLORS, PROCESS_TYPE_COLORS, GUIDE_STATUS_COLORS } from '@/constants/processes';
 
 type ProcessesPageProps = { navigation: NativeStackNavigationProp<any> };
 
@@ -41,18 +41,13 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
     search: debouncedQuery,
   });
 
-  const { getLabel: getProcessTypeLabel } = useCatalogLabelMap('process_type', { forceFresh: true });
-  const { getLabel: getProcessStatusLabel } = useCatalogLabelMap('process_status', { forceFresh: true });
-  const { getLabel: getServiceTypeLabel } = useCatalogLabelMap('service_type', { forceFresh: true });
+  const { getLabel: getProcessTypeLabel, isLoading: isLoadingProcessType } = useCatalogLabelMap('process_type', { forceFresh: true });
+  const { getLabel: getProcessStatusLabel, isLoading: isLoadingProcessStatus } = useCatalogLabelMap('process_status', { forceFresh: true });
+  const { getLabel: getServiceTypeLabel, isLoading: isLoadingServiceType } = useCatalogLabelMap('service_type', { forceFresh: true });
+  
+  const isLoadingCatalogs = isLoadingProcessType || isLoadingProcessStatus || isLoadingServiceType;
 
-  const PROCESS_TYPE_COLORS = useMemo(() => {
-    return PROCESS_TYPES.reduce<Record<string, string>>((acc, item) => {
-      if (item.value && item.color) {
-        acc[item.value.toUpperCase()] = item.color;
-      }
-      return acc;
-    }, {});
-  }, []);
+  // PROCESS_TYPE_COLORS ahora viene directamente de constants/processes.ts
 
   // Refrescar al entrar a la pantalla
   useFocusEffect(
@@ -129,20 +124,26 @@ export const ProcessesPage: React.FC<ProcessesPageProps> = ({ navigation }) => {
                 {filtered.map(p => {
                   // Usar GUIDE_STATUS_COLORS porque los procesos usan los mismos estados que las guías
                   const statusColor = GUIDE_STATUS_COLORS[p.status as keyof typeof GUIDE_STATUS_COLORS] || PROCESS_STATUS_COLORS[p.status as keyof typeof PROCESS_STATUS_COLORS] || '#6B7280';
-                  const statusLabel = getProcessStatusLabel(p.status, (p as any).status_label || p.status || 'Sin estado');
+                  const statusLabel = isLoadingProcessStatus 
+                    ? 'Cargando...' 
+                    : getProcessStatusLabel(p.status, (p as any).status_label || p.status || 'Sin estado');
 
                   const guideData = (p as any).guide || {};
                   const guideClient = guideData.client || {};
                   const serviceTypeCode = (guideData.service_type || (p as any).service_type || '').toUpperCase();
                   const processTypeCode = (p.process_type || '').toUpperCase();
-                  const processTypeLabel = getProcessTypeLabel(
-                    p.process_type,
-                    (p as any).process_type_label || p.process_type || 'Sin tipo'
-                  );
-                  const processTypeColor = PROCESS_TYPE_COLORS[processTypeCode] || '#6B7280';
-                  const serviceTypeLabel = serviceTypeCode
-                    ? getServiceTypeLabel(serviceTypeCode, serviceTypeCode)
-                    : 'Sin tipo';
+                  const processTypeLabel = isLoadingProcessType
+                    ? 'Cargando...'
+                    : getProcessTypeLabel(
+                        p.process_type,
+                        (p as any).process_type_label || p.process_type || 'Sin tipo'
+                      );
+                  const processTypeColor = PROCESS_TYPE_COLORS[processTypeCode as keyof typeof PROCESS_TYPE_COLORS] || '#6B7280';
+                  const serviceTypeLabel = isLoadingServiceType
+                    ? 'Cargando...'
+                    : serviceTypeCode
+                      ? getServiceTypeLabel(serviceTypeCode, serviceTypeCode)
+                      : 'Sin tipo';
                   const clientName =
                     guideClient.name ||
                     guideData.client_name ||
