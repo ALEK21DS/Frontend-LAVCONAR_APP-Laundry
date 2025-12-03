@@ -16,6 +16,8 @@ interface ClientDetailsModalProps {
   client: any;
   onEdit: () => void;
   onDelete: () => void;
+  hasPreApprovedAuthorization?: boolean;
+  approvedActionType?: 'UPDATE' | 'DELETE' | null;
 }
 
 export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
@@ -24,22 +26,17 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
   client,
   onEdit,
   onDelete,
+  hasPreApprovedAuthorization = false,
+  approvedActionType = null,
 }) => {
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [authAction, setAuthAction] = useState<'EDIT' | 'DELETE' | null>(null);
   const [description, setDescription] = useState('');
-  const [checkingAuth, setCheckingAuth] = useState(false);
-  const [currentRequestId, setCurrentRequestId] = useState('');
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
 
   const { user } = useAuthStore();
   const isSuperAdmin = isSuperAdminUser(user);
   const { createAuthorizationRequestAsync, isCreating } = useCreateAuthorizationRequest();
-  const { authorization, status: authStatus } = useGetAuthorizationById(
-    currentRequestId,
-    checkingAuth && !!currentRequestId
-  );
-
   const { deleteClientAsync, isDeleting } = useDeleteClient();
 
   // Obtener catálogo de tipos de servicio para mostrar la etiqueta
@@ -53,43 +50,9 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
   }, [client?.service_type, serviceTypeCatalog, isLoadingServiceType]);
 
   useEffect(() => {
-    if (checkingAuth && authStatus) {
-      if (authStatus === 'APPROVED') {
-        const action = authAction;
-        setCheckingAuth(false);
-        setDescription('');
-        setCurrentRequestId('');
-        setAuthAction(null);
-        setAuthModalVisible(false);
-
-        if (action === 'EDIT') {
-          onClose();
-          onEdit();
-        } else if (action === 'DELETE') {
-          setDeleteConfirmVisible(true);
-        }
-      } else if (authStatus === 'REJECTED') {
-        Alert.alert(
-          'Solicitud rechazada',
-          authAction === 'DELETE'
-            ? 'El superadmin ha rechazado tu solicitud de eliminación.'
-            : 'El superadmin ha rechazado tu solicitud de edición.'
-        );
-        setCheckingAuth(false);
-        setDescription('');
-        setCurrentRequestId('');
-        setAuthAction(null);
-        setAuthModalVisible(false);
-      }
-    }
-  }, [checkingAuth, authStatus, authAction, onClose, onEdit]);
-
-  useEffect(() => {
     if (!visible) {
       setAuthModalVisible(false);
       setDescription('');
-      setCheckingAuth(false);
-      setCurrentRequestId('');
       setAuthAction(null);
       setDeleteConfirmVisible(false);
     }
@@ -98,25 +61,36 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
   if (!client) return null;
 
   const handleEditRequest = () => {
-    // Si es superadmin, ejecutar directamente sin solicitar autorización
+    // Si es superadmin, ejecutar directamente
     if (isSuperAdmin) {
       onClose();
       onEdit();
       return;
     }
-    // Si no es superadmin, solicitar autorización
+    // Si tiene autorización pre-aprobada específicamente para UPDATE
+    if (hasPreApprovedAuthorization && approvedActionType === 'UPDATE') {
+      onClose();
+      onEdit();
+      return;
+    }
+    // Si no tiene autorización o tiene autorización para otra acción, solicitar autorización
     setAuthAction('EDIT');
     setDescription('');
     setAuthModalVisible(true);
   };
 
   const handleDeleteRequest = () => {
-    // Si es superadmin, abrir directamente el modal de confirmación de eliminación
+    // Si es superadmin, ejecutar directamente
     if (isSuperAdmin) {
       setDeleteConfirmVisible(true);
       return;
     }
-    // Si no es superadmin, solicitar autorización
+    // Si tiene autorización pre-aprobada específicamente para DELETE
+    if (hasPreApprovedAuthorization && approvedActionType === 'DELETE') {
+      setDeleteConfirmVisible(true);
+      return;
+    }
+    // Si no tiene autorización o tiene autorización para otra acción, solicitar autorización
     setAuthAction('DELETE');
     setDescription('');
     setAuthModalVisible(true);
@@ -130,16 +104,22 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
     }
 
     try {
-      const authRequest = await createAuthorizationRequestAsync({
+      await createAuthorizationRequestAsync({
         entity_type: 'clients',
         entity_id: client.id,
         action_type: authAction === 'DELETE' ? 'DELETE' : 'UPDATE',
         reason: description,
       });
 
-      setCurrentRequestId(authRequest.id);
       setAuthModalVisible(false);
-      setCheckingAuth(true);
+      setDescription('');
+      setAuthAction(null);
+      
+      Alert.alert(
+        '✓ Solicitud enviada',
+        'Tu solicitud ha sido enviada. Te notificaremos cuando sea aprobada. Revisa el centro de notificaciones.',
+        [{ text: 'Entendido' }]
+      );
     } catch (error: any) {
       const message = error?.message || 'No se pudo enviar la solicitud';
       Alert.alert('Error', message);
@@ -362,78 +342,65 @@ export const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({
       </View>
     </Modal>
 
-    {/* Modal de Espera */}
-    <Modal transparent visible={checkingAuth} animationType="fade" onRequestClose={() => {}}>
-      <View className="flex-1 items-center justify-center bg-black/50 p-4">
-        <View className="w-full max-w-sm bg-white rounded-xl p-6 shadow-xl">
-          <View className="flex-row items-center justify-center mb-4">
-            <ActivityIndicator size="large" color="#8EB021" />
-          </View>
-          <Text className="text-xl font-bold text-gray-900 text-center mb-2">
-            Esperando autorización
-          </Text>
-          <Text className="text-base text-gray-700 text-center mb-4">
-            Tu solicitud ha sido enviada al SuperAdmin.
-          </Text>
-          <Text className="text-sm text-gray-500 text-center">Verificando autorización...</Text>
-        </View>
-      </View>
-    </Modal>
 
     {/* Modal de Confirmación de Eliminación */}
     <Modal transparent visible={deleteConfirmVisible} animationType="fade" onRequestClose={() => setDeleteConfirmVisible(false)}>
-      <View className="flex-1 items-center justify-center bg-black/50 p-4">
-        <View className="w-full max-w-md bg-white rounded-2xl p-6 shadow-2xl">
-          <View className="flex-row items-center mb-4">
-            <View className="w-12 h-12 rounded-full bg-red-100 items-center justify-center mr-3">
-              <IonIcon name="warning-outline" size={26} color="#DC2626" />
-            </View>
-            <View>
-              <Text className="text-2xl font-bold text-gray-900">Confirmar eliminación</Text>
-              <Text className="text-sm text-gray-600 mt-1">Revisa los datos antes de eliminar al cliente</Text>
-            </View>
-          </View>
-
-          <View className="bg-gray-50 rounded-xl p-4 mb-4">
-            <Text className="text-xs text-gray-500 uppercase mb-1">Cliente</Text>
-            <Text className="text-lg font-semibold text-gray-900">{client?.name || 'Sin nombre'}</Text>
-            <View className="flex-row mt-3">
-              <View className="flex-1 mr-2">
-                <Text className="text-xs text-gray-500 uppercase">Identificación</Text>
-                <Text className="text-sm text-gray-800 mt-1">{client?.identification_number || '—'}</Text>
+      <View className="flex-1 items-center justify-center bg-black/50 px-6">
+        <View className="w-full bg-white rounded-2xl overflow-hidden shadow-2xl" style={{ maxHeight: '80%' }}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View className="p-5">
+              <View className="flex-row items-center mb-3">
+                <View className="w-10 h-10 rounded-full bg-red-100 items-center justify-center mr-3">
+                  <IonIcon name="warning-outline" size={22} color="#DC2626" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-lg font-bold text-gray-900">Confirmar eliminación</Text>
+                  <Text className="text-xs text-gray-600 mt-0.5">Revisa los datos antes de eliminar</Text>
+                </View>
               </View>
-              <View className="flex-1">
-                <Text className="text-xs text-gray-500 uppercase">Estado</Text>
-                <Text className="text-sm text-gray-800 mt-1">{client?.is_active ? 'Activo' : 'Inactivo'}</Text>
+
+              <View className="bg-gray-50 rounded-xl p-3 mb-3">
+                <Text className="text-xs text-gray-500 uppercase mb-1">Cliente</Text>
+                <Text className="text-base font-semibold text-gray-900">{client?.name || 'Sin nombre'}</Text>
+                <View className="flex-row mt-2">
+                  <View className="flex-1 mr-2">
+                    <Text className="text-xs text-gray-500 uppercase">Identificación</Text>
+                    <Text className="text-sm text-gray-800 mt-0.5">{client?.identification_number || '—'}</Text>
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-xs text-gray-500 uppercase">Estado</Text>
+                    <Text className="text-sm text-gray-800 mt-0.5">{client?.is_active ? 'Activo' : 'Inactivo'}</Text>
+                  </View>
+                </View>
+                <View className="mt-2">
+                  <Text className="text-xs text-gray-500 uppercase">Sucursal asignada</Text>
+                  <Text className="text-sm text-gray-800 mt-0.5">{client?.branch_office_name || '—'}</Text>
+                </View>
+              </View>
+
+              <Text className="text-sm text-gray-600 mb-4">
+                Esta acción no se puede deshacer y eliminará el acceso del cliente a la plataforma.
+              </Text>
+
+              <View className="flex-row">
+                <Button
+                  title="Cancelar"
+                  variant="outline"
+                  onPress={() => setDeleteConfirmVisible(false)}
+                  className="flex-1 mr-2"
+                  disabled={isDeleting}
+                />
+                <Button
+                  title="Eliminar"
+                  variant="danger"
+                  icon={<IonIcon name="trash-outline" size={16} color="white" />}
+                  onPress={handleDeleteConfirm}
+                  className="flex-1 ml-2"
+                  isLoading={isDeleting}
+                />
               </View>
             </View>
-            <View className="mt-3">
-              <Text className="text-xs text-gray-500 uppercase">Sucursal asignada</Text>
-              <Text className="text-sm text-gray-800 mt-1">{client?.branch_office_name || '—'}</Text>
-            </View>
-          </View>
-
-          <Text className="text-sm text-gray-600 mb-6">
-            Esta acción no se puede deshacer y eliminará el acceso del cliente a la plataforma.
-          </Text>
-
-          <View className="flex-row">
-            <Button
-              title="Cancelar"
-              variant="outline"
-              onPress={() => setDeleteConfirmVisible(false)}
-              className="flex-1 mr-3"
-              disabled={isDeleting}
-            />
-            <Button
-              title="Eliminar definitivamente"
-              variant="danger"
-              icon={<IonIcon name="trash-outline" size={18} color="white" />}
-              onPress={handleDeleteConfirm}
-              className="flex-1"
-              isLoading={isDeleting}
-            />
-          </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>

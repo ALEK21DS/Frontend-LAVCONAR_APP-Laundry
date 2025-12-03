@@ -12,13 +12,14 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { ClientForm } from './ui/ClientForm';
 import { ClientDetailsModal } from './ui/ClientDetailsModal';
+import { useNotificationsStore } from '@/laundry/store/notifications.store';
 
 
 type ClientsPageProps = {
   navigation: NativeStackNavigationProp<any>;
 };
 
-export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigation }) => {
+export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigation, route }: any) => {
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
   
@@ -34,6 +35,31 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [initialValues, setInitialValues] = useState<any | undefined>(undefined);
+  const authorizationIdRef = React.useRef<string | null>(null); // Usar ref para preservar el ID
+  const [approvedActionType, setApprovedActionType] = useState<'UPDATE' | 'DELETE' | null>(null);
+  const [fromNotification, setFromNotification] = useState(false); // Flag para saber si viene de notificación
+
+  // Detectar si venimos de una notificación y abrir el modal automáticamente
+  React.useEffect(() => {
+    const openEntityId = route?.params?.openEntityId;
+    const authorizationId = route?.params?.authorizationId;
+    const actionType = route?.params?.actionType;
+    
+    // Solo procesar si hay un openEntityId Y authorizationId válidos
+    if (openEntityId && authorizationId && clients && clients.length > 0) {
+      const clientToOpen = clients.find((c: any) => c.id === openEntityId);
+      if (clientToOpen) {
+        authorizationIdRef.current = authorizationId; // Guardar en ref (no se limpia)
+        setFromNotification(true);
+        setSelectedClient(clientToOpen);
+        setDetailsOpen(true);
+        setApprovedActionType(actionType || null);
+        
+        // Limpiar los parámetros para evitar que se abra de nuevo
+        _navigation.setParams({ openEntityId: undefined, authorizationId: undefined, actionType: undefined });
+      }
+    }
+  }, [route?.params?.openEntityId, route?.params?.authorizationId, clients, _navigation]);
 
   // Recargar la lista de clientes cada vez que la pantalla recibe foco
   useFocusEffect(
@@ -150,11 +176,27 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
     );
   };
 
+  const { markAsProcessed } = useNotificationsStore();
+
   const handleDeleteSuccess = () => {
     Alert.alert('Cliente eliminado', 'El cliente fue eliminado correctamente');
+    
+    // Marcar la notificación como procesada si venía de una notificación
+    if (authorizationIdRef.current) {
+      markAsProcessed(authorizationIdRef.current);
+      authorizationIdRef.current = null;
+      setFromNotification(false);
+    }
+    
     setSelectedClient(null);
     setDetailsOpen(false);
     refetch();
+  };
+
+  const handleCloseDetails = () => {
+    setDetailsOpen(false);
+    setSelectedClient(null);
+    setApprovedActionType(null);
   };
 
   return (
@@ -257,10 +299,12 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
       {/* Modal de Detalles */}
       <ClientDetailsModal
         visible={detailsOpen}
-        onClose={() => setDetailsOpen(false)}
+        onClose={handleCloseDetails}
         client={selectedClient}
         onEdit={openEdit}
         onDelete={handleDeleteSuccess}
+        hasPreApprovedAuthorization={fromNotification}
+        approvedActionType={approvedActionType}
       />
 
       {/* Modal de Formulario */}
@@ -279,12 +323,22 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
             isEditing={!!editingId}
             onSubmit={async (data) => {
               try {
+                // Usar el ref que nunca se limpia
+                const authIdToProcess = authorizationIdRef.current;
+                
                 if (editingId) {
                   await updateClientAsync({ id: editingId, data });
                   Alert.alert('Cliente actualizado', 'Los datos del cliente fueron actualizados');
                   // Ajustar el filtro para reflejar el nuevo estado si cambió
                   if ((data as any).status === 'INACTIVE') setStatusFilter('inactive');
                   if ((data as any).status === 'ACTIVE') setStatusFilter('active');
+                  
+                  // Marcar notificación como procesada DESPUÉS de guardado exitoso
+                  if (authIdToProcess) {
+                    markAsProcessed(authIdToProcess);
+                    authorizationIdRef.current = null; // Limpiar después de marcar
+                    setFromNotification(false);
+                  }
                 } else {
                   await createClientAsync(data);
                   Alert.alert('Cliente creado', 'El cliente fue creado correctamente');
@@ -292,6 +346,7 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ navigation: _navigatio
                 setFormOpen(false);
                 setEditingId(null);
                 setInitialValues(undefined);
+                setApprovedActionType(null);
                 refetch();
               } catch (error: any) {
                 const message = error?.response?.data?.message || error?.message || 'No se pudo guardar el cliente';

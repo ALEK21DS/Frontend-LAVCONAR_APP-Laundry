@@ -16,6 +16,9 @@ interface GuideDetailsModalProps {
   onClose: () => void;
   guide: any;
   onEdit: () => void;
+  onDelete?: () => void;
+  hasPreApprovedAuthorization?: boolean;
+  approvedActionType?: 'UPDATE' | 'DELETE' | null;
 }
 
 export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
@@ -23,12 +26,13 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
   onClose,
   guide,
   onEdit,
+  onDelete,
+  hasPreApprovedAuthorization = false,
+  approvedActionType = null,
 }) => {
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [authAction, setAuthAction] = useState<'EDIT' | 'DELETE' | null>(null);
   const [description, setDescription] = useState('');
-  const [checkingAuth, setCheckingAuth] = useState(false);
-  const [currentRequestId, setCurrentRequestId] = useState<string>('');
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   
   // Hook para exportar PDF
@@ -42,60 +46,17 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
   const { createAuthorizationRequestAsync, isCreating } = useCreateAuthorizationRequest();
   
   const { deleteGuideAsync, isDeleting } = useDeleteGuide();
-  
-  // Hook para verificar el estado de la solicitud específica (solo se activa cuando checkingAuth es true)
-  // El hook hace polling automático cada 3 segundos
-  const { authorization, status: authStatus, isChecking } = useGetAuthorizationById(
-    currentRequestId,
-    checkingAuth && !!currentRequestId
-  );
 
   const { getLabel: getGuideStatusLabel, isLoading: isLoadingGuideStatus } = useCatalogLabelMap('guide_status', { forceFresh: true, fallbackLabel: '—' });
   const { getLabel: getGeneralConditionLabel, isLoading: isLoadingGeneralCondition } = useCatalogLabelMap('general_condition', { forceFresh: true, fallbackLabel: '—' });
   const { getLabel: getServicePriorityLabel, isLoading: isLoadingServicePriority } = useCatalogLabelMap('service_priority', { forceFresh: true, fallbackLabel: '—' });
   const { getLabel: getRequestedServiceLabel, isLoading: isLoadingRequestedServices } = useCatalogLabelMap('requested_services', { forceFresh: true, fallbackLabel: '—' });
 
-  // Efecto para monitorear el estado de autorización
-  useEffect(() => {
-    if (checkingAuth && authStatus) {
-      if (authStatus === 'APPROVED') {
-        const action = authAction;
-        setCheckingAuth(false);
-        setDescription('');
-        setCurrentRequestId('');
-        setAuthAction(null);
-        setAuthModalVisible(false);
-
-        if (action === 'EDIT') {
-          onClose();
-          onEdit();
-        } else if (action === 'DELETE') {
-          setDeleteConfirmVisible(true);
-        }
-      } else if (authStatus === 'REJECTED') {
-        // Autorización rechazada
-        Alert.alert(
-          'Solicitud Rechazada', 
-          authAction === 'DELETE'
-            ? 'El superadmin ha rechazado tu solicitud de eliminación.'
-            : 'El superadmin ha rechazado tu solicitud de edición.'
-        );
-        setCheckingAuth(false);
-        setDescription('');
-        setCurrentRequestId('');
-        setAuthAction(null);
-        setAuthModalVisible(false);
-      }
-    }
-  }, [checkingAuth, authStatus, authAction, onEdit, onClose]);
-
   // Resetear estados cuando el modal se cierra
   useEffect(() => {
     if (!visible) {
       setAuthModalVisible(false);
       setDescription('');
-      setCheckingAuth(false);
-      setCurrentRequestId('');
       setAuthAction(null);
       setDeleteConfirmVisible(false);
     }
@@ -104,25 +65,36 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
   if (!guide) return null;
 
   const handleEditRequest = () => {
-    // Si es superadmin, ejecutar directamente sin solicitar autorización
+    // Si es superadmin, ejecutar directamente
     if (isSuperAdmin) {
       onClose();
       onEdit();
       return;
     }
-    // Si no es superadmin, solicitar autorización
+    // Si tiene autorización pre-aprobada específicamente para UPDATE
+    if (hasPreApprovedAuthorization && approvedActionType === 'UPDATE') {
+      onClose();
+      onEdit();
+      return;
+    }
+    // Si no tiene autorización o tiene autorización para otra acción, solicitar autorización
     setAuthAction('EDIT');
     setDescription('');
     setAuthModalVisible(true);
   };
 
   const handleDeleteRequest = () => {
-    // Si es superadmin, abrir directamente el modal de confirmación de eliminación
+    // Si es superadmin, ejecutar directamente
     if (isSuperAdmin) {
       setDeleteConfirmVisible(true);
       return;
     }
-    // Si no es superadmin, solicitar autorización
+    // Si tiene autorización pre-aprobada específicamente para DELETE
+    if (hasPreApprovedAuthorization && approvedActionType === 'DELETE') {
+      setDeleteConfirmVisible(true);
+      return;
+    }
+    // Si no tiene autorización o tiene autorización para otra acción, solicitar autorización
     setAuthAction('DELETE');
     setDescription('');
     setAuthModalVisible(true);
@@ -139,18 +111,22 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
     }
 
     try {
-      // Crear la solicitud de autorización y guardar su ID
-      const authRequest = await createAuthorizationRequestAsync({
+      await createAuthorizationRequestAsync({
         entity_type: 'guides',
         entity_id: guide.id,
         action_type: authAction === 'DELETE' ? 'DELETE' : 'UPDATE',
         reason: description,
       });
       
-      // Guardar el ID de la solicitud para verificar específicamente esta autorización
-      setCurrentRequestId(authRequest.id);
       setAuthModalVisible(false);
-      setCheckingAuth(true);
+      setDescription('');
+      setAuthAction(null);
+      
+      Alert.alert(
+        '✓ Solicitud enviada',
+        'Tu solicitud ha sido enviada. Te notificaremos cuando sea aprobada. Revisa el centro de notificaciones.',
+        [{ text: 'Entendido' }]
+      );
     } catch (error: any) {
       const errorMessage = error.message || 'No se pudo enviar la solicitud';
       
@@ -180,6 +156,9 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
       await deleteGuideAsync(guide.id);
       setDeleteConfirmVisible(false);
       Alert.alert('Guía eliminada', 'La guía se eliminó correctamente.');
+      if (onDelete) {
+        onDelete();
+      }
       onClose();
     } catch (error: any) {
       const backendMessage = error?.response?.data?.message;
@@ -456,89 +435,71 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
         </View>
       </Modal>
 
-      {/* Modal de Espera de Autorización */}
-      <Modal transparent visible={checkingAuth} animationType="fade" onRequestClose={() => {}}>
-        <View className="flex-1 items-center justify-center bg-black/50 p-4">
-          <View className="w-full max-w-sm bg-white rounded-xl p-6 shadow-xl">
-            <View className="flex-row items-center justify-center mb-4">
-              <ActivityIndicator size="large" color="#8EB021" />
-            </View>
-
-            <Text className="text-xl font-bold text-gray-900 text-center mb-2">
-              Esperando Autorización
-            </Text>
-
-            <Text className="text-base text-gray-700 text-center mb-4">
-              Tu solicitud ha sido enviada al SuperAdmin.
-            </Text>
-
-            <Text className="text-sm text-gray-500 text-center">
-              Verificando autorización...
-            </Text>
-          </View>
-        </View>
-      </Modal>
 
       {/* Modal de Confirmación de Eliminación */}
       <Modal transparent visible={deleteConfirmVisible} animationType="fade" onRequestClose={() => setDeleteConfirmVisible(false)}>
-        <View className="flex-1 items-center justify-center bg-black/50 p-4">
-          <View className="w-full max-w-md bg-white rounded-2xl p-6 shadow-2xl">
-            <View className="flex-row items-center mb-4">
-              <View className="w-12 h-12 rounded-full bg-red-100 items-center justify-center mr-3">
-                <IonIcon name="warning-outline" size={26} color="#DC2626" />
-              </View>
-              <View>
-                <Text className="text-2xl font-bold text-gray-900">Confirmar eliminación</Text>
-                <Text className="text-sm text-gray-600 mt-1">Revisa los datos antes de eliminar la guía</Text>
-              </View>
-            </View>
+        <View className="flex-1 items-center justify-center bg-black/50 px-6">
+          <View className="w-full bg-white rounded-2xl overflow-hidden shadow-2xl" style={{ maxHeight: '80%' }}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View className="p-5">
+                <View className="flex-row items-center mb-3">
+                  <View className="w-10 h-10 rounded-full bg-red-100 items-center justify-center mr-3">
+                    <IonIcon name="warning-outline" size={22} color="#DC2626" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-lg font-bold text-gray-900">Confirmar eliminación</Text>
+                    <Text className="text-xs text-gray-600 mt-0.5">Revisa los datos antes de eliminar</Text>
+                  </View>
+                </View>
 
-            <View className="bg-gray-50 rounded-xl p-4 mb-4">
-              <Text className="text-xs text-gray-500 uppercase mb-1">Guía</Text>
-              <Text className="text-lg font-semibold text-gray-900">{guide?.guide_number || 'Sin número'}</Text>
-              <View className="flex-row mt-3">
-                <View className="flex-1 mr-2">
-                  <Text className="text-xs text-gray-500 uppercase">Cliente</Text>
-                  <Text className="text-sm text-gray-800 mt-1">{guide?.client_name || '—'}</Text>
+                <View className="bg-gray-50 rounded-xl p-3 mb-3">
+                  <Text className="text-xs text-gray-500 uppercase mb-1">Guía</Text>
+                  <Text className="text-base font-semibold text-gray-900">{guide?.guide_number || 'Sin número'}</Text>
+                  <View className="flex-row mt-2">
+                    <View className="flex-1 mr-2">
+                      <Text className="text-xs text-gray-500 uppercase">Cliente</Text>
+                      <Text className="text-sm text-gray-800 mt-0.5">{guide?.client_name || '—'}</Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-xs text-gray-500 uppercase">Sucursal</Text>
+                      <Text className="text-sm text-gray-800 mt-0.5">{guide?.branch_office_name || '—'}</Text>
+                    </View>
+                  </View>
+                  <View className="flex-row mt-2">
+                    <View className="flex-1 mr-2">
+                      <Text className="text-xs text-gray-500 uppercase">Estado</Text>
+                      <Text className="text-sm text-gray-800 mt-0.5">{isLoadingGuideStatus ? 'Cargando...' : getGuideStatusLabel(guide?.status, guide?.status_label || '—')}</Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-xs text-gray-500 uppercase">Prendas</Text>
+                      <Text className="text-sm text-gray-800 mt-0.5">{guide?.total_garments ?? 0}</Text>
+                    </View>
+                  </View>
                 </View>
-                <View className="flex-1">
-                  <Text className="text-xs text-gray-500 uppercase">Sucursal</Text>
-                  <Text className="text-sm text-gray-800 mt-1">{guide?.branch_office_name || '—'}</Text>
+
+                <Text className="text-sm text-gray-600 mb-4">
+                  Esta acción no se puede deshacer. Todas las prendas asociadas y registros de escaneo permanecerán, pero la guía dejará de estar disponible.
+                </Text>
+
+                <View className="flex-row">
+                  <Button
+                    title="Cancelar"
+                    variant="outline"
+                    onPress={() => setDeleteConfirmVisible(false)}
+                    className="flex-1 mr-2"
+                    disabled={isDeleting}
+                  />
+                  <Button
+                    title="Eliminar"
+                    variant="danger"
+                    icon={<IonIcon name="trash-outline" size={16} color="white" />}
+                    onPress={handleDeleteConfirm}
+                    className="flex-1 ml-2"
+                    isLoading={isDeleting}
+                  />
                 </View>
               </View>
-              <View className="flex-row mt-3">
-                <View className="flex-1 mr-2">
-                  <Text className="text-xs text-gray-500 uppercase">Estado</Text>
-                  <Text className="text-sm text-gray-800 mt-1">{isLoadingGuideStatus ? 'Cargando...' : getGuideStatusLabel(guide?.status, guide?.status_label || '—')}</Text>
-                </View>
-                <View className="flex-1">
-                  <Text className="text-xs text-gray-500 uppercase">Prendas</Text>
-                  <Text className="text-sm text-gray-800 mt-1">{guide?.total_garments ?? 0}</Text>
-                </View>
-              </View>
-            </View>
-
-            <Text className="text-sm text-gray-600 mb-6">
-              Esta acción no se puede deshacer. Todas las prendas asociadas y registros de escaneo permanecerán, pero la guía dejará de estar disponible.
-            </Text>
-
-            <View className="flex-row">
-              <Button
-                title="Cancelar"
-                variant="outline"
-                onPress={() => setDeleteConfirmVisible(false)}
-                className="flex-1 mr-3"
-                disabled={isDeleting}
-              />
-              <Button
-                title="Eliminar definitivamente"
-                variant="danger"
-                icon={<IonIcon name="trash-outline" size={18} color="white" />}
-                onPress={handleDeleteConfirm}
-                className="flex-1"
-                isLoading={isDeleting}
-              />
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>

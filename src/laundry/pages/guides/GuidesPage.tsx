@@ -19,6 +19,7 @@ import { useCatalogLabelMap } from '@/laundry/hooks';
 import { GUIDE_STATUS_COLORS } from '@/constants/processes';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { isSuperAdminUser, getPreferredBranchOfficeId } from '@/helpers/user.helper';
+import { useNotificationsStore } from '@/laundry/store/notifications.store';
 
  type GuidesPageProps = { navigation: NativeStackNavigationProp<any> };
 
@@ -53,6 +54,10 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedGuide, setSelectedGuide] = useState<any | null>(null);
+  const [editingGuide, setEditingGuide] = useState<any | null>(null); // Guía siendo editada
+  
+  // Usar editingGuide para pasarlo al formulario
+  const guideToEdit = editingId ? editingGuide : undefined;
   const [isNavigatingToScanner, setIsNavigatingToScanner] = useState(false);
   const prefilledTags = route?.params?.prefilledTags || [];
   const [scannedTags, setScannedTags] = useState<ScannedTag[]>([]);
@@ -96,6 +101,32 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   
   // Estado para el cliente seleccionado
   const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const authorizationIdRef = React.useRef<string | null>(null); // Usar ref para preservar el ID
+  const [approvedActionType, setApprovedActionType] = useState<'UPDATE' | 'DELETE' | null>(null);
+  const [fromNotification, setFromNotification] = useState(false); // Flag para saber si viene de notificación
+  const { markAsProcessed } = useNotificationsStore();
+
+  // Detectar si venimos de una notificación y abrir el modal automáticamente
+  useEffect(() => {
+    const openEntityId = route?.params?.openEntityId;
+    const authorizationId = route?.params?.authorizationId;
+    const actionType = route?.params?.actionType;
+    
+    // Solo procesar si hay un openEntityId Y authorizationId válidos
+    if (openEntityId && authorizationId && guides && guides.length > 0) {
+      const guideToOpen = guides.find((g: any) => g.id === openEntityId);
+      if (guideToOpen) {
+        authorizationIdRef.current = authorizationId; // Guardar en ref (no se limpia)
+        setFromNotification(true);
+        setSelectedGuide(guideToOpen);
+        setDetailsOpen(true);
+        setApprovedActionType(actionType || null);
+        
+        // Limpiar los parámetros para evitar que se abra de nuevo
+        navigation.setParams({ openEntityId: undefined, authorizationId: undefined, actionType: undefined });
+      }
+    }
+  }, [route?.params?.openEntityId, route?.params?.authorizationId, guides, navigation]);
 
   // Refs para control de escaneo RFID
   const isScanningRef = useRef<boolean>(false);
@@ -174,6 +205,7 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
   const openEdit = () => {
     if (selectedGuide) {
       setEditingId(selectedGuide.id);
+      setEditingGuide(selectedGuide); // Guardar la guía en estado separado
       setSelectedClientId(selectedGuide.client_id || '');
       // Sincronizar sucursal de la guía con el estado de filtrado de clientes
       if (isSuperAdmin && selectedGuide.branch_office_id) {
@@ -183,6 +215,22 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
         setSelectedServiceType(selectedGuide.service_type === 'PERSONAL' ? 'personal' : 'industrial');
       }
       setFormOpen(true);
+      // NO marcar como procesada aquí, solo cuando se guarde exitosamente
+    }
+  };
+
+  const handleCloseDetails = () => {
+    setDetailsOpen(false);
+    setSelectedGuide(null);
+    setApprovedActionType(null);
+  };
+
+  const handleDeleteComplete = () => {
+    // Marcar la notificación como procesada si venía de una notificación
+    if (authorizationIdRef.current) {
+      markAsProcessed(authorizationIdRef.current);
+      authorizationIdRef.current = null;
+      setFromNotification(false);
     }
   };
 
@@ -213,11 +261,11 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
 
   const closeModal = async () => {
     // Si estaba editando una guía, invalidar la autorización
-    if (editingId && selectedGuide) {
+    if (editingId && guideToEdit) {
       try {
         await invalidateAuthorizationAsync({
           entity_type: 'guides',
-          entity_id: selectedGuide.id,
+          entity_id: guideToEdit.id,
         });
       } catch (error) {
         console.error('Error al invalidar autorización:', error);
@@ -228,6 +276,7 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
     setScannedTags([]);
     setSelectedClientId('');
     setEditingId(null);
+    setEditingGuide(null); // Limpiar la guía en edición
     seenSetRef.current.clear();
     stopScanning();
     if (route?.params?.prefilledTags) {
@@ -491,28 +540,32 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
       {/* Modal de Detalles de Guía (componente unificado) */}
       <GuideDetailsModal
         visible={detailsOpen}
-        onClose={() => setDetailsOpen(false)}
+        onClose={handleCloseDetails}
         guide={selectedGuide}
         onEdit={openEdit}
+        onDelete={handleDeleteComplete}
+        hasPreApprovedAuthorization={fromNotification}
+        approvedActionType={approvedActionType}
       />
 
       {/* Modal de Formulario */}
-      <Modal visible={formOpen || prefilledTags.length > 0} transparent animationType="slide" onRequestClose={closeModal}>
-        <View className="flex-1 bg-black/40" />
-        <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl p-4" style={{ elevation: 8 }}>
-          <View className="flex-row items-center mb-4">
-            <Text className="text-xl font-bold text-gray-900 flex-1">{editingId ? 'Editar Guía' : 'Nueva Guía'}</Text>
-            <TouchableOpacity onPress={closeModal}>
-              <IonIcon name="close" size={22} color="#111827" />
-            </TouchableOpacity>
-          </View>
-          <GuideForm
+      {(formOpen || prefilledTags.length > 0) && (
+        <Modal visible={true} transparent animationType="slide" onRequestClose={closeModal}>
+          <View className="flex-1 bg-black/40" />
+          <View className="absolute inset-x-0 bottom-0 top-14 bg-white rounded-t-2xl p-4" style={{ elevation: 8 }}>
+            <View className="flex-row items-center mb-4">
+              <Text className="text-xl font-bold text-gray-900 flex-1">{editingId ? 'Editar Guía' : 'Nueva Guía'}</Text>
+              <TouchableOpacity onPress={closeModal}>
+                <IonIcon name="close" size={22} color="#111827" />
+              </TouchableOpacity>
+            </View>
+            <GuideForm
             clientOptions={clientOptions}
             selectedClientId={selectedClientId}
             onChangeClient={onChangeClient}
             onChangeBranchOffice={onChangeBranchOffice}
             initialServiceType={
-              (editingId && selectedGuide?.service_type) ||
+              (editingId && guideToEdit?.service_type) ||
               (selectedServiceType === 'personal' ? 'PERSONAL' : 'INDUSTRIAL')
             }
             guideItems={(() => {
@@ -539,29 +592,64 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
               }
             }}
             onSubmit={async (result) => {
-              // Si estaba editando, invalidar la autorización
-              if (editingId && selectedGuide) {
-                try {
-                  await invalidateAuthorizationAsync({
-                    entity_type: 'guides',
-                    entity_id: selectedGuide.id,
+              try {
+                // Usar el ref que nunca se limpia
+                const authIdToProcess = authorizationIdRef.current;
+                
+                // Si estaba editando, guardar los cambios
+                if (editingId && guideToEdit) {
+                  const { guideData } = result;
+                  const authIdToProcess = authorizationIdRef.current;
+                  await updateGuideAsync({ id: editingId, data: guideData });
+                  Alert.alert('Guía actualizada', 'Los datos de la guía fueron actualizados correctamente');
+                  
+                  // Invalidar la autorización
+                  try {
+                    await invalidateAuthorizationAsync({
+                      entity_type: 'guides',
+                      entity_id: guideToEdit.id,
+                    });
+                  } catch (error) {
+                    console.error('Error al invalidar autorización:', error);
+                  }
+                  
+                  // Marcar notificación como procesada solo después de guardar exitosamente
+                  if (authIdToProcess) {
+                    markAsProcessed(authIdToProcess);
+                    authorizationIdRef.current = null; // Limpiar después de marcar
+                    setFromNotification(false);
+                  }
+                  refetch();
+                } else {
+                  // Modo crear: navegar a ScanClothes para completar el proceso
+                  // (este era el flujo original)
+                  navigation.navigate('ScanClothes', {
+                    mode: 'create',
+                    guideData: result.guideData,
+                    draftValues: result.draftValues,
                   });
-                } catch (error) {
-                  console.error('Error al invalidar autorización:', error);
+                  return; // No cerrar el modal aún en modo creación
                 }
-              }
-              
-              setFormOpen(false);
-              setScannedTags([]);
-              seenSetRef.current.clear();
-              stopScanning();
-              // Limpiar tags escaneados al cerrar
-              if (route?.params?.prefilledTags) {
-                // @ts-ignore
-                navigation.setParams({ prefilledTags: [] });
+                
+                setFormOpen(false);
+                setScannedTags([]);
+                seenSetRef.current.clear();
+                stopScanning();
+                setEditingId(null);
+                setEditingGuide(null); // Limpiar la guía en edición
+                setSelectedGuide(null);
+                setApprovedActionType(null);
+                // Limpiar tags escaneados al cerrar
+                if (route?.params?.prefilledTags) {
+                  // @ts-ignore
+                  navigation.setParams({ prefilledTags: [] });
+                }
+              } catch (error: any) {
+                const message = error?.response?.data?.message || error?.message || 'No se pudo actualizar la guía';
+                Alert.alert('Error', message);
               }
             }}
-            showScanButton={editingId ? true : prefilledTags.length === 0}
+            showScanButton={editingId ? false : prefilledTags.length === 0}
             isScanning={isScanning}
             onNavigate={(route: string, params?: any) => {
               // Marcar que estamos navegando al escáner para mantener el estado
@@ -571,10 +659,11 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ navigation, route }: any
               // @ts-ignore
               navigation.navigate(route, params);
             }}
-            guideToEdit={editingId ? selectedGuide : undefined}
+            guideToEdit={guideToEdit}
           />
         </View>
       </Modal>
+      )}
 
       {/* Modal de Selección de Tipo de Servicio */}
       <ServiceTypeModal

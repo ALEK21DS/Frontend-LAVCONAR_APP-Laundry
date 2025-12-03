@@ -7,8 +7,9 @@ type HeaderBarProps = {
   className?: string;
   bgColor?: string;
   showThemeToggle?: boolean;
-  onLogoutPress?: () => void;
   onUserPress?: () => void;
+  onNotificationsPress?: () => void;
+  notificationsCount?: number;
 };
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -16,8 +17,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   className = '',
   bgColor = '#0b1f36',
   showThemeToggle = false,
-  onLogoutPress,
   onUserPress,
+  onNotificationsPress,
+  notificationsCount = 0,
 }) => {
   return (
     <View
@@ -41,18 +43,27 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             <IonIcon name="moon" size={18} color="#ffffff" />
           </TouchableOpacity>
         )}
+        {onNotificationsPress && (
+          <TouchableOpacity
+            onPress={onNotificationsPress}
+            className="w-12 h-12 rounded-lg bg-white/20 items-center justify-center mr-2">
+            <IonIcon name="notifications-outline" size={24} color="#ffffff" />
+            {notificationsCount > 0 && (
+              <View
+                className="absolute top-1 right-1 bg-red-500 rounded-full items-center justify-center"
+                style={{ minWidth: 18, height: 18, paddingHorizontal: 4 }}>
+                <Text className="text-white text-xs font-bold">
+                  {notificationsCount > 99 ? '99+' : notificationsCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
         {onUserPress && (
           <TouchableOpacity
             onPress={onUserPress}
             className="w-12 h-12 rounded-lg bg-white/20 items-center justify-center mr-2">
             <IonIcon name="person-circle-outline" size={24} color="#ffffff" />
-          </TouchableOpacity>
-        )}
-        {onLogoutPress && (
-          <TouchableOpacity
-            onPress={onLogoutPress}
-            className="w-12 h-12 rounded-lg bg-white/20 items-center justify-center mr-2">
-            <IonIcon name="log-out-outline" size={24} color="#ffffff" />
           </TouchableOpacity>
         )}
       </View>

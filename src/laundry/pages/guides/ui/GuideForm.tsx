@@ -92,16 +92,16 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   }, [sucursales]);
 
   // Estado local para campos del servicio y fechas
-  const resolvedInitialServiceType = initialServiceType || 'INDUSTRIAL';
+  const resolvedInitialServiceType = initialServiceType || guideToEdit?.service_type || 'INDUSTRIAL';
   const [serviceType, setServiceType] = useState<string>(draftValues?.serviceType || resolvedInitialServiceType);
-  const [condition, setCondition] = useState<string>(draftValues?.condition || 'REGULAR');
-  const [personalEmployee, setPersonalEmployee] = useState<string>(draftValues?.personalEmployee || '');
+  const [condition, setCondition] = useState<string>(draftValues?.condition || guideToEdit?.general_condition || 'REGULAR');
+  const [personalEmployee, setPersonalEmployee] = useState<string>(draftValues?.personalEmployee || guideToEdit?.delivered_by || '');
   const [transportEmployee, setTransportEmployee] = useState<string>(draftValues?.transportEmployee || '');
   const [packageManager, setPackageManager] = useState<string>(draftValues?.packageManager || '');
   const [departureTime, setDepartureTime] = useState<string>(draftValues?.departureTime || '');
   const [arrivalTime, setArrivalTime] = useState<string>(draftValues?.arrivalTime || '');
-  const [sealNumber1, setSealNumber1] = useState<string>(draftValues?.sealNumber1 || '');
-  const [sealNumber2, setSealNumber2] = useState<string>(draftValues?.sealNumber2 || '');
+  const [sealNumber1, setSealNumber1] = useState<string>(draftValues?.sealNumber1 || guideToEdit?.precinct_number || '');
+  const [sealNumber2, setSealNumber2] = useState<string>(draftValues?.sealNumber2 || guideToEdit?.precinct_number_2 || '');
   const [shift, setShift] = useState<string>(draftValues?.shift || guideToEdit?.shift || '');
   // Formatear fecha actual a dd/mm/yyyy
   const formatDateToDisplay = (date: Date): string => {
@@ -110,17 +110,44 @@ export const GuideForm: React.FC<GuideFormProps> = ({
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
   };
-  const [collectionDate, setCollectionDate] = useState<string>(draftValues?.collectionDate || formatDateToDisplay(new Date()));
-  const [deliveryDate, setDeliveryDate] = useState<string>(draftValues?.deliveryDate || formatDateToDisplay(new Date()));
+
+  // Función para extraer fecha y hora de un ISO string
+  const extractDateTimeFromISO = (isoString: string | undefined) => {
+    if (!isoString) return { date: '', time: '' };
+    try {
+      const dateObj = new Date(isoString);
+      const date = formatDateToDisplay(dateObj);
+      const time = `${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+      return { date, time };
+    } catch {
+      return { date: '', time: '' };
+    }
+  };
+
+  const collectionDateTime = extractDateTimeFromISO(guideToEdit?.collection_date);
+  const deliveryDateTime = extractDateTimeFromISO(guideToEdit?.delivery_date);
+
+  const [collectionDate, setCollectionDate] = useState<string>(
+    draftValues?.collectionDate || collectionDateTime.date || formatDateToDisplay(new Date())
+  );
+  const [deliveryDate, setDeliveryDate] = useState<string>(
+    draftValues?.deliveryDate || deliveryDateTime.date || formatDateToDisplay(new Date())
+  );
   // Hora asociada a cada fecha (formato HH:mm)
   const getCurrentTimeString = () => {
     const now = new Date();
     return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   };
-  const [collectionTime, setCollectionTime] = useState<string>(draftValues?.collectionTime || getCurrentTimeString());
-  const [deliveryTime, setDeliveryTime] = useState<string>(draftValues?.deliveryTime || getCurrentTimeString());
+  const [collectionTime, setCollectionTime] = useState<string>(
+    draftValues?.collectionTime || collectionDateTime.time || getCurrentTimeString()
+  );
+  const [deliveryTime, setDeliveryTime] = useState<string>(
+    draftValues?.deliveryTime || deliveryDateTime.time || getCurrentTimeString()
+  );
   const [totalWeight, setTotalWeight] = useState<string>(
-    draftValues?.totalWeight ?? (initialTotalWeight > 0 ? initialTotalWeight.toFixed(2) : '')
+    draftValues?.totalWeight ?? 
+    (guideToEdit?.total_weight ? guideToEdit.total_weight.toString() : '') ??
+    (initialTotalWeight > 0 ? initialTotalWeight.toFixed(2) : '')
   );
   const [missingGarments, setMissingGarments] = useState<string>(
     draftValues?.missingGarments ??
@@ -139,7 +166,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
     return 'COLLECTED'; // Fallback si no hay catálogo
   }, [guideStatusCatalog]);
   
-  const [status, setStatus] = useState<string>(draftValues?.status || getInitialStatus);
+  const [status, setStatus] = useState<string>(draftValues?.status || guideToEdit?.status || getInitialStatus);
   
   // Actualizar estado inicial cuando el catálogo esté disponible y no haya draftValues
   useEffect(() => {
@@ -234,25 +261,29 @@ export const GuideForm: React.FC<GuideFormProps> = ({
       .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
       .map(v => ({ label: v.label, value: v.code }));
   }, [requestedServicesCatalog]);
-  const [notes, setNotes] = useState<string>(draftValues?.notes || '');
-  const [supplierGuideNumber, setSupplierGuideNumber] = useState<string>(draftValues?.supplierGuideNumber || '');
-  const [requestedServices, setRequestedServices] = useState<string[]>(draftValues?.requestedServices || []);
+  const [notes, setNotes] = useState<string>(draftValues?.notes || guideToEdit?.notes || '');
+  const [supplierGuideNumber, setSupplierGuideNumber] = useState<string>(draftValues?.supplierGuideNumber || guideToEdit?.supplier_guide_number || '');
+  const [requestedServices, setRequestedServices] = useState<string[]>(draftValues?.requestedServices || guideToEdit?.requested_services || []);
   const [showRequestedServices, setShowRequestedServices] = useState<boolean>(false);
   const [clientModalOpen, setClientModalOpen] = useState(false);
   // Detalle de guía eliminado del flujo
 
   // Nuevos campos basados en las imágenes y schema
-  const [servicePriority, setServicePriority] = useState<string>(draftValues?.servicePriority || 'NORMAL');
-  const [washingType, setWashingType] = useState<string>(draftValues?.washingType || '');
+  const [servicePriority, setServicePriority] = useState<string>(draftValues?.servicePriority || guideToEdit?.service_priority || 'NORMAL');
+  const [washingType, setWashingType] = useState<string>(draftValues?.washingType || guideToEdit?.washing_type || '');
 
   // Personal involucrado
-  const [deliveredBy, setDeliveredBy] = useState<string>(draftValues?.deliveredBy || '');
+  const [deliveredBy, setDeliveredBy] = useState<string>(draftValues?.deliveredBy || guideToEdit?.delivered_by || '');
   // Campos adicionales de transporte removidos del UI actual
 
   // Gestión de paquetes
-  const [totalBundlesReceived, setTotalBundlesReceived] = useState<string>(draftValues?.totalBundlesReceived || '');
+  const [totalBundlesReceived, setTotalBundlesReceived] = useState<string>(
+    draftValues?.totalBundlesReceived || 
+    (guideToEdit?.total_bundles_received ? String(guideToEdit.total_bundles_received) : '') ||
+    ''
+  );
   // Discrepancia/esperados removidos del UI actual
-  const [vehiclePlate, setVehiclePlate] = useState<string>(draftValues?.vehiclePlate || '');
+  const [vehiclePlate, setVehiclePlate] = useState<string>(draftValues?.vehiclePlate || guideToEdit?.vehicle_plate || '');
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
   const [vehicleUnitNumber, setVehicleUnitNumber] = useState<string>(
     draftValues?.vehicleUnitNumber || guideToEdit?.vehicle_unit_number || ''
@@ -308,25 +339,23 @@ export const GuideForm: React.FC<GuideFormProps> = ({
     !!guideToEdit && existingRfids.length > 0 // Solo en modo edición
   );
 
-  // Calcular el total de prendas sumando las cantidades (quantity) de las prendas registradas
-  // Si una prenda no tiene cantidad definida, se cuenta como 1
+  // Total de prendas: en modo creación se calcula desde items escaneados,
+  // en modo edición se usa el valor guardado en la BD (actualizado después de escaneos)
   const totalGarments = useMemo(() => {
     if (guideToEdit) {
-      // Modo edición: usar las prendas obtenidas por los códigos RFID de existingRfids
-      const garments = garmentsDataInEdit?.data || [];
-      return garments.reduce((total, garment) => {
-        const quantity = garment.quantity;
-        return total + (quantity && quantity > 0 ? quantity : 1);
-      }, 0);
+      // Modo edición: usar el valor actualizado de la base de datos
+      // No calcular, porque el total ya fue actualizado cuando se hicieron los escaneos
+      return guideToEdit.total_garments || 0;
     } else {
-      // Modo creación: usar las prendas obtenidas por los códigos RFID de guideItems
+      // Modo creación: calcular desde los items escaneados (RFID)
+      // Si una prenda no tiene cantidad definida, se cuenta como 1
       const garments = garmentsDataInCreation?.data || [];
       return garments.reduce((total, garment) => {
         const quantity = garment.quantity;
         return total + (quantity && quantity > 0 ? quantity : 1);
       }, 0);
     }
-  }, [guideToEdit, garmentsDataInEdit, garmentsDataInCreation]);
+  }, [guideToEdit, garmentsDataInCreation]);
 
   // Cargar borrador cuando no estamos en modo edición
   useEffect(() => {
@@ -550,6 +579,29 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
       <ScrollView className="flex-1" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 16 }}>
+        {/* Información de la Guía (solo en modo edición) */}
+        {guideToEdit && (
+          <View className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+            <View className="flex-row items-center">
+              <View className="w-10 h-10 rounded-full bg-blue-100 items-center justify-center mr-3">
+                <Icon name="document-text-outline" size={20} color="#3B82F6" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-xs text-blue-600 font-semibold">Editar Guía</Text>
+                <Text className="text-sm text-blue-900 font-medium mt-0.5">
+                  Actualiza la información de la guía
+                </Text>
+              </View>
+            </View>
+            <View className="bg-blue-100 rounded-lg px-3 py-2 mt-3">
+              <View className="flex-row items-center">
+                <Text className="text-xs text-blue-700 font-medium">Número de Guía:</Text>
+                <Text className="text-sm text-blue-900 font-bold ml-2">{guideToEdit.guide_number}</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* Advertencia para servicio industrial con prendas no registradas */}
         {unregisteredCount > 0 && (
           <View className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
@@ -1068,7 +1120,7 @@ export const GuideForm: React.FC<GuideFormProps> = ({
 
         <View className="h-3" />
         <Button
-          title={guideToEdit ? 'Editar Guía' : 'Crear Guía'}
+          title={guideToEdit ? 'Guardar Cambios' : 'Crear Guía'}
           onPress={async () => {
             // Validar campos obligatorios según el esquema de Prisma
             if (!guideToEdit) {

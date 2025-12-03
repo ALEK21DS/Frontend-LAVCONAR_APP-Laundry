@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { View, Alert, Modal, Text, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Container } from '@/components/common';
+import { Container, Button } from '@/components/common';
 import { HeaderBar } from './HeaderBar';
 import { BottomNav } from './BottomNav';
 import { useAuth } from '@/auth/hooks/useAuth';
@@ -18,6 +18,10 @@ import { useCallback } from 'react';
 import IonIcon from 'react-native-vector-icons/Ionicons';
 import { getPreferredBranchOfficeId, isSuperAdminUser } from '@/helpers/user.helper';
 import { useCatalogValuesByType } from '@/laundry/hooks/catalogs';
+import { NotificationsModal } from '@/components/notifications/NotificationsModal';
+import { useGetUserAuthorizations } from '@/laundry/hooks/authorizations';
+import { useNotificationsStore } from '@/laundry/store/notifications.store';
+import type { AuthorizationRequest } from '@/laundry/interfaces/authorizations/authorization.interface';
 
 interface MainLayoutProps {
   activeTab: 'Dashboard' | 'Clients' | 'ScanClothes' | 'Guides' | 'Processes' | 'Incidents';
@@ -58,6 +62,24 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
   const [selectedGuideForProcess, setSelectedGuideForProcess] = useState<any>(null);
   const [washingProcessFormOpen, setWashingProcessFormOpen] = useState(false);
   const [userInfoModalOpen, setUserInfoModalOpen] = useState(false);
+  const [notificationsModalOpen, setNotificationsModalOpen] = useState(false);
+
+  // Sistema de notificaciones (solo para usuarios no SuperAdmin)
+  const shouldShowNotifications = !isSuperAdmin;
+  const { approvedAuthorizations, refetch: refetchAuthorizations } = useGetUserAuthorizations(shouldShowNotifications);
+  const { getActiveNotifications } = useNotificationsStore();
+
+  // Obtener notificaciones activas (filtradas por las que no han sido procesadas)
+  const activeNotifications = shouldShowNotifications ? getActiveNotifications(approvedAuthorizations) : [];
+
+  // Refetch notificaciones al navegar (solo si no es SuperAdmin)
+  useFocusEffect(
+    useCallback(() => {
+      if (shouldShowNotifications) {
+        refetchAuthorizations();
+      }
+    }, [refetchAuthorizations, shouldShowNotifications])
+  );
 
   // Detectar cuando se regresa de ScanClothesPage y abrir form de proceso si corresponde
   useFocusEffect(
@@ -475,12 +497,31 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
   };
 
 
+  // Manejar cuando se presiona una notificación
+  const handleNotificationPress = (notification: AuthorizationRequest) => {
+    // Navegar a la pantalla correspondiente con los parámetros de la notificación
+    if (notification.entity_type === 'clients') {
+      onNavigate('Clients', {
+        openEntityId: notification.entity_id,
+        authorizationId: notification.id,
+        actionType: notification.action_type,
+      });
+    } else if (notification.entity_type === 'guides') {
+      onNavigate('Guides', {
+        openEntityId: notification.entity_id,
+        authorizationId: notification.id,
+        actionType: notification.action_type,
+      });
+    }
+  };
+
   return (
     <Container safe padding="none">
       <HeaderBar
         showThemeToggle={false}
-        onLogoutPress={logout}
         onUserPress={() => setUserInfoModalOpen(true)}
+        onNotificationsPress={shouldShowNotifications ? () => setNotificationsModalOpen(true) : undefined}
+        notificationsCount={shouldShowNotifications ? activeNotifications.length : 0}
       />
       <View className="flex-1">{children}</View>
       <BottomNav 
@@ -606,10 +647,40 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
                   <Text className="text-base text-gray-900 font-semibold">{branchOfficeName}</Text>
                 </View>
               </View>
+
+              {/* Botón de Cerrar Sesión */}
+              <View className="mt-4">
+                <Button
+                  title="Cerrar Sesión"
+                  onPress={() => {
+                    setUserInfoModalOpen(false);
+                    Alert.alert(
+                      'Cerrar Sesión',
+                      '¿Estás seguro de que deseas cerrar sesión?',
+                      [
+                        { text: 'Cancelar', style: 'cancel' },
+                        { text: 'Cerrar Sesión', style: 'destructive', onPress: logout },
+                      ]
+                    );
+                  }}
+                  variant="danger"
+                  icon={<IonIcon name="log-out-outline" size={18} color="white" />}
+                  fullWidth
+                />
+              </View>
             </View>
           </View>
         </View>
       </Modal>
+
+      {/* Modal de Notificaciones (solo para no SuperAdmin) */}
+      {shouldShowNotifications && (
+        <NotificationsModal
+          visible={notificationsModalOpen}
+          onClose={() => setNotificationsModalOpen(false)}
+          onNotificationPress={handleNotificationPress}
+        />
+      )}
     </Container>
   );
 };
