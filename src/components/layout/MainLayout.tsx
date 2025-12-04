@@ -654,14 +654,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ activeTab, onNavigate, c
                   title="Cerrar Sesión"
                   onPress={() => {
                     setUserInfoModalOpen(false);
-                    Alert.alert(
-                      'Cerrar Sesión',
-                      '¿Estás seguro de que deseas cerrar sesión?',
-                      [
-                        { text: 'Cancelar', style: 'cancel' },
-                        { text: 'Cerrar Sesión', style: 'destructive', onPress: logout },
-                      ]
-                    );
+                    logout();
                   }}
                   variant="danger"
                   icon={<IonIcon name="log-out-outline" size={18} color="white" />}

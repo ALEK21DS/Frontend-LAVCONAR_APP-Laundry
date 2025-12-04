@@ -77,7 +77,7 @@ export const ScanFormModal: React.FC<ScanFormModalProps> = ({
             deferRfidScanUpdate={deferRfidScanUpdate}
             unregisteredCodes={unregisteredCodes}
             serviceType={serviceType}
-            disableScanType={origin === 'process'}
+            disableScanType={true}
           />
         </View>
       </View>

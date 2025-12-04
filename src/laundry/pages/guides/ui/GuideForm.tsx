@@ -146,8 +146,12 @@ export const GuideForm: React.FC<GuideFormProps> = ({
   );
   const [totalWeight, setTotalWeight] = useState<string>(
     draftValues?.totalWeight ?? 
-    (guideToEdit?.total_weight ? guideToEdit.total_weight.toString() : '') ??
-    (initialTotalWeight > 0 ? initialTotalWeight.toFixed(2) : '')
+    (guideToEdit?.total_weight !== undefined && guideToEdit?.total_weight !== null
+      ? guideToEdit.total_weight.toString()
+      : initialTotalWeight > 0 
+        ? initialTotalWeight.toFixed(2) 
+        : ''
+    )
   );
   const [missingGarments, setMissingGarments] = useState<string>(
     draftValues?.missingGarments ??

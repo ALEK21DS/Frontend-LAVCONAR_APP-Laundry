@@ -288,6 +288,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   }, [scannedTags, getGarmentByRfid]);
 
   // Peso total de prendas obtenidas del backend (para industrial y procesos)
+  // Peso total = Σ(weight × quantity) de todas las prendas escaneadas
   const totalWeightFromScannedGarments = React.useMemo(() => {
     if (scannedTags.length === 0) {
       return 0;
@@ -303,7 +304,9 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
       const numericWeight = typeof rawWeight === 'string' ? parseFloat(rawWeight) : Number(rawWeight);
       if (Number.isNaN(numericWeight)) return total;
 
-      return total + numericWeight;
+      // Multiplicar peso individual por cantidad
+      const quantity = garment.quantity && garment.quantity > 0 ? garment.quantity : 1;
+      return total + (numericWeight * quantity);
     }, 0);
   }, [scannedTags, getGarmentByRfid]);
 
@@ -333,12 +336,12 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
         }
         const group = grouped.get(garmentType)!;
         // Sumar la cantidad de la prenda (quantity), o contar como 1 si no tiene cantidad
-        const quantity = garment.quantity;
-        group.count += (quantity && quantity > 0 ? quantity : 1);
-        // Sumar el peso de la prenda (weight); si no tiene, no suma nada
+        const quantity = garment.quantity && garment.quantity > 0 ? garment.quantity : 1;
+        group.count += quantity;
+        // Calcular peso total: weight × quantity
         const weight = garment.weight;
         if (typeof weight === 'number' && !Number.isNaN(weight) && weight > 0) {
-          group.totalWeight += weight;
+          group.totalWeight += weight * quantity;
         }
         group.tags.push(tag);
       } else {
@@ -380,9 +383,12 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   const [editingQuantity, setEditingQuantity] = useState<string>('');
 
   // Calcular peso total de las prendas registradas
+  // Peso total = Σ(weight × quantity) para servicio personal
   const calculateTotalWeight = useCallback(() => {
     return registeredGarments.reduce((total, garment) => {
-      return total + (garment.weight || 0);
+      const weight = garment.weight || 0;
+      const quantity = garment.quantity || 1;
+      return total + (weight * quantity);
     }, 0);
   }, [registeredGarments]);
 
@@ -991,11 +997,13 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   };
 
   const handleCloseGuideModal = () => {
+    stopScanning(); // Detener escaneo antes de cerrar modal
     setGuideModalOpen(false);
     clearAllScannedData(); // Esta función ya limpia registeredGarments
   };
 
   const handleCloseGarmentModal = () => {
+    stopScanning(); // Detener escaneo antes de cerrar modal
     setGarmentModalOpen(false);
     setExistingGarment(null);
     // Limpiar el último tag para permitir re-escaneo
@@ -1627,6 +1635,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   };
 
   const handleGuideFormCancel = () => {
+    stopScanning(); // Detener escaneo antes de cerrar modal
     setGuideModalOpen(false);
   };
 
