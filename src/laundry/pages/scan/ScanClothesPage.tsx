@@ -1681,6 +1681,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   };
 
   const handleScanFormSuccess = async (context: ScanFormContext, result?: any) => {
+    stopScanning(); // Detener escaneo al completar ScanForm exitosamente
     if (context.origin === 'process') {
       const updatePayload = result?.rfidScanUpdateData || result;
       
@@ -1741,6 +1742,7 @@ export const ScanClothesPage: React.FC<ScanClothesPageProps> = ({ navigation, ro
   };
 
   const handleScanFormCancel = (context: ScanFormContext) => {
+    stopScanning(); // Detener escaneo antes de cerrar ScanForm
     setScanFormContext(null);
 
     if (context.origin === 'guide') {

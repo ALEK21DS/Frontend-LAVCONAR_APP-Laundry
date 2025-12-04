@@ -10,6 +10,7 @@ import { useCatalogLabelMap } from '@/laundry/hooks';
 import { useDeleteGuide } from '@/laundry/hooks/guides/guide/useDeleteGuide';
 import { useAuthStore } from '@/auth/store/auth.store';
 import { isSuperAdminUser } from '@/helpers/user.helper';
+import { BundlesModal } from './BundlesModal';
 
 interface GuideDetailsModalProps {
   visible: boolean;
@@ -34,6 +35,7 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
   const [authAction, setAuthAction] = useState<'EDIT' | 'DELETE' | null>(null);
   const [description, setDescription] = useState('');
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [bundlesModalVisible, setBundlesModalVisible] = useState(false);
   
   // Hook para exportar PDF
   const { downloadGuidePDF, isPrinting } = usePrintGuide();
@@ -179,9 +181,21 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
               </View>
               <Text className="text-xl font-bold text-gray-900">Detalles de la Guía</Text>
             </View>
-            <TouchableOpacity onPress={onClose}>
-              <IonIcon name="close" size={24} color="#111827" />
-            </TouchableOpacity>
+            <View className="flex-row items-center">
+              {/* Botón Ver Bultos (solo para INDUSTRIAL) - solo icono */}
+              {guide.service_type === 'INDUSTRIAL' && (
+                <TouchableOpacity
+                  onPress={() => setBundlesModalVisible(true)}
+                  className="mr-3 p-2 rounded-lg"
+                  style={{ backgroundColor: '#0b1f3620' }}
+                >
+                  <IonIcon name="cube-outline" size={24} color="#0b1f36" />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={onClose}>
+                <IonIcon name="close" size={24} color="#111827" />
+              </TouchableOpacity>
+            </View>
           </View>
 
         {/* Content - secciones espejo del modal de prenda */}
@@ -504,6 +518,12 @@ export const GuideDetailsModal: React.FC<GuideDetailsModalProps> = ({
         </View>
       </Modal>
 
+      {/* Modal de Bultos */}
+      <BundlesModal
+        visible={bundlesModalVisible}
+        onClose={() => setBundlesModalVisible(false)}
+        guide={guide}
+      />
     </>
   );
 };

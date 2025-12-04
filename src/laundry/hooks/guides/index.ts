@@ -15,3 +15,6 @@ export * from './guide-garments';
 
 // Hooks de escaneos RFID
 export * from './rfid-scans';
+
+// Hooks de bultos
+export * from '../../hooks/bundles';
